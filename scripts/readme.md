@@ -24,3 +24,13 @@ npm run update-locales
 ```bash
 npm run add-locale fr
 ```
+
+### Version bump
+
+```bash
+./scripts/bump-version.sh 1.0.1
+```
+
+- Updates `version` in `package.json`, all browser manifests, and `dev/manifest.json`
+- Updates `MARKETING_VERSION` in the Xcode project
+- Increments `CURRENT_PROJECT_VERSION` by 1

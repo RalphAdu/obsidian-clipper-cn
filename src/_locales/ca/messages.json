@@ -103,6 +103,14 @@
 			}
 		}
 	},
+	"clipboardError": {
+		"message": "L'Obsidian no pot accedir al porta-retalls. Prova les instruccions de resolució de problemes aquí: $1",
+		"placeholders": {
+			"1": {
+				"content": "$1"
+			}
+		}
+	},
 	"close": {
 		"message": "Tancar"
 	},

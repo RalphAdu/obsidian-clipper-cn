@@ -103,6 +103,14 @@
 			}
 		}
 	},
+	"clipboardError": {
+		"message": "ל-Obsidian אין אפשרות לגשת ללוח שלך. נסה את הוראות פתרון הבעיות כאן: $1",
+		"placeholders": {
+			"1": {
+				"content": "$1"
+			}
+		}
+	},
 	"close": {
 		"message": "סגור"
 	},

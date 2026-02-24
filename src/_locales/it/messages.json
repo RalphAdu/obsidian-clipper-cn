@@ -103,6 +103,14 @@
 			}
 		}
 	},
+	"clipboardError": {
+		"message": "Obsidian non riesce ad accedere agli appunti. Prova le istruzioni per la risoluzione dei problemi qui: $1",
+		"placeholders": {
+			"1": {
+				"content": "$1"
+			}
+		}
+	},
 	"close": {
 		"message": "Chiudi"
 	},

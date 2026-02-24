@@ -103,6 +103,14 @@
 			}
 		}
 	},
+	"clipboardError": {
+		"message": "O Obsidian não consegue acessar sua área de transferência. Tente as instruções de solução de problemas aqui: $1",
+		"placeholders": {
+			"1": {
+				"content": "$1"
+			}
+		}
+	},
 	"close": {
 		"message": "Fechar"
 	},

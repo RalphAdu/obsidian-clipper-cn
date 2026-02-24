@@ -103,6 +103,14 @@
 			}
 		}
 	},
+	"clipboardError": {
+		"message": "Obsidian is not able to access your clipboard. Try the troubleshooting instructions here: $1",
+		"placeholders": {
+			"1": {
+				"content": "$1"
+			}
+		}
+	},
 	"close": {
 		"message": "Close"
 	},

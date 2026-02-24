@@ -103,6 +103,14 @@
 			}
 		}
 	},
+	"clipboardError": {
+		"message": "Obsidian không thể truy cập bảng tạm của bạn. Hãy thử làm theo hướng dẫn khắc phục sự cố tại đây: $1",
+		"placeholders": {
+			"1": {
+				"content": "$1"
+			}
+		}
+	},
 	"close": {
 		"message": "Đóng"
 	},

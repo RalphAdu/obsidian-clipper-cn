@@ -103,6 +103,14 @@
 			}
 		}
 	},
+	"clipboardError": {
+		"message": "Obsidian आपके क्लिपबोर्ड तक पहुँच नहीं पा रहा है। यहाँ दिए गए समस्या-निवारण निर्देश आज़माएँ: $1",
+		"placeholders": {
+			"1": {
+				"content": "$1"
+			}
+		}
+	},
 	"close": {
 		"message": "Band karein"
 	},

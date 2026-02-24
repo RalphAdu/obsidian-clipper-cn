@@ -504,10 +504,15 @@ Tags:
 				{ items: JSON.stringify(['rock', 'pop']) },
 			);
 			const parsed = JSON.parse(output);
-			expect(parsed).toEqual([
-				{ str: 'genres/rock' },
-				{ str: 'genres/pop' },
-			]);
+			expect(parsed).toEqual(['genres/rock', 'genres/pop']);
+		});
+
+		test('map with string literal piped to template', async () => {
+			const output = await renderTemplate(
+				'{{items|map:item => "genres/${item}"|template:"- ${str}"}}',
+				{ items: JSON.stringify(['rock', 'pop']) },
+			);
+			expect(output).toBe('- genres/rock\n\n- genres/pop');
 		});
 	});
 

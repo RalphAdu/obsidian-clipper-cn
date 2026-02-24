@@ -50,13 +50,18 @@ function replaceTemplateVariables(obj: any, template: string): string {
 	debugLog('Template', 'Replacing template variables for:', obj);
 	debugLog('Template', 'Template:', template);
 
-	// If obj is a string that looks like an object, try to parse it
+	// If obj is a plain string, make it available as ${str} for template compatibility
 	if (typeof obj === 'string') {
+		const strValue = obj;
 		try {
 			obj = parseObjectString(obj);
 			debugLog('Template', 'Parsed object:', obj);
 		} catch (error) {
 			debugLog('Template', 'Failed to parse object string:', obj);
+		}
+		// Ensure str property is set for plain strings
+		if (obj.str === undefined) {
+			obj.str = strValue;
 		}
 	}
 
@@ -66,11 +71,6 @@ function replaceTemplateVariables(obj: any, template: string): string {
 		debugLog('Template', 'Replaced with:', value);
 		return value !== undefined && value !== 'undefined' ? value : '';
 	});
-
-	// Handle the case where obj is a simple string (from string literal in map)
-	if (typeof obj === 'object' && obj.str) {
-		result = result.replace(/\$\{str\}/g, obj.str);
-	}
 
 	debugLog('Template', 'Result after variable replacement:', result);
 

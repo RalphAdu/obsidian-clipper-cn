@@ -17,6 +17,7 @@ assets/shared
 
 # Xcode
 *.xcuserstate
+*.xcuserdatad
 
 .cursorrules
 .env

@@ -68,9 +68,9 @@ export const map = (str: string, param?: string): string => {
 						debugLog('Map', `Assigned ${cleanKey}:`, mappedItem[cleanKey]);
 					});
 				} else {
-					// Handle string literal
+					// Handle string literal — return plain string
 					const stringLiteral = expr.slice(1, -1);
-					mappedItem.str = stringLiteral.replace(new RegExp(`\\$\\{${argName}\\}`, 'g'), item);
+					return stringLiteral.replace(new RegExp(`\\$\\{${argName}\\}`, 'g'), item);
 				}
 
 				debugLog('Map', 'Mapped item:', mappedItem);

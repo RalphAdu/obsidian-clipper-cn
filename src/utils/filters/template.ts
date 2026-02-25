@@ -21,7 +21,7 @@ export const template = (input: string | any[], param?: string): string => {
 	// Remove outer parentheses if present
 	param = param.replace(/^\((.*)\)$/, '$1');
 	// Remove surrounding quotes (both single and double)
-	param = param.replace(/^(['"])(.*)\1$/, '$2');
+	param = param.replace(/^(['"])([\s\S]*)\1$/, '$2');
 
 	let obj: any[] = [];
 	if (typeof input === 'string') {

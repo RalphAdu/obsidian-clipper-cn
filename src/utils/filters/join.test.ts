@@ -29,5 +29,10 @@ describe('join filter', () => {
 	test('joins with dash separator', () => {
 		expect(join('["a","b","c"]', '-')).toBe('a-b-c');
 	});
+
+	test('joins with quoted newline separator', () => {
+		// When the renderer wraps actual newlines in quotes
+		expect(join('["a","b"]', '"\n\n"')).toBe('a\n\nb');
+	});
 });
 

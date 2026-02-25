@@ -1730,6 +1730,10 @@ function expressionToString(expr: Expression): string {
 				if (/^["'].*["']$/.test(expr.value) || expr.value.includes('":"') || expr.value.includes("':'")) {
 					return expr.value;
 				}
+				// Don't quote arrow function expressions (e.g., map:item => item.name)
+				if (/\s*\w+\s*=>/.test(expr.value)) {
+					return expr.value;
+				}
 				// Don't quote simple values like "2n", "3:4", etc.
 				// Only quote strings with spaces or special chars that need protection
 				if (/^[\w.:+\-*/]+$/.test(expr.value)) {

@@ -514,6 +514,18 @@ Tags:
 			);
 			expect(output).toBe('- genres/rock\n\n- genres/pop');
 		});
+
+		test('map property then join with newlines', async () => {
+			const highlights = [
+				{"text":"First highlight text","timestamp":"2026-02-25T15:40:05.762Z"},
+				{"text":"Second highlight text","timestamp":"2026-02-25T15:40:05.762Z"}
+			];
+			const output = await renderTemplate(
+				'{{highlights|map: item => item.text|join:"\\n\\n"}}',
+				{ highlights: JSON.stringify(highlights) },
+			);
+			expect(output).toBe('First highlight text\n\nSecond highlight text');
+		});
 	});
 
 	describe('Convenience Function', () => {

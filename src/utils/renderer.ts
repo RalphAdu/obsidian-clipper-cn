@@ -860,7 +860,7 @@ function trimLeadingWhitespace(str: string): string {
  * Examples: "value", 'value', "old":"new"
  */
 function isQuotedString(str: string): boolean {
-	return /^["'].*["']$/.test(str) || str.includes('":"') || str.includes("':'");
+	return /^["'][\s\S]*["']$/.test(str) || str.includes('":"') || str.includes("':'");
 }
 
 /**

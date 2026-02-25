@@ -8,7 +8,7 @@ description: Use conditionals, loops, and variable assignment in Web Clipper tem
 
 Use `{% if %}` to conditionally include content based on variables or expressions.
 
-```
+```twig
 {% if author %}
 Author: {{author}}
 {% endif %}
@@ -18,7 +18,7 @@ Author: {{author}}
 
 Use `{% else %}` to provide fallback content, and `{% elseif %}` to chain multiple conditions:
 
-```
+```twig
 {% if status == "published" %}
 Live article
 {% elseif status == "draft" %}
@@ -64,6 +64,12 @@ Examples:
 - `{% if not hidden %}` — negation
 - `{% if (premium or featured) and published %}` — grouped conditions
 
+Each side of a logical operator must be a complete expression. For example, to check if a string contains one of several values:
+
+```twig
+{% if title contains "review" or title contains "opinion" or title contains "editorial" %}
+```
+
 ### Truthiness
 
 When a variable is used without a comparison operator, it's evaluated for "truthiness":
@@ -72,7 +78,7 @@ When a variable is used without a comparison operator, it's evaluated for "truth
 - Empty arrays `[]` are considered **falsy**
 - Everything else is **truthy**
 
-```
+```twig
 {% if content %}
 Has content
 {% endif %}
@@ -82,7 +88,7 @@ Has content
 
 Use `{% set %}` to create or modify variables within your template:
 
-```
+```twig
 {% set slug = title|lower|replace:" ":"-" %}
 File: {{slug}}.md
 ```
@@ -99,7 +105,7 @@ Variables set with `{% set %}` can be used in subsequent template logic and in `
 
 Use the `??` operator to provide fallback values when a variable is empty or undefined:
 
-```
+```twig
 {{title ?? "Untitled"}}
 ```
 
@@ -115,7 +121,7 @@ This is a shorthand for the equivalent `if` statement:
 
 You can chain multiple fallbacks:
 
-```
+```twig
 {{title ?? headline ?? "No title"}}
 ```
 
@@ -125,7 +131,7 @@ This will use `title` if available, otherwise `headline`, otherwise the string `
 
 Filters bind more tightly than `??`, so filters are applied before the fallback check:
 
-```
+```twig
 {{title|upper ?? "UNTITLED"}}
 ```
 
@@ -141,7 +147,7 @@ This will use `title` if available, otherwise apply `lower` to the fallback, res
 
 Use `{% for %}` to iterate over arrays:
 
-```
+```twig
 {% for item in schema:author %}
 - {{item.name}}
 {% endfor %}
@@ -166,7 +172,7 @@ Inside a loop, you have access to a `loop` object with the following properties:
 | `loop.last` | `true` if last iteration |
 | `loop.length` | Total number of items |
 
-```
+```twig
 {% for tag in tags %}
 {{loop.index}}. {{tag}}
 {% if loop.last %} (end of list){% endif %}
@@ -175,7 +181,7 @@ Inside a loop, you have access to a `loop` object with the following properties:
 
 For backwards compatibility, you can also use `item_index` (where `item` is your iterator variable name) to get the 0-indexed position:
 
-```
+```twig
 {% for tag in tags %}
 {{tag_index}}. {{tag}}
 {% endfor %}
@@ -185,14 +191,14 @@ For backwards compatibility, you can also use `item_index` (where `item` is your
 
 Use bracket notation to access array elements by index:
 
-```
+```twig
 {{items[0]}}
 {{items[loop.index0]}}
 ```
 
 This is useful when you need to access items from multiple arrays in parallel:
 
-```
+```twig
 {% set transcripts = selector:.transcript-text %}
 {% set timestamps = selector:.timestamp %}
 
@@ -203,7 +209,7 @@ This is useful when you need to access items from multiple arrays in parallel:
 
 Bracket notation also works with object properties:
 
-```
+```twig
 {{user["name"]}}
 {{data["my-key"]}}
 ```
@@ -212,7 +218,7 @@ Bracket notation also works with object properties:
 
 Loops can be nested for complex data structures:
 
-```
+```twig
 {% for section in sections %}
 ## {{section.title}}
 {% for item in section.items %}
@@ -225,7 +231,7 @@ Loops can be nested for complex data structures:
 
 Conditionals and loops can be combined:
 
-```
+```twig
 {% for item in items %}
 {% if item.active %}
 - {{item.name}}

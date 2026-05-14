@@ -13,6 +13,37 @@ const YOUTUBE_EMBED_RULE_ID = 9001;
 const BILIBILI_EMBED_RULE_ID = 9002;
 const YOUTUBE_INNERTUBE_RULE_ID = 9003;
 
+// Hot reload: poll build-marker.txt (written by webpack on every build) and
+// reload the extension when its contents change. Lets `npm run build` trigger
+// an automatic chrome.runtime.reload() so iteration doesn't require clicking
+// the reload button in chrome://extensions every time.
+// Active in all build modes — for users installing from the webstore the
+// marker file is written once at build time and never changes, so this only
+// ever fires for self-built / unpacked installations.
+{
+	let lastBuildMarker: string | null = null;
+	const checkMarker = async () => {
+		try {
+			const url = chrome.runtime.getURL('build-marker.txt');
+			const resp = await fetch(url, { cache: 'no-store' });
+			if (!resp.ok) return;
+			const text = (await resp.text()).trim();
+			if (lastBuildMarker === null) {
+				lastBuildMarker = text;
+				return;
+			}
+			if (lastBuildMarker !== text) {
+				bgLogger.info(`Build marker changed (${lastBuildMarker} -> ${text}), reloading extension`);
+				chrome.runtime.reload();
+			}
+		} catch {
+			// Service worker may be transitioning; ignore and try again next tick
+		}
+	};
+	setInterval(checkMarker, 3000);
+	checkMarker();
+}
+
 function fetchBilibiliJsonViaMainWorld(tabId: number, url: string): Promise<any> {
 	if (!isAllowedBilibiliFetchUrl(url)) {
 		return Promise.reject(new Error('Blocked Bilibili fetch URL'));

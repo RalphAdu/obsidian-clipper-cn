@@ -167,6 +167,29 @@ module.exports = (env, argv) => {
 					});
 				}
 			},
+			// Emit a build-marker.txt with the current timestamp every build.
+			// The background service worker polls this file when DEBUG_MODE is on
+			// and reloads the extension when the contents change. Enables fully
+			// automated dev-iteration: edit code, npm build, extension auto-reloads.
+			{
+				apply: (compiler) => {
+					compiler.hooks.thisCompilation.tap('BuildMarkerPlugin', (compilation) => {
+						compilation.hooks.processAssets.tap(
+							{
+								name: 'BuildMarkerPlugin',
+								stage: webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
+							},
+							() => {
+								const marker = String(Date.now());
+								compilation.emitAsset(
+									'build-marker.txt',
+									new webpack.sources.RawSource(marker)
+								);
+							}
+						);
+					});
+				}
+			},
 			new webpack.DefinePlugin({
 				'process.env.NODE_ENV': JSON.stringify(argv.mode),
 				'DEBUG_MODE': JSON.stringify(!isProduction)

@@ -1,13 +1,25 @@
 import Defuddle from 'defuddle/full';
+import { createMarkdownContent } from 'defuddle/full';
+import hljs from 'highlight.js';
 import browser from './browser-polyfill';
 import { detectBrowser } from './browser-detection';
 import { flattenShadowDom as flattenShadowDomUtil } from './flatten-shadow-dom';
 import { getLocalStorage, setLocalStorage } from './storage-utils';
-import hljs from 'highlight.js';
 import { getDomain } from './string-utils';
 import type { HighlighterAPI } from './highlighter';
 import * as localHighlighter from './highlighter';
 import { removeExistingHighlights as localRemoveExistingHighlights } from './highlighter-overlays';
+import { copyToClipboard } from './clipboard-utils';
+import { getMessage, initializeI18n } from './i18n';
+import { getFontCss } from './font-utils';
+import { saveFile } from './file-utils';
+import { parseForClip } from './clip-utils';
+import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './iframe-resize';
+import { setElementHTML, setSVGChildren, serializeChildren } from './dom-utils';
+import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './bilibili-extractor';
+import { createBilibiliPlaybackTracker } from './bilibili-playback-tracker';
+import { ReaderSettings } from '../types/types';
+import { wireTranscript } from './reader-transcript';
 
 // Bridge: on a live page with reader mode (case 2), content.js already loaded
 // and owns the highlighter module. reader-script.js delegates to it via this
@@ -23,22 +35,9 @@ function hl(): HighlighterAPI {
 		ensureHighlighterCSS: () => Reader.ensureHighlighterCSS(document),
 	};
 }
-import { copyToClipboard } from './clipboard-utils';
-import { getMessage, initializeI18n } from './i18n';
-import { getFontCss } from './font-utils';
-import { createMarkdownContent } from 'defuddle/full';
-import { saveFile } from './file-utils';
-import { parseForClip } from './clip-utils';
-import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './iframe-resize';
-import { setElementHTML, setSVGChildren, serializeChildren } from './dom-utils';
-import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './bilibili-extractor';
-import { createBilibiliPlaybackTracker } from './bilibili-playback-tracker';
 
 // Mobile viewport settings
 const VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1';
-
-import { ReaderSettings } from '../types/types';
-import { wireTranscript } from './reader-transcript';
 
 interface ReaderContent {
 	content: string;

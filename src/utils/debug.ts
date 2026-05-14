@@ -36,9 +36,5 @@ export const debugLog = (filterName: string, ...args: any[]) => {
 export const isDebugMode = () => DEBUG_MODE && debugMode;
 
 if (DEBUG_MODE) {
-	try {
-		(window as any).toggleDebug = toggleDebug;
-	} catch {
-		// service worker context has no window — safe to ignore
-	}
+	(globalThis as any).toggleDebug = toggleDebug;
 }

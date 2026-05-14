@@ -1,16 +1,19 @@
 import browser from './utils/browser-polyfill';
 import * as highlighter from './utils/highlighter';
+import { removeExistingHighlights } from './utils/highlighter-overlays';
 import { loadSettings, generalSettings } from './utils/storage-utils';
-import Defuddle from 'defuddle';
 import { getDomain, normalizeImageSources } from './utils/string-utils';
 import { extractContentBySelector as extractContentBySelectorShared } from './utils/shared';
+import Defuddle from 'defuddle';
 import { createMarkdownContent } from 'defuddle/full';
 import { flattenShadowDom } from './utils/flatten-shadow-dom';
+import { serializeChildren } from './utils/dom-utils';
 import { saveFile } from './utils/file-utils';
 import { debugLog } from './utils/debug';
 import { createLogger } from './utils/logger';
 import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bilibili-extractor';
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
+import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
 const contentLogger = createLogger('Content');
 
@@ -71,22 +74,10 @@ declare global {
 	const iframeId = 'obsidian-clipper-iframe';
 	const containerId = 'obsidian-clipper-container';
 
-	let sidebarWidthRaf: number | null = null;
-
-	function updateSidebarWidth(container: HTMLElement | null) {
-		if (sidebarWidthRaf) cancelAnimationFrame(sidebarWidthRaf);
-		sidebarWidthRaf = requestAnimationFrame(() => {
-			if (container && document.contains(container)) {
-				document.documentElement.style.setProperty('--clipper-sidebar-width', `${container.offsetWidth + 24}px`);
-			} else {
-				document.documentElement.style.removeProperty('--clipper-sidebar-width');
-			}
-		});
-	}
-
 	function removeContainer(container: HTMLElement) {
 		container.classList.add('is-closing');
-		updateSidebarWidth(null);
+		updateSidebarWidth(document, null);
+		cleanupResizeHandlers(document);
 		container.addEventListener('animationend', () => {
 			container.remove();
 			highlighter.repositionHighlights();
@@ -116,107 +107,21 @@ declare global {
 
 		const iframe = document.createElement('iframe');
 		iframe.id = iframeId;
+		iframe.allow = 'clipboard-write; web-share';
 		iframe.src = browser.runtime.getURL('side-panel.html?context=iframe');
 		container.appendChild(iframe);
 
-		// Add resize handle (left side only)
-		const handle = document.createElement('div');
-		handle.className = `obsidian-clipper-resize-handle obsidian-clipper-resize-handle-w`;
-		container.appendChild(handle);
-		addResizeListener(container, handle, 'w');
-
-		const southHandle = document.createElement('div');
-		southHandle.className = `obsidian-clipper-resize-handle obsidian-clipper-resize-handle-s`;
-		container.appendChild(southHandle);
-		addResizeListener(container, southHandle, 's');
-
-		const southWestHandle = document.createElement('div');
-		southWestHandle.className = 'obsidian-clipper-resize-handle obsidian-clipper-resize-handle-sw';
-		container.appendChild(southWestHandle);
-		addResizeListener(container, southWestHandle, 'sw');
+		const resizeCallbacks = {
+			onResize: () => highlighter.repositionHighlights(),
+			onResizeEnd: () => highlighter.repositionHighlights(),
+		};
+		addResizeHandle(document, container, 'w', resizeCallbacks);
+		addResizeHandle(document, container, 's', resizeCallbacks);
+		addResizeHandle(document, container, 'sw', resizeCallbacks);
 
 		document.body.appendChild(container);
-		updateSidebarWidth(container);
-		container.addEventListener('animationend', () => {
-			highlighter.repositionHighlights();
-		}, { once: true });
-	}
-
-	function addResizeListener(container: HTMLElement, handle: HTMLElement, direction: string) {
-		let isResizing = false;
-		let startX: number, startY: number, startWidth: number, startHeight: number, startLeft: number, startTop: number;
-	
-		handle.onmousedown = (e) => {
-			e.stopPropagation();
-			isResizing = true;
-			startX = e.clientX;
-			startY = e.clientY;
-			startWidth = container.offsetWidth;
-			startHeight = container.offsetHeight;
-			startLeft = container.offsetLeft;
-			startTop = container.offsetTop;
-
-			document.body.style.cursor = window.getComputedStyle(handle).cursor;
-	
-			const iframe = container.querySelector('#obsidian-clipper-iframe');
-			if (iframe) iframe.classList.add('is-resizing');
-	
-			document.onmousemove = (moveEvent) => {
-				if (!isResizing) return;
-
-				const dx = moveEvent.clientX - startX;
-				const dy = moveEvent.clientY - startY;
-
-				const minWidth = parseInt(container.style.minWidth) || 200;
-				const minHeight = parseInt(container.style.minHeight) || 200;
-
-				if (direction.includes('e')) {
-					let newWidth = startWidth + dx;
-					if (newWidth < minWidth) newWidth = minWidth;
-					container.style.width = `${newWidth}px`;
-				}
-				if (direction.includes('w')) {
-					let newWidth = startWidth - dx;
-					if (newWidth < minWidth) {
-						newWidth = minWidth;
-					}
-					container.style.width = `${newWidth}px`;
-				}
-				if (direction.includes('s')) {
-					let newHeight = startHeight + dy;
-					if (newHeight < minHeight) newHeight = minHeight;
-					container.style.height = `${newHeight}px`;
-				}
-				if (direction.includes('n')) {
-					let newHeight = startHeight - dy;
-					let newTop = startTop + dy;
-					if (newHeight < minHeight) {
-						newHeight = minHeight;
-						newTop = startTop + startHeight - minHeight;
-					}
-					container.style.height = `${newHeight}px`;
-					container.style.top = `${newTop}px`;
-				}
-
-				updateSidebarWidth(container);
-			};
-	
-			document.onmouseup = () => {
-				isResizing = false;
-				const iframe = container.querySelector('#obsidian-clipper-iframe');
-				if (iframe) iframe.classList.remove('is-resizing');
-				document.body.style.cursor = '';
-				
-				const newWidth = container.offsetWidth;
-				const newHeight = container.offsetHeight;
-				browser.storage.local.set({ clipperIframeWidth: newWidth, clipperIframeHeight: newHeight });
-
-				highlighter.repositionHighlights();
-
-				document.onmousemove = null;
-				document.onmouseup = null;
-			};
-		};
+		updateSidebarWidth(document, container);
+		container.addEventListener('animationend', () => highlighter.repositionHighlights(), { once: true });
 	}
 
 	// Firefox
@@ -343,7 +248,7 @@ declare global {
 					const clonedSelection = range.cloneContents();
 					const div = document.createElement('div');
 					div.appendChild(clonedSelection);
-					selectedHtml = div.innerHTML;
+					selectedHtml = serializeChildren(div);
 				}
 
 				// Use parseAsync to ensure async variables like {{transcript}} are available.
@@ -427,26 +332,30 @@ declare global {
 					? extractWeChatArticleContent(doc)
 					: null;
 
-			const response: ContentResponse = {
-				author: bilibiliContent?.author || feishuContent?.author || defuddled.author,
-				content: bilibiliContent?.structuredHtml || feishuContent?.content || weChatArticleContent || defuddled.content,
-				description: bilibiliContent?.description || defuddled.description,
-				domain: getDomain(document.URL),
-				extractedContent: extractedContent,
-				favicon: defuddled.favicon,
-				fullHtml: cleanedHtml,
-				highlights: highlighter.getHighlights(),
-				image: bilibiliContent?.image || defuddled.image,
-				language: defuddled.language || '',
-				parseTime: defuddled.parseTime,
-				published: bilibiliContent?.published || defuddled.published,
-				schemaOrgData: defuddled.schemaOrgData,
-				selectedHtml: selectedHtml,
-				site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : defuddled.site,
-				title: bilibiliContent?.title || feishuContent?.title || defuddled.title,
-				wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || defuddled.wordCount,
-				metaTags: defuddled.metaTags || []
-			};
+				const response: ContentResponse = {
+					author: bilibiliContent?.author || feishuContent?.author || defuddled.author,
+					content: bilibiliContent?.structuredHtml || feishuContent?.content || weChatArticleContent || defuddled.content,
+					description: bilibiliContent?.description || defuddled.description,
+					domain: getDomain(document.URL),
+					extractedContent: extractedContent,
+					favicon: defuddled.favicon,
+					fullHtml: cleanedHtml,
+					highlights: highlighter.getHighlights(),
+					image: bilibiliContent?.image || defuddled.image,
+					language: defuddled.language || '',
+					parseTime: defuddled.parseTime,
+					published: bilibiliContent?.published || defuddled.published,
+					schemaOrgData: defuddled.schemaOrgData,
+					selectedHtml: selectedHtml,
+					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : defuddled.site,
+					title: bilibiliContent?.title || feishuContent?.title || defuddled.title,
+					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || defuddled.wordCount,
+					metaTags: defuddled.metaTags || []
+				};
+				if (response.title) {
+					highlighter.setPageTitle(response.title);
+				}
+				highlighter.updatePageDomainSettings({ site: response.site, favicon: response.favicon });
 				sendResponse(response);
 			}).catch((error: unknown) => {
 				contentLogger.error('getPageContent error', { error: error instanceof Error ? error.message : String(error) });
@@ -526,7 +435,6 @@ declare global {
 				}
 
 				if (elementToHighlight) {
-					const xpath = highlighter.getElementXPath(elementToHighlight);
 					highlighter.highlightElement(elementToHighlight);
 				} else {
 					console.warn('Could not find element to highlight. Info:', request.targetElementInfo);
@@ -591,11 +499,36 @@ declare global {
 		}
 
 		await highlighter.loadHighlights();
+		highlighter.setPageTitle(document.title);
 		updateHasHighlights();
 	}
 
 	// Initialize highlighter
 	initializeHighlighter();
+
+	// Expose highlighter API on window so reader-script.js (a separate
+	// webpack bundle injected when reader mode activates) can delegate
+	// all state operations to this single module instance. Without this,
+	// both bundles own a copy of highlighter.ts with independent mutable
+	// state — the bridge ensures one source of truth per tab.
+	window.__obsidianHighlighter = {
+		toggleHighlighterMenu: highlighter.toggleHighlighterMenu,
+		handleTextSelection: highlighter.handleTextSelection,
+		highlightElement: highlighter.highlightElement,
+		applyHighlights: highlighter.applyHighlights,
+		loadHighlights: highlighter.loadHighlights,
+		invalidateHighlightCache: highlighter.invalidateHighlightCache,
+		repositionHighlights: highlighter.repositionHighlights,
+		getHighlights: highlighter.getHighlights,
+		setPageUrl: highlighter.setPageUrl,
+		setPageTitle: highlighter.setPageTitle,
+		updatePageDomainSettings: highlighter.updatePageDomainSettings,
+		clearHighlights: highlighter.clearHighlights,
+		saveHighlights: highlighter.saveHighlights,
+		updateHighlighterMenu: highlighter.updateHighlighterMenu,
+		removeExistingHighlights,
+		ensureHighlighterCSS: () => { ensureHighlighterCSS(); },
+	} satisfies highlighter.HighlighterAPI;
 
 	// Call updateHasHighlights when the page loads
 	window.addEventListener('load', updateHasHighlights);

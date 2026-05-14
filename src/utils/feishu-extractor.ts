@@ -84,7 +84,7 @@ interface FeishuBlock {
 	table_cell?: object;
 	grid?: { column_size?: number };
 	grid_column?: object;
-	file?: { name?: string; token?: string };
+	file?: { name?: string; token?: string; size?: number };
 	view?: object;
 	undefined_block?: object;
 }
@@ -312,6 +312,92 @@ async function fetchFeishuImageDataUrl(fileToken: string): Promise<string | null
 		logger.warn(`Image binary fetch error [${fileToken}]: ${String(err)}`);
 		return null;
 	}
+}
+
+function formatFileSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function fetchFeishuFileDataUrl(fileToken: string): Promise<{
+	dataUrl?: string;
+	tooLarge?: boolean;
+	size?: number;
+	error?: string;
+}> {
+	try {
+		const response = await browser.runtime.sendMessage({
+			action: 'fetchFeishuFile',
+			fileToken,
+		}) as { success?: boolean; dataUrl?: string; tooLarge?: boolean; size?: number; error?: string };
+
+		if (!response?.success) {
+			logger.warn(`File binary fetch failed [${fileToken}]: ${response?.error}`);
+			return { error: response?.error || 'unknown' };
+		}
+		if (response.tooLarge) {
+			return { tooLarge: true, size: response.size };
+		}
+		if (response.dataUrl) {
+			return { dataUrl: response.dataUrl, size: response.size };
+		}
+		return { error: 'no dataUrl in response' };
+	} catch (err) {
+		logger.warn(`File binary fetch error [${fileToken}]: ${String(err)}`);
+		return { error: String(err) };
+	}
+}
+
+async function resolveFeishuFiles(html: string): Promise<string> {
+	const linkPattern = /<a href="feishu-file:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)"(?: data-size="(\d+)")?>([^<]*)<\/a>/g;
+	const matches: Array<{
+		full: string;
+		token: string;
+		filename: string;
+		dataSize?: number;
+		displayName: string;
+	}> = [];
+	let m: RegExpExecArray | null;
+	while ((m = linkPattern.exec(html)) !== null) {
+		matches.push({
+			full: m[0],
+			token: m[1],
+			filename: m[2],
+			dataSize: m[3] ? parseInt(m[3], 10) : undefined,
+			displayName: m[4],
+		});
+	}
+
+	if (matches.length === 0) return html;
+
+	logger.debug(`Resolving ${matches.length} Feishu file(s)`);
+
+	let result = html;
+	for (const item of matches) {
+		// Client-side size pre-check using block.file.size when available,
+		// to skip HEAD/GET for known-large files.
+		if (item.dataSize !== undefined && item.dataSize > 10 * 1024 * 1024) {
+			const size = formatFileSize(item.dataSize);
+			const fallback = `<p>📎 <strong>${escapeHtml(item.filename)}</strong> <em>(${size} — 请到原飞书文档下载)</em></p>`;
+			result = result.replace(item.full, fallback);
+			continue;
+		}
+
+		const res = await fetchFeishuFileDataUrl(item.token);
+		let replacement: string;
+		if (res.dataUrl) {
+			replacement = `<a href="${res.dataUrl}">${escapeHtml(item.displayName)}</a>`;
+		} else if (res.tooLarge) {
+			const size = res.size ? formatFileSize(res.size) : '过大';
+			replacement = `<p>📎 <strong>${escapeHtml(item.filename)}</strong> <em>(${size} — 请到原飞书文档下载)</em></p>`;
+		} else {
+			replacement = `<p>📎 <strong>${escapeHtml(item.filename)}</strong> <em>(下载失败)</em></p>`;
+		}
+		result = result.replace(item.full, replacement);
+	}
+
+	return result;
 }
 
 async function resolveFeishuImages(html: string): Promise<string> {
@@ -675,10 +761,11 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 
 		case FEISHU_BLOCK_TYPE.FILE: {
 			const file = block.file;
-			if (file?.name) {
-				return `<p>[File: ${escapeHtml(file.name)}]</p>`;
+			if (!file?.token || !file?.name) {
+				return file?.name ? `<p>📎 ${escapeHtml(file.name)}</p>` : '';
 			}
-			return '';
+			const sizeAttr = typeof file.size === 'number' ? ` data-size="${file.size}"` : '';
+			return `<a href="feishu-file://${file.token}" data-filename="${escapeHtml(file.name)}"${sizeAttr}>${escapeHtml(file.name)}</a>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.TABLE: {
@@ -767,7 +854,8 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	logger.info('Extraction complete', { documentId: resolved.documentId, blockCount: blocks.length });
 
 	const rawContent = convertBlocksToHtml(blocks);
-	const content = await resolveFeishuImages(rawContent);
+	const imagesResolved = await resolveFeishuImages(rawContent);
+	const content = await resolveFeishuFiles(imagesResolved);
 	const title = meta?.title || doc.title || '';
 
 	const textContent = blocks

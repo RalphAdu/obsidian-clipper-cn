@@ -78,7 +78,8 @@ describe('flattenScysBlocks', () => {
 		const blocks: ScysBlock[] = [{
 			block_id: 'img1',
 			block_type: 27,
-			image: { width: 100, height: 50, file_url: 'https://sphere-sh.oss-cn-shanghai.aliyuncs.com/xx?sig=abc' },
+			image: { width: 100, height: 50 },
+			file_url: 'https://sphere-sh.oss-cn-shanghai.aliyuncs.com/xx?sig=abc',
 		}];
 		const flat = flattenScysBlocks(blocks);
 		expect(flat[0].image?.token).toMatch(/^scys:/);
@@ -94,7 +95,7 @@ describe('flattenScysBlocks', () => {
 			children_blocks: [{
 				block_id: 'inner-img',
 				block_type: 27,
-				image: { file_url: 'https://x.y/z' },
+				file_url: 'https://x.y/z',
 			}],
 		}];
 		const flat = flattenScysBlocks(blocks);

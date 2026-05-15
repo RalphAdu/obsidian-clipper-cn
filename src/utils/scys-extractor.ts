@@ -28,8 +28,10 @@ export function parseScysUrl(url: string): { courseId: number; chapterId: number
 
 export interface ScysBlock extends Omit<FeishuBlock, 'children'> {
 	children_blocks?: ScysBlock[];
-	// scys image block has file_url (signed OSS URL) instead of feishu's token
-	image?: FeishuBlock['image'] & { file_url?: string };
+	// scys serves the signed OSS URL as a top-level block field
+	// (sibling to `image`, not nested inside it). image.token still
+	// carries the feishu-style identifier.
+	file_url?: string;
 }
 
 const HEADING_REWRITE: Record<number, { newType: number; oldField: keyof ScysBlock; newField: string }> = {
@@ -61,9 +63,10 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 			flat.block_type = rewrite.newType;
 		}
 
-		// Image: inject scys: prefixed token from file_url
-		if (flat.block_type === 27 && flat.image?.file_url) {
-			flat.image = { ...flat.image, token: `scys:${encodeURIComponent(flat.image.file_url)}` };
+		// Image: inject scys: prefixed token from top-level file_url
+		// (scys serves the OSS signed URL alongside the image block, not inside image)
+		if (flat.block_type === 27 && flat.file_url) {
+			flat.image = { ...flat.image, token: `scys:${encodeURIComponent(flat.file_url)}` };
 		}
 
 		out.push(flat as FeishuBlock);

@@ -348,8 +348,8 @@ declare global {
 					: null;
 
 				const response: ContentResponse = {
-					author: bilibiliContent?.author || feishuContent?.author || defuddled.author,
-					content: bilibiliContent?.structuredHtml || feishuContent?.content || weChatArticleContent || defuddled.content,
+					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || defuddled.author,
+					content: bilibiliContent?.structuredHtml || feishuContent?.content || scysContent?.content || weChatArticleContent || defuddled.content,
 					description: bilibiliContent?.description || defuddled.description,
 					domain: getDomain(document.URL),
 					extractedContent: extractedContent,
@@ -362,9 +362,9 @@ declare global {
 					published: bilibiliContent?.published || defuddled.published,
 					schemaOrgData: defuddled.schemaOrgData,
 					selectedHtml: selectedHtml,
-					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : defuddled.site,
-					title: bilibiliContent?.title || feishuContent?.title || defuddled.title,
-					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || defuddled.wordCount,
+					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : defuddled.site,
+					title: bilibiliContent?.title || feishuContent?.title || scysContent?.title || defuddled.title,
+					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || defuddled.wordCount,
 					metaTags: defuddled.metaTags || []
 				};
 				if (response.title) {
@@ -639,12 +639,13 @@ declare global {
 			const markdown = defuddleMod.createMarkdownContent(content, document.URL);
 
 			// Security: only upload to localhost / 127.0.0.1 (BACKLOG §5.2 option B).
+			let uploadedTo: string | null = null;
 			if (data.uploadUrl && typeof data.uploadUrl === 'string') {
 				try {
 					const u = new URL(data.uploadUrl);
-					const isLocal = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
-					if (isLocal) {
+					if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
 						await fetch(data.uploadUrl, { method: 'POST', body: markdown });
+						uploadedTo = data.uploadUrl;
 					}
 				} catch { /* best-effort */ }
 			}
@@ -658,7 +659,7 @@ declare global {
 				markdownLength: markdown.length,
 				markdownHead: markdown.slice(0, 500),
 				markdownTail: markdown.slice(-1000),
-				uploadedTo: data.uploadUrl || null,
+				uploadedTo,
 			}));
 		} catch (err) {
 			localStorage.setItem(key, JSON.stringify({ status: 'error', error: String(err) }));

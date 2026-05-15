@@ -571,12 +571,44 @@ if (data.uploadUrl && typeof data.uploadUrl === 'string') {
 
 ## 8. 操作 / 工作流类待办
 
-### 8.1 push 远端
+### 8.1 git remotes 与 push 配置
 
-- main 当前领先 `origin/main` 多个 commit
-- 用户**明示不 push**（保留本地控制）
-- 想 push 时：`git push origin main`
-- 不可 `git push --force` 到 main
+**当前三个 remote**：
+
+| Remote | URL | 角色 |
+|--------|-----|------|
+| `adu` | `git@github.com:RalphAdu/obsidian-clipper-cn.git` | **用户自己的 fork**，push 默认目标，`main` 已 `-u` 跟踪 `adu/main` |
+| `origin` | `git@github.com:nextcaicai/obsidian-clipper-cn.git` | nextcaicai 的 fork（用户最初 clone 的源），**只读跟踪**（无 push 权限）|
+| `upstream` | `git@github.com:obsidianmd/obsidian-clipper.git` | 上游飞书官方（cn fork 的最初分叉点）|
+
+**fork 链条**：
+```
+obsidianmd/obsidian-clipper  ← 官方上游
+        ↓ fork
+nextcaicai/obsidian-clipper-cn  ← cn fork（加飞书/Bilibili/WeChat 增强）
+        ↓ fork
+RalphAdu/obsidian-clipper-cn   ← 用户自己的 fork（在 nextcaicai 基础上继续加工）
+```
+
+**默认行为**：
+- `git push` / `git pull` 走 `adu`（已 `-u` 跟踪）
+- 不需要每次指定 remote
+
+**同步 nextcaicai 上游更新**：
+```bash
+git fetch origin
+git log --oneline ..origin/main | wc -l   # 看新增 commit 数
+git merge origin/main                      # 或 git rebase origin/main
+git push adu main                          # 推到自己 fork
+```
+
+**同步飞书官方上游**：参考 §9.1，走 `upstream` remote + merge 流程。
+
+**最近一次 push**：commit `2169327..8955071`（42 commits）—— 本次会话所有 merge + feature + cleanup 工作
+
+**禁止操作**：
+- `git push --force` 到 `adu/main`（强制覆盖远端历史）
+- 推 `nextcaicai/origin`（无权限，会 403）
 
 ### 8.2 测试基线 3 个 known failures
 

@@ -923,9 +923,15 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 					try {
 						const res = await fetch(url);
 						if (!res.ok) return;
-						const mime = (res.headers.get('Content-Type') || 'image/png').split(';')[0].trim();
 						const buf = await res.arrayBuffer();
 						const bytes = new Uint8Array(buf);
+						// Detect actual format from magic bytes; some servers return wrong Content-Type.
+						let mime: string;
+						if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) mime = 'image/jpeg';
+						else if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) mime = 'image/png';
+						else if (bytes.length >= 3 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) mime = 'image/gif';
+						else if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) mime = 'image/webp';
+						else mime = (res.headers.get('Content-Type') || 'image/png').split(';')[0].trim();
 						let bin = '';
 						for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
 						results[url] = `data:${mime};base64,${btoa(bin)}`;

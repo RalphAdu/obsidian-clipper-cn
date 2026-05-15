@@ -458,8 +458,39 @@ async function extractScysCourseChapter(doc: Document): Promise<ScysStructuredCo
 	};
 }
 
+async function extractScysDocxStandalone(doc: Document): Promise<ScysStructuredContent | null> {
+	const raw = localStorage.getItem('__cnScysDocxBlocks');
+	if (!raw) {
+		logger.warn('[scys-docx] no decrypted blocks captured; patch may not have run');
+		return null;
+	}
+	let blocks: ScysBlock[];
+	try {
+		blocks = JSON.parse(raw);
+	} catch (err) {
+		logger.warn(`[scys-docx] failed to parse captured blocks: ${String(err)}`);
+		return null;
+	}
+	if (!Array.isArray(blocks) || blocks.length === 0) return null;
+
+	let html = renderScysChapterContent(blocks);
+	html = await resolveScysImages(html);
+
+	// title 后处理：剥离 "丨超级 AI 大航海..." 与 "丨生财有术" 品牌 suffix
+	const rawTitle = doc.title || '';
+	const stripped = rawTitle
+		.replace(/丨超级\s*AI\s*大航海.*$/, '')
+		.replace(/丨生财有术$/, '')
+		.trim();
+	const title = stripped || rawTitle;
+
+	const wordCount = countWordsFromBlocks(flattenScysBlocks(blocks));
+
+	return { title, author: '', content: html, wordCount };
+}
+
 export async function extractScysStructuredContent(doc: Document): Promise<ScysStructuredContent | null> {
 	if (isScysCourseUrl(doc.URL)) return extractScysCourseChapter(doc);
-	// Task 4 will add isScysDocxUrl branch here
+	if (isScysDocxUrl(doc.URL)) return extractScysDocxStandalone(doc);
 	return null;
 }

@@ -588,3 +588,70 @@ describe('parseScysDocxUrl', () => {
 		expect(parseScysDocxUrl('not a url')).toBeNull();
 	});
 });
+
+// Minimal Storage/localStorage shim — vitest runs in node env (no DOM globals).
+// Plan-prescribed tests below monkey-patch Storage.prototype.getItem, so we
+// install a stub class + global localStorage instance before the suite.
+if (typeof (globalThis as any).Storage === 'undefined') {
+	class StorageStub {
+		getItem(_key: string): string | null { return null; }
+		setItem(_key: string, _val: string): void {}
+		removeItem(_key: string): void {}
+		clear(): void {}
+		key(_i: number): string | null { return null; }
+		get length(): number { return 0; }
+	}
+	(globalThis as any).Storage = StorageStub;
+	(globalThis as any).localStorage = new StorageStub();
+}
+
+describe('extractScysDocxStandalone (via router)', () => {
+	const originalGetItem = Storage.prototype.getItem;
+	afterEach(() => { Storage.prototype.getItem = originalGetItem; });
+
+	it('returns null when no captured blocks in localStorage', async () => {
+		Storage.prototype.getItem = vi.fn().mockReturnValue(null);
+		const doc = { URL: 'https://scys.com/view/docx/Test', title: 'Test' } as any;
+		expect(await extractScysStructuredContent(doc)).toBeNull();
+	});
+
+	it('returns null when captured blocks is empty array', async () => {
+		Storage.prototype.getItem = vi.fn().mockReturnValue('[]');
+		const doc = { URL: 'https://scys.com/view/docx/Test', title: 'Test' } as any;
+		expect(await extractScysStructuredContent(doc)).toBeNull();
+	});
+
+	it('returns null when captured blocks is malformed JSON', async () => {
+		Storage.prototype.getItem = vi.fn().mockReturnValue('not-json');
+		const doc = { URL: 'https://scys.com/view/docx/Test', title: 'Test' } as any;
+		expect(await extractScysStructuredContent(doc)).toBeNull();
+	});
+
+	it('renders content from captured blocks (reusing course fixture)', async () => {
+		const fixture = (await import('./fixtures/scys-chapter-11408.json')) as any;
+		const blocks = fixture.default.data.chapter.content;
+		Storage.prototype.getItem = vi.fn().mockReturnValue(JSON.stringify(blocks));
+		const doc = { URL: 'https://scys.com/view/docx/Test', title: 'AI 工具怎么选丨超级 AI 大航海丨生财有术' } as any;
+		const result = await extractScysStructuredContent(doc);
+		expect(result).not.toBeNull();
+		expect(result?.title).toBe('AI 工具怎么选');  // suffix stripped
+		expect(result?.content).toContain('<h2>0. 本章概要</h2>');
+		expect(result?.content).toContain('class="feishu-callout"');
+		expect(result?.author).toBe('');
+		expect(result?.wordCount).toBeGreaterThan(100);
+	});
+
+	it('strips only 丨生财有术 suffix when 丨超级 AI 大航海 absent', async () => {
+		Storage.prototype.getItem = vi.fn().mockReturnValue('[{"block_id":"x","block_type":2,"text":{"elements":[]}}]');
+		const doc = { URL: 'https://scys.com/view/docx/X', title: '简单标题丨生财有术' } as any;
+		const result = await extractScysStructuredContent(doc);
+		expect(result?.title).toBe('简单标题');
+	});
+
+	it('falls back to original title when suffix patterns not present', async () => {
+		Storage.prototype.getItem = vi.fn().mockReturnValue('[{"block_id":"x","block_type":2,"text":{"elements":[]}}]');
+		const doc = { URL: 'https://scys.com/view/docx/X', title: 'Pure Title' } as any;
+		const result = await extractScysStructuredContent(doc);
+		expect(result?.title).toBe('Pure Title');
+	});
+});

@@ -191,7 +191,10 @@ export async function fetchScysChapter(courseId: number, chapterId: number): Pro
 		}
 		const json = await res.json();
 		const chapter = json?.data?.chapter;
-		if (!chapter || !Array.isArray(chapter.content)) return null;
+		if (!chapter || !Array.isArray(chapter.content)) {
+			logger.warn(`[chapter] unexpected response shape (course=${courseId} chapter=${chapterId})`);
+			return null;
+		}
 		return chapter as ScysChapter;
 	} catch (err) {
 		logger.warn(`[chapter] fetch error: ${String(err)}`);
@@ -211,6 +214,10 @@ export async function fetchScysComments(
 	const PAGE_CAP = 50;
 
 	while (true) {
+		if (page > PAGE_CAP) {
+			logger.warn(`[comments] page cap (${PAGE_CAP}) reached, stopping before page ${page}`);
+			break;
+		}
 		let json: any;
 		try {
 			const res = await fetch(
@@ -242,10 +249,6 @@ export async function fetchScysComments(
 		if (pageItems.length === 0) break;
 		if (items.length >= total) break;
 		page++;
-		if (page > PAGE_CAP) {
-			logger.warn(`[comments] page cap reached at ${PAGE_CAP}, breaking`);
-			break;
-		}
 	}
 	return { total, items, users };
 }

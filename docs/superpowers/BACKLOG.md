@@ -255,12 +255,11 @@ print(''.join(chr(ord('a') + int(c, 16)) for c in sha))
 - **语言**：中文（包含技术解释、报告）
 - **风格**：紧凑、信息密度高，避免冗余
 - **不要轻易停下来澄清** — 用户偏好我"基于合理假设直接推进"，但若问题真分支大（如方案 A/B/C 选择）才停
-- **小心 destructive 操作** — `git reset --hard`、`rm -rf` 等必须明确授权
-- **不擅自 commit** — 必须用户明确说"commit"或者推进流程的语境（如方案 brainstorming 走到尾声）
-- **不擅自 push** — 用户多次明示"不 push"
+- **小心 destructive 操作** — `git reset --hard`、`git push --force`、`rm -rf` 等必须明确授权
+- **可主动 commit** — 完成一段独立工作后可直接 commit（不需要每次问）。commit message 要清楚说明做了什么 + 为什么。**不要 amend 已有 commit**，总是新 commit。
+- **可主动 push 到 `adu` remote**（`RalphAdu/obsidian-clipper-cn`）— commit 完成后可直接 `git push adu main`。**仅 `adu`**，不可 push 到 `origin`（nextcaicai）。
 - **完整的自动化测试** — 用户对 chrome MCP + bridge + HTTP receiver 三件套熟悉，验证过来回（端到端比手测可信）
 - **brainstorming 流程** — 大改动用 `superpowers:brainstorming` 走 spec → plan → 实施 → 自动测试
-- **不擅自 amend 已有 commit** — 总是新 commit
 
 ---
 
@@ -606,9 +605,12 @@ git push adu main                          # 推到自己 fork
 
 **最近一次 push**：commit `2169327..8955071`（42 commits）—— 本次会话所有 merge + feature + cleanup 工作
 
-**禁止操作**：
-- `git push --force` 到 `adu/main`（强制覆盖远端历史）
+**禁止操作（未经明确授权）**：
+- `git push --force` 到 `adu/main`（强制覆盖远端历史，需用户明示）
 - 推 `nextcaicai/origin`（无权限，会 403）
+- `git reset --hard` / 任何 destructive history 改写
+
+**默认允许**：完成独立工作单元后直接 `git commit` + `git push adu main`，无需逐条问用户。
 
 ### 8.2 测试基线 3 个 known failures
 

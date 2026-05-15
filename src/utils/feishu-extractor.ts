@@ -314,89 +314,27 @@ async function fetchFeishuImageDataUrl(fileToken: string): Promise<string | null
 	}
 }
 
-function formatFileSize(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-async function fetchFeishuFileDataUrl(fileToken: string): Promise<{
-	dataUrl?: string;
-	tooLarge?: boolean;
-	size?: number;
-	error?: string;
-}> {
-	try {
-		const response = await browser.runtime.sendMessage({
-			action: 'fetchFeishuFile',
-			fileToken,
-		}) as { success?: boolean; dataUrl?: string; tooLarge?: boolean; size?: number; error?: string };
-
-		if (!response?.success) {
-			logger.warn(`File binary fetch failed [${fileToken}]: ${response?.error}`);
-			return { error: response?.error || 'unknown' };
-		}
-		if (response.tooLarge) {
-			return { tooLarge: true, size: response.size };
-		}
-		if (response.dataUrl) {
-			return { dataUrl: response.dataUrl, size: response.size };
-		}
-		return { error: 'no dataUrl in response' };
-	} catch (err) {
-		logger.warn(`File binary fetch error [${fileToken}]: ${String(err)}`);
-		return { error: String(err) };
-	}
-}
-
-async function resolveFeishuFiles(html: string): Promise<string> {
-	const linkPattern = /<a href="feishu-file:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)"(?: data-size="(\d+)")?>([^<]*)<\/a>/g;
-	const matches: Array<{
-		full: string;
-		token: string;
-		filename: string;
-		dataSize?: number;
-		displayName: string;
-	}> = [];
+function resolveFeishuFiles(html: string, sourceDocUrl: string): string {
+	const linkPattern = /<a href="feishu-file:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)"(?: data-size="\d+")?>([^<]*)<\/a>/g;
+	const matches: Array<{ full: string; filename: string }> = [];
 	let m: RegExpExecArray | null;
 	while ((m = linkPattern.exec(html)) !== null) {
-		matches.push({
-			full: m[0],
-			token: m[1],
-			filename: m[2],
-			dataSize: m[3] ? parseInt(m[3], 10) : undefined,
-			displayName: m[4],
-		});
+		matches.push({ full: m[0], filename: m[2] });
 	}
 
 	if (matches.length === 0) return html;
 
-	logger.debug(`Resolving ${matches.length} Feishu file(s)`);
+	logger.debug(`Resolving ${matches.length} Feishu file(s) -> source doc URL`);
 
+	// Inline link to the source Feishu doc: user clicks → opens doc (with the
+	// attachment still embedded inside) in their logged-in browser session.
+	// Keeping the .md file small (no base64 inlined) means Obsidian renders
+	// fast and Export-to-PDF stays clean.
 	let result = html;
 	for (const item of matches) {
-		// Client-side size pre-check using block.file.size when available,
-		// to skip HEAD/GET for known-large files.
-		if (item.dataSize !== undefined && item.dataSize > 10 * 1024 * 1024) {
-			const size = formatFileSize(item.dataSize);
-			const fallback = `<p>📎 <strong>${escapeHtml(item.filename)}</strong> <em>(${size} — 请到原飞书文档下载)</em></p>`;
-			result = result.replace(item.full, fallback);
-			continue;
-		}
-
-		const res = await fetchFeishuFileDataUrl(item.token);
-		let replacement: string;
-		if (res.dataUrl) {
-			replacement = `<a href="${res.dataUrl}">${escapeHtml(item.displayName)}</a>`;
-		} else if (res.tooLarge) {
-			const size = res.size ? formatFileSize(res.size) : '过大';
-			replacement = `<p>📎 <strong>${escapeHtml(item.filename)}</strong> <em>(${size} — 请到原飞书文档下载)</em></p>`;
-		} else {
-			replacement = `<p>📎 <strong>${escapeHtml(item.filename)}</strong> <em>(下载失败)</em></p>`;
-		}
+		const replacement = `<p>📎 <a href="${escapeHtml(sourceDocUrl)}">${escapeHtml(item.filename)}</a></p>`;
 		result = result.replace(item.full, replacement);
 	}
-
 	return result;
 }
 
@@ -863,7 +801,7 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	const rawContent = convertBlocksToHtml(blocks);
 	const imagesResolved = await resolveFeishuImages(rawContent);
-	const content = await resolveFeishuFiles(imagesResolved);
+	const content = resolveFeishuFiles(imagesResolved, doc.URL);
 	const title = meta?.title || doc.title || '';
 
 	const textContent = blocks

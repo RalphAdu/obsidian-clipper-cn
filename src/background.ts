@@ -320,54 +320,6 @@ async function fetchFeishuImageAsBase64(fileToken: string): Promise<{ dataUrl: s
 	return { dataUrl: `data:${mimeType};base64,${base64}` };
 }
 
-const FEISHU_FILE_SIZE_CAP_BYTES = 10 * 1024 * 1024; // 10 MB
-
-async function fetchFeishuFileAsBase64(fileToken: string): Promise<{
-	dataUrl?: string;
-	tooLarge?: boolean;
-	size?: number;
-	mimeType?: string;
-}> {
-	const url = `https://open.feishu.cn/open-apis/drive/v1/medias/${fileToken}/download`;
-	if (!isAllowedFeishuFetchUrl(url)) {
-		throw new Error('Blocked Feishu file URL');
-	}
-
-	const token = await getFeishuTenantToken();
-
-	// Feishu's /medias/{token}/download endpoint rejects HEAD with 404, so
-	// we GET directly and check size from the downloaded byte length.
-	const response = await fetch(url, {
-		method: 'GET',
-		headers: { Authorization: `Bearer ${token}` },
-		cache: 'no-store',
-	});
-
-	if (!response.ok) {
-		throw new Error(`Feishu file fetch failed: HTTP ${response.status}`);
-	}
-
-	const mimeType = response.headers.get('Content-Type') || 'application/octet-stream';
-	const buffer = await response.arrayBuffer();
-	const size = buffer.byteLength;
-
-	if (size > FEISHU_FILE_SIZE_CAP_BYTES) {
-		return { tooLarge: true, size };
-	}
-
-	const bytes = new Uint8Array(buffer);
-	let binary = '';
-	for (let i = 0; i < bytes.byteLength; i++) {
-		binary += String.fromCharCode(bytes[i]);
-	}
-	const base64 = btoa(binary);
-	return {
-		dataUrl: `data:${mimeType};base64,${base64}`,
-		size,
-		mimeType,
-	};
-}
-
 // Set Origin header on YouTube innertube API requests from the extension.
 // YouTube doesn't accept chrome-extension://...
 async function enableYouTubeInnertubeRule(): Promise<void> {
@@ -976,23 +928,6 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
-		if (typedRequest.action === 'fetchFeishuFile') {
-			const fileToken = (typedRequest as any).fileToken as string;
-			if (!fileToken) {
-				sendResponse({ success: false, error: 'Missing fileToken' });
-				return true;
-			}
-			fetchFeishuFileAsBase64(fileToken).then((result) => {
-				sendResponse({ success: true, ...result });
-			}).catch((error) => {
-				sendResponse({
-					success: false,
-					error: error instanceof Error ? error.message : String(error)
-				});
-			});
-			return true;
-		}
-
 		if (typedRequest.action === "sidePanelOpened") {
 			if (sender.tab && sender.tab.windowId) {
 				sidePanelOpenWindows.add(sender.tab.windowId);
@@ -1320,8 +1255,7 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			typedRequest.action === "openObsidianUrl" ||
 			typedRequest.action === 'fetchBilibiliJson' ||
 			typedRequest.action === 'fetchFeishuApi' ||
-			typedRequest.action === 'fetchFeishuImage' ||
-			typedRequest.action === 'fetchFeishuFile') {
+			typedRequest.action === 'fetchFeishuImage') {
 			return true;
 		}
 	}

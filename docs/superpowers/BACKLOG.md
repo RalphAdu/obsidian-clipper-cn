@@ -4,8 +4,8 @@
 > 包含项目背景、开发基础设施、关键认知、踩过的坑、待办 feature。
 > 每条 feature 都标了"为什么这么做 / 已知什么不行 / 推荐怎么做"。
 
-**最后更新**：2026-05-15
-**最新 commit 基线**：`02251b2`（docs: add Backlog）/ `7a19a10`（feat: render embedded Feishu sheets as Markdown tables）
+**最后更新**：2026-05-16
+**最新 commit 基线**：`dd0e028`（scys 收尾 — MIME 从 magic bytes 检测）/ `7a19a10`（feat: render embedded Feishu sheets as Markdown tables）
 
 ---
 
@@ -42,6 +42,7 @@
 
 - **飞书文档完整提取**（`src/utils/feishu-extractor.ts`）—— 走飞书 OpenAPI，避开上游用 defuddle 通用 DOM 解析的 incomplete content 问题
 - **Bilibili 视频提取**（`src/utils/bilibili-extractor.ts` + `bilibili-playback-tracker.ts`）—— 简介/章节/字幕/时间戳跳转/Reader Mode 嵌入播放器
+- **scys.com 课程页面提取**（`src/utils/scys-extractor.ts`）—— 生财有术超级 AI 大航海课程。scys 后端返回飞书 docx 原生 block 结构，复用 `convertBlocksToHtml` 渲染；评论区分页全抓 + HTML 嵌套 blockquote；图片 base64 内嵌（背景 fetch 绕 OSS CORS）
 - **微信公众号文章图片保留**（content.ts 内联逻辑）
 - **扩展 ID / 名称为 `obsidian-web-clipper-cn`**（避免与官方扩展碰撞）
 
@@ -156,6 +157,52 @@ curl -s "https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node?token=<wiki_to
 - 用 Bash + curl（不受 CORS 限制）
 - 或通过 cn extension 的 `fetchFeishuApi` message（background script 不受 CORS，有 host_permissions）
 
+### 1.8 三种 fetch 上下文 CORS 行为对比（scys 实施教训）
+
+| 上下文 | 受 CORS 限制？ | 带 page cookie？ | 用途 |
+|---|---|---|---|
+| content-script fetch（page-document world） | **是**（受目标域 CORS 头限制） | 是（同 origin） | 需要 page session cookie 的同源 API（如 scys `/search/course/...`） |
+| `chrome.scripting.executeScript({world:'MAIN'})` 内 fetch | **是**（与 content-script 等价） | 是 | 飞书 imageManager API 调用（页面内 runtime 函数） |
+| background script fetch | **否**（凭 manifest `host_permissions` 绕过 CORS） | 否（扩展 origin） | 跨域资源下载，无需 cookie 的资源 |
+
+**关键教训**：scys 实施时假设 MAIN-world fetch 能绕 CORS（错误），实际仍受目标域 CORS 头限制。OSS 图片必须走 background fetch + 在 `host_permissions` 加目标域。
+
+### 1.9 Markdown 渲染自动化验收（替代肉眼目视）
+
+每轮 bridge 测试后，把保存的 .md 渲染为 HTML 再程序化校验，等价于"目视检查"但完全自动：
+
+```bash
+# 1. md → html
+python3 -c "
+import markdown_it
+md = markdown_it.MarkdownIt('gfm-like', {'html': False, 'linkify': False})
+with open('input.md') as f: body = md.render(f.read())
+with open('output.html','w') as f: f.write('<html><body>'+body+'</body></html>')
+"
+
+# 2. HTML 结构化校验（Python html.parser）：
+#   - 数 h2/h3/h4/blockquote/table/tr/li 等标签
+#   - 提取 H2/H3/H4 文本对照预期
+#   - 检查 blockquote 最大嵌套深度
+#   - 扫破损 \[!quote\] 转义残留
+# 3. 图片 binary 校验：
+#   - 逐张 base64 decode
+#   - magic bytes 比对（PNG=\x89PNG / JPEG=\xff\xd8 / GIF=GIF8 / WEBP=RIFF...WEBP）
+#   - 检测 declared MIME ↔ actual format 不一致
+```
+
+**为什么不直接 chrome MCP 加载 HTML 看**：
+- chrome MCP `navigate` 自动 prepend `https://`，无法跳 `file://`
+- 即使能跳，需要 chrome 真渲染 + javascript_tool 检查 layout — 太重
+- 解析 HTML 比解析 markdown 更稳：marked/markdown-it 已正确处理 markdown 语法的边缘情况
+
+**为什么不直接 grep .md**：
+- 行级 grep 漏掉嵌套结构（blockquote 深度、断行的 callout）
+- HTML 标签计数与 markdown 标记数量不一定 1:1
+- 图片 base64 校验必须 decode，grep 看不出来
+
+`docs/superpowers/specs/2026-05-15-scys-extractor-design.md` §5.3 验收清单 + Task 11 Step 8 给出过 grep 简版；这一套 HTML 解析 + magic bytes 是升级版。**适合所有提取器的端到端验收**（feishu / bilibili / scys / 未来新增）。
+
 ---
 
 ## 2. 关键认知（避免重复踩坑）
@@ -201,6 +248,20 @@ TABLE: 31, TABLE_CELL: 32, VIEW: 33, QUOTE_CONTAINER: 34
 - **VIEW (33) 是容器**——飞书"附件"和"内嵌文档"都用 VIEW 包裹真实 FILE/DOC 子块。cn 之前 default `return ''` 导致 FILE 完全丢失，已在 `9f4776c` 修复（VIEW + QUOTE_CONTAINER 递归 children）
 - **SHEET (30) 是内嵌表格**，token 格式 `{spreadsheet_token}_{sheet_id}`（下划线分割，取**最后一个**下划线作 separator）
 - TABLE (31) 是 docx 内建表格（与 SHEET 不同），cn 已支持
+- **scys 自定义 block_type=5001**：scys 评论 content 用这个非飞书原生类型，带 `sc_html.content`（服务端预渲染 HTML）。`convertBlocksToHtml.renderBlock` 不识别该类型，要在 scys 适配层提前 dispatch（参见 `scys-extractor.renderCommentBodyHtml`）
+
+### 2.4.1 第三方系统嵌入飞书 docx 的常见特征
+
+scys 实施观察到的"飞书 docx 嵌入式渲染"模式（其他类似站点可能也用同款）：
+
+| 特征 | 取值/含义 |
+|---|---|
+| DOM 容器 | `.feishu-doc-content` + `.vc-doc-item[data-block-id]` |
+| 后端 API | 直接返回飞书 docx 原生 block 数组（`block_type` 数字编号一致） |
+| 嵌套表达 | `children_blocks: Block[]`（内嵌完整对象），**与飞书原生 API 用 `children: string[]` 引用不同**，需在适配层把嵌套→扁平 + 收集 children id |
+| 图片 token | `image.token` 是 feishu-style 但**不能用 feishu OpenAPI 解析**（scys 没暴露飞书 token），需配合 `file_url`（OSS 签名直链）才能下载 |
+| 第三方扩展字段 | API 偶尔附加非飞书字段（如 scys 的 `sc_html`, `meta.course_comment`），适配层要识别 |
+| 时间字段 | scys 用 ISO 8601 字符串，**不是** unix 整数（飞书 OpenAPI 用 unix 秒）—— 字段同名 `created_at`，类型不同，易踩 |
 
 ### 2.5 飞书附件没有独立 URL
 
@@ -231,6 +292,19 @@ TABLE: 31, TABLE_CELL: 32, VIEW: 33, QUOTE_CONTAINER: 34
 - **自动**（已部署）：cn 自身轮询 build-marker.txt，发现变化调 chrome.runtime.reload()
 - **彻底**（影响所有 tab）：Cmd+Q Chrome → 重启（unpacked extension 启动时自动重读 dist）
 - **不能**：chrome MCP 不能直接 reload extension
+
+**重要踩坑（scys 实施时）**：自动 reload 只工作于扩展实际加载的目录。`npm run dev:chrome` 输出到 `dev/`，`npm run build:chrome` 输出到 `dist/`。用户加载哪个目录决定哪个 marker 文件被 poll。**实施前必须先确认用户的扩展加载路径**，否则改完代码 + watch 的目录与 chrome 加载的目录不一致，会反复出现"代码改了 chrome 没反应"的假象。
+
+判定方法：浏览器开 `chrome://extensions/`，cn 卡片的 "Inspect views: background page" 或 "Loaded from" 路径。或更简单：让用户报路径。
+
+### 2.9 webpack 缓存与"代码改了没编译"
+
+webpack 5 watch + ts-loader 偶尔出现：源文件 mtime 改了，但 webpack 报 `cached modules`，新代码没 emit。两种触发因素：
+1. **缓存目录陈旧**：`rm -rf node_modules/.cache dev/` 强制全量重建
+2. **mtime 精度问题**：某些文件系统 mtime 不变（rare on APFS, more common on NFS）— `touch src/xxx.ts` 显式 bump
+
+scys 实施时这两种都遇到过。**症状**：bridge 输出与改前完全一致（长度同、内容同），但 dev/content.js 通过 grep 已含新 string literal。
+**rule-of-thumb**：连续 2 轮端到端测试输出**完全相同**就立即怀疑是缓存问题，先 `du -h dev/content.js` 看时间戳。
 
 ### 2.8 cn extension ID（chrome）
 
@@ -275,6 +349,7 @@ print(''.join(chr(ord('a') + int(c, 16)) for c in sha))
 | `src/core/reader-view.ts` | 上游 Reader 重构入口（cn 在内部加了 Bilibili 集成） |
 | `src/utils/feishu-extractor.ts` | 飞书提取核心：OpenAPI 调用、block 渲染、resolveImages/Files/Sheets |
 | `src/utils/bilibili-extractor.ts` | Bilibili 视频提取 |
+| `src/utils/scys-extractor.ts` | scys.com 课程页面提取（章节 + 评论），复用 `convertBlocksToHtml` |
 | `src/utils/content-extractor.ts` | popup 端：拿到 content 后用 defuddle 转 markdown |
 | `src/utils/reader.ts` | Reader Mode 逻辑（cn 在其中加 Bilibili 播放器集成，**不再 inline base64** for PDF） |
 
@@ -283,13 +358,26 @@ print(''.join(chr(ord('a') + int(c, 16)) for c in sha))
 | 函数 | 行号附近 | 用途 |
 |------|----------|------|
 | `extractFeishuStructuredContent` | 880+ | 入口：解析 URL → fetch blocks → 渲染 HTML → resolve images/sheets/files |
-| `convertBlocksToHtml` | 606 | blocks 转 HTML（PAGE 起递归） |
+| `convertBlocksToHtml` (`export`) | 606 | blocks 转 HTML（PAGE 起递归）。**scys 复用此函数** |
 | `renderChildren` | 622 | 递归子块，特别处理 BULLET/ORDERED/TODO 合并 list |
 | `renderBlock` | 688 | 单块按 type switch 渲染 |
 | `fetchFeishuApi` | 154 | 消息桥：调 background `fetchFeishuApi` |
 | `resolveFeishuImages` | 443 | 图片 token → data: URL（含 cookie-based MainWorld fallback） |
 | `resolveFeishuSheets` | (P0 已加) | sheet token → HTML 表格（并发 fetch） |
 | `resolveFeishuFiles` | 418 | file token → `wiki_url#block_id` 跳转链接（B 方案） |
+
+### scys 提取关键函数（`src/utils/scys-extractor.ts`）
+
+| 函数 | 用途 |
+|------|------|
+| `isScysCourseUrl(url)` | URL 检测：`scys.com/course/detail/\d+?chapterId=\d+` |
+| `parseScysUrl(url)` | 提取 `{courseId, chapterId}` |
+| `flattenScysBlocks(blocks)` | scys 嵌套 `children_blocks` → 飞书原生扁平 + `children: string[]` + heading 层级 rewrite（h4/h5/h6→h2/h3/h4）+ image scys: token 注入 |
+| `renderScysChapterContent(blocks)` | 章节渲染入口（合成 PAGE block 防止 `convertBlocksToHtml` 走 fallback 导致嵌套块双重渲染） |
+| `resolveScysImages(html)` | 图片 base64 化：L1 content-script 同源 fetch → L2 background fetch（凭 host_permissions 绕 CORS）→ L3 保留原 URL |
+| `fetchScysChapter` / `fetchScysComments` / `fetchScysCourse` | 同源 API 调用，`credentials: 'include'` 带 page session cookie |
+| `renderScysCommentsAsync` | 评论渲染为 HTML（**不是 markdown**——避免下游 defuddle 把 `[!quote]` 当文本 escape） |
+| `extractScysStructuredContent(doc)` | 主入口：URL 检测 → 拉章节 + 评论 + 课程元 → 渲染合并 → 返回 `{title, author, content: html, wordCount}` |
 
 ### 关键 commit 范围
 
@@ -312,7 +400,7 @@ a04bc32 feat: auto-reload extension on rebuild via build-marker polling ← hot-
 ### 5.1 临时测试文件
 
 **位置**：`/Users/adu/Documents/Obsidian /Life/_cn-test/`
-**含**：`feishu-pdf-test.md`、`feishu-sheet-test.md`（自动化测试输出）
+**含**：`feishu-pdf-test.md`、`feishu-sheet-test.md`、`scys-test.md`（自动化测试输出）
 
 **清理**：
 ```bash
@@ -558,6 +646,57 @@ if (data.uploadUrl && typeof data.uploadUrl === 'string') {
 
 ---
 
+### 6.7 scys-extractor 收尾：callout 视觉区分 + 类型标记保留
+
+**来源**：scys 实施期间为绕过 defuddle 把 markdown 当 HTML 处理的 escape 问题，把评论 / 正文 callout 一律降级为普通 `> ` blockquote，**失去了 Obsidian `[!quote]+` / `[!tip]` / `[!warning]` callout 类型标记**。
+
+**当前妥协**：
+- 评论与正文都是普通 blockquote
+- 评论与正文的视觉区分仅靠 `## 💬 章节评论` H2 + 每条粗体 `**name** · ❤️ · date` 头
+- 飞书 4 个正文 callout block 也都是 `> ` 引用，看不出 tip / warning 区别
+
+**未实施候选**：
+- **方案 A**：改造 `feishu-extractor.renderBlock` 让 CALLOUT 输出 `<blockquote data-callout-type="tip">`，turndown 后处理识别 data 属性转 `[!tip]`。影响范围：飞书 + scys 同时受益。**估时 2-3 hr**（需要 turndown 自定义规则 + 测试）
+- **方案 B**：scys 评论保留 markdown 输出，让 bridge / content.ts 主流程 跳过 defuddle 二次转换（要求 extractor 自己输出最终 markdown，破坏 cn 现有"content 是 HTML"的统一假设）。**估时 4-5 hr**（涉及主流程改动）
+
+**风险**：方案 A 改飞书提取器，可能 regression。方案 B 破坏管线统一性。
+
+**状态**：未启动；当前妥协可接受（用户 spec §"Spec-Plan Deltas" 已认可）
+
+---
+
+### 6.8 scys-extractor 抽通用化：飞书 docx 嵌入式渲染站点 framework
+
+**来源**：scys 探明的"第三方系统嵌入飞书 docx"模式（§2.4.1）很可能适用于其他类似站点。
+
+**当前**：`scys-extractor.ts` 是 site-specific（hardcoded URL pattern + API endpoint）。
+
+**重构候选**：抽出 `embedded-feishu-docx-adapter.ts`，提供：
+- `flattenEmbeddedFeishuBlocks(blocks, options)` — 嵌套→扁平 + heading rewrite + 自定义 block_type dispatcher
+- `resolveEmbeddedImages(html, fetchStrategy)` — 三级 fallback 模板
+- `renderEmbeddedComments(items, options)` — HTML 嵌套 blockquote 渲染
+
+scys-extractor 变成薄壳，只配置 URL 模式 + API endpoint + 评论 content 处理（type=5001 sc_html）。新增同类站点（如知识星球、得到等）成本大幅降低。
+
+**前提**：至少遇到第二个同类站点，再决定是否重构（YAGNI）
+
+**状态**：观察中，未启动
+
+---
+
+### 6.9 scys-extractor follow-up — 重命名 `fetchScysImagesViaMainWorld` action
+
+**来源**：scys 实施期间 L2 fallback 从"MainWorld fetch"改为"background fetch"，action 名字保留 `ViaMainWorld` 后缀，但已与实际逻辑不符。
+
+**改动**：
+- 重命名为 `fetchScysImagesViaBackground`（或简洁版 `fetchScysImages`）
+- 同步改 `src/background.ts` handler + `src/utils/scys-extractor.ts` 调用方
+- 估时 5 min
+
+**状态**：trivial 命名清理，下次顺手做
+
+---
+
 ## 7. 代码内 TODO 注释
 
 | 文件:行 | 内容 | 优先级 |
@@ -696,5 +835,59 @@ template-integration.test.ts > youtube
    - `docs/superpowers/specs/2026-05-14-f1-mark-to-equals-design.md`（F1 已弃方案，作反例参考）
    - `docs/superpowers/specs/2026-05-14-f5-feishu-file-download-design.md`（PDF 附件）
    - `docs/superpowers/specs/2026-05-15-feishu-sheet-rendering-design.md`（SHEET 表格）
+   - `docs/superpowers/specs/2026-05-15-scys-extractor-design.md` + `plans/2026-05-15-scys-extractor.md`（scys 课程页面，最近完成）
 5. **如要自动化测试**：参考第 1 节"开发基础设施速查"重启 receiver + 用 page-world bridge
 6. **如要拉新上游 commit**：参考第 9 节
+
+---
+
+## 附录 B：scys-extractor 实施反思（2026-05-16）
+
+scys.com 课程页面提取器从 brainstorm 到端到端验收通过约 4 小时，22 个 commits。沉淀的教训和可借鉴的模式：
+
+### 做对的事情
+
+1. **先抓真实 API fixture 再写代码**：Task 0 抓了 scys API 返回的 JSON 落到 `src/utils/fixtures/`，所有单测基于 fixture（不是合成数据）。多次 catch 了"接口实际形态 vs spec 假设"的偏差（`file_url` 实际是顶层字段 not nested in image，`created_at` 是 ISO 字符串 not unix，评论 content 是 `block_type=5001` not feishu 原生）。**没有真实 fixture 这些都要到 Task 11 端到端才暴露**，调试成本高很多。
+2. **复用现有渲染管线**：scys 后端"碰巧"返回飞书 docx 原生 block，让我们能复用 `convertBlocksToHtml`。这省了 ~80% block 渲染代码，且使飞书提取器的 bug 修复自动惠及 scys。即使后端结构不同，也应**优先考虑写薄适配层把数据转换到现有管线**而不是另写一套。
+3. **Subagent-Driven Development**：每个 task 派新 subagent 实施 + 两个 reviewer（spec compliance + code quality）。主上下文不被实现细节淹没，subagent 输出可控。22 commits 中约 1/3 是 reviewer 提出的修复——值得。
+4. **自动化端到端循环**：webpack watch + chrome.alarms reload + page-world bridge + HTTP receiver + Python HTML parser 五件套，单轮 ~15 秒。比手测可信也比手测快。
+
+### 走过的弯路
+
+1. **MAIN-world fetch 假设**：spec 设计 L2 fallback 用 `executeScript world: 'MAIN'`，假设这能绕 CORS。**实际仍受目标域 CORS 头限制**。Task 11 测试发现 58 张图全失败才察觉，要回到 spec 修方案。**教训**：CORS 行为按"上下文 origin"分类（content-script = page origin / MAIN world = 同 page origin / background = extension origin），只有 background fetch 凭 host_permissions 真正绕过 CORS。已记入 §1.8。
+2. **dev/ vs dist/ 加载路径混乱**：扩展加载哪个目录决定 `chrome.alarms` poll 哪个 marker。**我反复 watch dev/ 而用户加载 dist/，反复"代码改了 chrome 没反应"**。教训：实施前先问清扩展加载路径。已记入 §2.7。
+3. **webpack 缓存假阴性**：偶尔 webpack 报 `cached`，源代码已改但 emit 文件未更新。`touch` 或 `rm -rf dev/ node_modules/.cache` 强制重建。已记入 §2.9。
+4. **content 字段格式假设**：scys-extractor 早期一次性输出 HTML + markdown 混合到 content 字段，下游 defuddle 把 markdown 字符当 HTML 文本节点 escape，整段评论 squash 成一行。**教训**：cn 现有约定 `content` 字段是 HTML，所有提取器必须遵守；要在 markdown 里嵌入特殊语法（如 Obsidian callout `[!quote]+`）必须重新设计管线，不能边角偷工。最终 scys 接受妥协：评论用 HTML blockquote（失去 callout 类型）。
+5. **CDP eval 30 秒超时**：bridge 触发 + poll 写在同一个 javascript_tool 调用里，bridge 跑 30+ 秒（多张 image fetch）时会触发 CDP 超时。**修复**：拆成两次 javascript_tool 调用——trigger 一次（立即返回 testId），等几秒后单独 poll localStorage。
+
+### 可借鉴的模式（未来类似 feature 实施时复用）
+
+1. **专项提取器骨架**（参考 scys/feishu/bilibili 三个 extractor 的共同 shape）：
+   - `isXxxUrl(url)` URL 检测
+   - `parseXxxUrl(url)` 提取关键参数
+   - `fetchXxxData(...)` API 调用（same-origin 用 `credentials: 'include'`；跨域用 background fetch）
+   - `flattenXxxBlocks(...)` 适配层（结构转换，不做渲染）
+   - 复用 `convertBlocksToHtml` 或自己 render 出 HTML
+   - `resolveXxxImages(html)` 图片 base64 化
+   - `extractXxxStructuredContent(doc)` 主入口，返回 `ScysStructuredContent` 形态
+
+2. **L1/L2/L3 图片下载 fallback** 标准模式（按 CORS 限制递增）：
+   - L1: content-script 同源 fetch（带 page cookie，但受目标域 CORS 限制）
+   - L2: background fetch（凭 host_permissions 绕 CORS，但没有 page cookie）
+   - L3: 保留原 URL（兜底，等价当前行为）
+   - **关键**：必须给目标域 host_permissions，否则 L2 也跨域被拒
+
+3. **第三方 docx 嵌入识别**（§2.4.1）：DOM 含 `.feishu-doc-content` + `.vc-doc-item[data-block-id]` 高概率是飞书 docx 嵌入式渲染。API 返回大概率是飞书 block 形态。
+
+4. **HTML 结构化验收**（§1.9）：md → HTML（markdown-it）→ Python HTMLParser 解析 → magic bytes 校验。比 grep .md 更可靠。`scripts/scys-clip-loop.sh`（plan §11）的 grep 简版只覆盖 60% 缺陷，HTML 解析覆盖 95%。
+
+5. **HTTP receiver + bridge** 是 scys/feishu/bilibili 共用的端到端基础设施。新增 extractor 时**不要重复造**，扩展 `src/content.ts` page-world bridge 的 origin 白名单 + URL 路由分发即可（参考 commit `ca0b17f`）。
+
+### 仍可改进的地方（未列入 §6 feature 因 YAGNI）
+
+- spec 阶段对"image MIME server-side 不可信"没预见到（servers return wrong Content-Type），导致 Task 11 末轮才补 magic-byte detection。下次 spec 检查 image 处理时把"binary 自检"作为默认。
+- bridge 同步/异步 API 拆分得有点繁（sync `renderScysComments` 只为单测保留，prod 用 async 版）。如果 vitest 能 mock fetch 进 async 路径，sync 版可删。
+
+### 跨仓库（上游同步）影响
+
+scys-extractor 是 cn fork 独有 feature，**不计划上游化**（scys.com 是中文小众站点）。但 §1.8/§1.9 总结的 CORS 上下文表 + HTML 结构化验收模式是通用的，未来如果上游讨论扩展 hot-reload / e2e 测试基础设施，可以贡献。

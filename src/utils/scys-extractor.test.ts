@@ -220,23 +220,25 @@ describe('resolveScysImages (L1 same-origin fetch)', () => {
 		expect(resolved).toContain('feishu-image://scys:');
 	});
 
-	it('handles multiple images independently', async () => {
-		let n = 0;
-		global.fetch = vi.fn().mockImplementation(() => {
-			n++;
+	it('handles multiple images independently (mixed success/failure)', async () => {
+		// URL-specific mock — avoids depending on fetch call ordering through Set iteration.
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			// fileUrl is decoded before fetch, so url here is "https://a" / "https://b".
+			const isA = String(url).endsWith('/a');
 			return Promise.resolve({
-				ok: n === 1,
+				ok: isA,
 				headers: new Headers({ 'Content-Type': 'image/png' }),
-				blob: () => Promise.resolve(new Blob([new Uint8Array([n])], { type: 'image/png' })),
+				blob: () => Promise.resolve(new Blob([new Uint8Array([1])], { type: 'image/png' })),
 			});
 		});
 		const html =
 			'<img src="feishu-image://scys:https%3A%2F%2Fa">' +
 			'<img src="feishu-image://scys:https%3A%2F%2Fb">';
 		const resolved = await resolveScysImages(html);
-		// First resolved, second left as placeholder
-		expect((resolved.match(/data:image/g) || []).length).toBe(1);
-		expect((resolved.match(/feishu-image:\/\/scys:/g) || []).length).toBe(1);
+		// a/ succeeded → data URL present; b/ failed → placeholder retained.
+		expect(resolved).toMatch(/<img src="data:image\/png;base64,/);
+		expect(resolved).toContain('feishu-image://scys:https%3A%2F%2Fb');
+		expect(resolved).not.toContain('feishu-image://scys:https%3A%2F%2Fa');
 	});
 
 	it('is a no-op for HTML with no scys tokens', async () => {
@@ -245,5 +247,20 @@ describe('resolveScysImages (L1 same-origin fetch)', () => {
 		const resolved = await resolveScysImages(html);
 		expect(resolved).toBe(html);
 		expect(global.fetch).not.toHaveBeenCalled();
+	});
+
+	it('deduplicates identical tokens into a single fetch call', async () => {
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			headers: new Headers({ 'Content-Type': 'image/png' }),
+			blob: () => Promise.resolve(new Blob([new Uint8Array([1])], { type: 'image/png' })),
+		} as any);
+		const token = 'feishu-image://scys:https%3A%2F%2Fexample.com%2Fsame.png';
+		const html = `<img src="${token}"><img src="${token}">`;
+		const resolved = await resolveScysImages(html);
+		expect(global.fetch).toHaveBeenCalledTimes(1);
+		// Both occurrences in HTML get replaced
+		expect((resolved.match(/data:image/g) || []).length).toBe(2);
+		expect(resolved).not.toContain('feishu-image://scys:');
 	});
 });

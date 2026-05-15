@@ -103,7 +103,10 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 	let bin = '';
 	for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
 	const base64 = btoa(bin);
-	const mime = blob.type || 'application/octet-stream';
+	// Default to image/png when blob.type is missing — application/octet-stream
+	// would make the browser treat the data URL as a download, not an inline <img>.
+	// Matches background.ts:807-813 pattern for feishu images.
+	const mime = blob.type || 'image/png';
 	return `data:${mime};base64,${base64}`;
 }
 
@@ -112,7 +115,8 @@ async function fetchScysImageL1(scysToken: string): Promise<string | null> {
 	try {
 		const res = await fetch(fileUrl, { credentials: 'include' });
 		if (!res.ok) {
-			logger.warn(`[scys-img L1] HTTP ${res.status} for ${fileUrl.slice(0, 80)}...`);
+			const display = fileUrl.length > 80 ? fileUrl.slice(0, 80) + '...' : fileUrl;
+			logger.warn(`[scys-img L1] HTTP ${res.status} for ${display}`);
 			return null;
 		}
 		const blob = await res.blob();

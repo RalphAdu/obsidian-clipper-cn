@@ -159,7 +159,59 @@ OSS 域 `*.aliyuncs.com` 不需要加入 host_permissions：L2 的 MAIN-world fe
 
 **用户当前模板不需要改**——`{{title}}` 自动从首页 og:title「用好 AI 跟上时代」切换到章节标题「02. 积累能力：知识库系统」，文件名也随之更新。
 
-### 3.8 接入点
+### 3.8 评论区抓取与渲染
+
+**API**：`GET /search/course/getCourseComments?course_id=...&chapter_id=...&page=N&page_size=20&sort_by=most_likes`
+
+**返回结构**：
+- `data.total`：评论总数（如本测试章节 70 条）
+- `data.items[]`：评论数组，每条 `{id, user_id, title, content: ScysBlock[], comments: SubComment[], like_count, created_at, ...}`
+- `data.extra.users[]`：本页涉及的用户列表 `{id, name, avatar, xq_group_number}`，需按 `user_id` 建查表
+- `items[].comments`：嵌套子评论（回复）数组，结构同主评论；子评论的 `.comments` 字段可能继续嵌套（实测最深可达多层）
+
+**抓取范围（用户选 β）**：分页全抓直到 `items.length === 0` 或累计达 `total`。20 条/页，70 条 = 约 4 次串行调用。**用户级映射表**跨页累积合并（每页 `extra.users` 增量合入查表）。
+
+**嵌套回复（用户选 ω）**：完整递归保留所有层级的回复。`renderCommentTree(comment, depth)` 函数递归处理 `comment.comments`，每深一级 markdown 引用前缀多一个 `>`。
+
+**评论 content 渲染**：`content` 字段是飞书 docx block 数组（与正文同结构，但每个 block 多了一个服务端预渲染的 `sc_html` 字段）。**统一走 `convertBlocksToHtml` 管线**（忽略 `sc_html`），保持渲染逻辑单一来源。评论内的图片走与正文相同的三级 fallback 下载。
+
+**Markdown 输出（用户选 A — Obsidian 原生 callout）**：
+
+```markdown
+---
+
+## 💬 章节评论（70 条）
+
+> [!quote]+ **叁斤** · 9 ❤️ · 2026-05-10
+> 评论正文 markdown（可能多段、含列表、含图片等）
+>
+> > **杨树亮** · 2 ❤️ · 2026-05-11
+> > 一级回复正文
+> >
+> > > **Gaby🥳** · 2026-05-12
+> > > 二级回复正文
+>
+> > **飞鱼** · 1 ❤️ · 2026-05-11
+> > 另一条一级回复
+```
+
+格式约定：
+- 评论分区作为正文后追加的 H1（与文章主体平级，markdown 中输出为 `## 💬 章节评论（X 条）` 即 h2，因为 chapter.title 不写入 content）
+- 每条主评论用 `> [!quote]+ {user_name} · {N} ❤️ · {YYYY-MM-DD}` 起头（`+` 表示默认展开；点赞数为 0 时省略 ❤️ 段）
+- 评论正文（callout body）使用每行前缀 `> `
+- 一级回复在 callout body 内嵌套 `> > ` 二级引用，回复元信息行 `> > **{user_name}** · {点赞} · {日期}`
+- 多级回复继续追加 `> ` 前缀
+- 多层 callout body 间用空 callout 行（`>`）分隔以视觉分组
+
+**用户名**：从 `data.extra.users` 查表得 `name` 字段。查表失败回退到 ``匿名#{user_id}` `。
+
+**时间**：从 `created_at`（Unix 秒）格式化为 `YYYY-MM-DD`。
+
+**点赞 0 时**：省略 `· N ❤️`。
+
+**评论内图片**：评论 block 数组中 image block 的 `file_url` 与正文同处理。
+
+### 3.9 接入点
 
 `src/content.ts` 当前 line ~269 已有 `feishuContent` 分支，在其后平行加：
 
@@ -175,7 +227,7 @@ const scysContent = isScysCourseUrl(document.URL)
 if (scysContent) {
   extractedContent.title = scysContent.title;
   extractedContent.author = scysContent.author;
-  extractedContent.content = scysContent.content;
+  extractedContent.content = scysContent.content;  // 已含正文 + 评论区
   extractedContent.wordCount = String(scysContent.wordCount);
   extractedContent.description = '';  // 显式覆盖，避免首页 og:description 污染
 }
@@ -210,8 +262,9 @@ scys docx 用 `heading4/5/6` 三级表达文档内层级（飞书 docx 习惯把
 - `parseScysUrl`：course_id + chapter_id 提取
 - `flattenScysBlocks`：嵌套 → 扁平 + `children` 数组，使用合成 fixture
 - **关键 fixture 测试**：保存当前真实 API 响应到 `src/utils/fixtures/scys-chapter-11408.json`，跑 `flattenScysBlocks → convertBlocksToHtml`，断言 HTML 输出片段（含所有 heading 层级、列表、表格、callout、代码块、图片占位）
+- **评论 fixture 测试**：保存评论 API 真实响应到 `src/utils/fixtures/scys-comments-11408.json`（含主评论 + 嵌套回复），跑 `renderCommentTree` 输出 markdown，断言 callout 前缀正确（`> [!quote]+` / `> > ` / `> > > `）、用户名查表正确、日期格式正确
 - `resolveScysImages`：mock fetch，断言 `scys:`-prefixed token 被替换为 base64
-- 失败路径：API 抛错 → `extractScysStructuredContent` 返回 `null`
+- 失败路径：API 抛错 → `extractScysStructuredContent` 返回 `null`；评论 API 单独失败时正文仍能返回
 
 ### 5.2 端到端自动化迭代回路
 
@@ -237,7 +290,11 @@ scys docx 用 `heading4/5/6` 三级表达文档内层级（飞书 docx 习惯把
 - [ ] 4 个 quote_container 为 `> ` 引用
 - [ ] 50 个 image 全部为 `data:image/...;base64,...` 内嵌
 - [ ] 4 个 grid 块按 grid_column 转换（或合理降级）
-- [ ] 浏览器纯文本与 md 纯文本字符差距 < 2%
+- [ ] 浏览器纯文本与 md 纯文本字符差距 < 2%（仅正文段，不含评论）
+- [ ] 评论区以 `## 💬 章节评论（70 条）` H2 起头
+- [ ] 70 条主评论全部抓取（多页累积合并 `extra.users` 表）
+- [ ] 嵌套回复保留所有层级（`> > ` / `> > > ` ...），实测含 8 条回复的主评论展开完整
+- [ ] 每条评论 callout 行含 user_name + 点赞数（>0 时）+ 日期
 
 ## 6. 文件清单
 
@@ -246,6 +303,7 @@ scys docx 用 `heading4/5/6` 三级表达文档内层级（飞书 docx 习惯把
 | 新建 | `src/utils/scys-extractor.ts` |
 | 新建 | `src/utils/scys-extractor.test.ts` |
 | 新建 | `src/utils/fixtures/scys-chapter-11408.json` |
+| 新建 | `src/utils/fixtures/scys-comments-11408.json` |
 | 修改 | `src/content.ts`（line ~269 附近加 scys 分支） |
 | 修改 | `src/manifest.chrome.json` |
 | 修改 | `src/manifest.firefox.json` |
@@ -258,8 +316,9 @@ scys docx 用 `heading4/5/6` 三级表达文档内层级（飞书 docx 习惯把
 1. **基础骨架**：`isScysCourseUrl` / `parseScysUrl` / `fetchScysChapter` / `flattenScysBlocks` + 单测 pass
 2. **HTML 输出**：接 `convertBlocksToHtml`，fixture 测试覆盖所有 block 类型（不含图片）pass
 3. **图片下载 L1**：content-script 同源 fetch 路径
-4. **接入流水线**：`content.ts` 加 scys 分支，dev build，手动跑一次保存到 Obsidian，肉眼初看
-5. **自动化迭代闭环**：跑 §5.3 的 10 条验收清单直至全 pass；过程中发现图片 L1 跨域被拦再补 L2
+4. **评论区抓取与渲染**：`fetchScysComments`（分页累积）、`renderCommentTree`（递归 callout 嵌套）+ fixture 单测 pass
+5. **接入流水线**：`content.ts` 加 scys 分支，dev build，手动跑一次保存到 Obsidian，肉眼初看
+6. **自动化迭代闭环**：跑 §5.3 的验收清单直至全 pass；过程中发现图片 L1 跨域被拦再补 L2
 
 ## 8. 风险与回滚
 
@@ -271,6 +330,9 @@ scys docx 用 `heading4/5/6` 三级表达文档内层级（飞书 docx 习惯把
 | scys 出现新 block_type | 该 block 渲染空 | 现有 `renderBlock` default 分支已 fall-through，不崩；warn 日志 |
 | Safari/Firefox 行为差异 | 跨浏览器构建失败 | 最后一步统一跑 `npm test` + `npm run build` |
 | 误触发于非课程页面 | 干扰 scys.com 其他子页 | `isScysCourseUrl` 严格匹配 `/course/detail/\d+` + chapterId 数字 |
+| 评论 API 401/失败 | 评论区缺失 | 评论抓取与正文解耦：评论失败不阻断正文返回，content 末尾省略评论区 |
+| 评论数极多（如 >500）| 多页串行 API 调用慢，笔记巨大 | 串行 + 进度日志；实测 70 条耗时可接受。本 spec 不限制条数，未来若需可加 setting |
+| 用户隐私（公开评论包含真实用户名）| 笔记落地后用户名留存 | 评论与原页面公开可见一致，未引入新隐私面；用户掌控笔记后续分享 |
 
 **回滚**：提取器是新增模块，未触动通用 Defuddle 路径。回滚 = 删除 `content.ts` 中新增的 import + scys 分支（约 8 行），或在 `isScysCourseUrl` 永远 return false。零侵入。
 
@@ -278,6 +340,7 @@ scys docx 用 `heading4/5/6` 三级表达文档内层级（飞书 docx 习惯把
 
 - ❌ 视频播放器内容抓取（scys 课程含视频，但本任务聚焦正文）
 - ❌ 课程章节侧边栏导航（非当前 chapter 的核心内容）
-- ❌ 评论区 `getCourseComments`（信噪比污染）
+- ❌ 评论的点赞用户头像列表（`latest_like_users`，与笔记内容无关）
+- ❌ 评论的回复点赞数差异化呈现（统一 `· N ❤️` 即可）
 - ❌ 课程购买/学习进度页面（与裁剪无关）
 - ❌ 通用化到其他飞书 docx 嵌入式站点（用户明确选范围 A：仅 scys.com）

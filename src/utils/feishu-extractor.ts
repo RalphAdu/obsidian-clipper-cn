@@ -316,23 +316,31 @@ async function fetchFeishuImageDataUrl(fileToken: string): Promise<string | null
 
 function resolveFeishuFiles(html: string, sourceDocUrl: string): string {
 	const linkPattern = /<a href="feishu-file:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)"(?: data-size="\d+")?>([^<]*)<\/a>/g;
-	const matches: Array<{ full: string; filename: string }> = [];
+	const matches: Array<{ full: string; token: string; filename: string }> = [];
 	let m: RegExpExecArray | null;
 	while ((m = linkPattern.exec(html)) !== null) {
-		matches.push({ full: m[0], filename: m[2] });
+		matches.push({ full: m[0], token: m[1], filename: m[2] });
 	}
 
 	if (matches.length === 0) return html;
 
-	logger.debug(`Resolving ${matches.length} Feishu file(s) -> source doc URL`);
+	logger.debug(`Resolving ${matches.length} Feishu file(s) -> /file/{token} URL`);
 
-	// Inline link to the source Feishu doc: user clicks → opens doc (with the
-	// attachment still embedded inside) in their logged-in browser session.
-	// Keeping the .md file small (no base64 inlined) means Obsidian renders
-	// fast and Export-to-PDF stays clean.
+	// Build link directly to the Feishu file viewer URL: clicking opens the
+	// attachment's preview/download page (not the parent doc). Format:
+	//   https://{tenant}.feishu.cn/file/{file_token}
+	// Falls back to the source doc URL if origin extraction fails.
+	let fileUrlBase: string;
+	try {
+		fileUrlBase = new URL(sourceDocUrl).origin + '/file/';
+	} catch {
+		fileUrlBase = sourceDocUrl;
+	}
+
 	let result = html;
 	for (const item of matches) {
-		const replacement = `<p>📎 <a href="${escapeHtml(sourceDocUrl)}">${escapeHtml(item.filename)}</a></p>`;
+		const fileUrl = `${fileUrlBase}${item.token}`;
+		const replacement = `<p>📎 <a href="${escapeHtml(fileUrl)}">${escapeHtml(item.filename)}</a></p>`;
 		result = result.replace(item.full, replacement);
 	}
 	return result;

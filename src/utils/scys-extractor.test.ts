@@ -264,3 +264,76 @@ describe('resolveScysImages (L1 same-origin fetch)', () => {
 		expect(resolved).not.toContain('feishu-image://scys:');
 	});
 });
+
+import { fetchScysChapter, fetchScysComments } from './scys-extractor';
+
+describe('fetchScysChapter', () => {
+	const originalFetch = global.fetch;
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('hits /search/course/getChapterContent with credentials and returns chapter object', async () => {
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ data: { chapter: { id: 11408, title: 'X', content: [] } } }),
+		} as any);
+		const result = await fetchScysChapter(172, 11408);
+		expect(global.fetch).toHaveBeenCalledWith(
+			'/search/course/getChapterContent?course_id=172&chapter_id=11408',
+			{ credentials: 'include' }
+		);
+		expect(result).toEqual({ id: 11408, title: 'X', content: [] });
+	});
+
+	it('returns null on HTTP error', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 } as any);
+		expect(await fetchScysChapter(172, 11408)).toBeNull();
+	});
+
+	it('returns null on missing data.chapter', async () => {
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ data: {} }),
+		} as any);
+		expect(await fetchScysChapter(172, 11408)).toBeNull();
+	});
+
+	it('returns null when fetch throws', async () => {
+		global.fetch = vi.fn().mockRejectedValue(new Error('network down'));
+		expect(await fetchScysChapter(172, 11408)).toBeNull();
+	});
+});
+
+describe('fetchScysComments', () => {
+	const originalFetch = global.fetch;
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('paginates until total reached, merging items and users', async () => {
+		const pages = [
+			{ data: { total: 25, items: Array(20).fill(null).map((_, i) => ({ id: i, user_id: i, content: [], comments: null, like_count: 0, created_at: 0 })), extra: { users: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] } } },
+			{ data: { total: 25, items: Array(5).fill(null).map((_, i) => ({ id: 20 + i, user_id: 20 + i, content: [], comments: null, like_count: 0, created_at: 0 })), extra: { users: [{ id: 2, name: 'B' }, { id: 3, name: 'C' }] } } },
+		];
+		let n = 0;
+		global.fetch = vi.fn().mockImplementation(() =>
+			Promise.resolve({ ok: true, json: () => Promise.resolve(pages[n++]) } as any)
+		);
+		const result = await fetchScysComments(172, 11408);
+		expect(result?.items).toHaveLength(25);
+		expect(result?.users.size).toBe(3);
+		expect(result?.users.get(2)?.name).toBe('B');
+		expect(result?.total).toBe(25);
+	});
+
+	it('stops if page returns empty items even before total reached (safety)', async () => {
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ data: { total: 100, items: [], extra: { users: [] } } }),
+		} as any);
+		const result = await fetchScysComments(172, 11408);
+		expect(result?.items).toHaveLength(0);
+	});
+
+	it('returns null on first-page fetch error', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: false } as any);
+		expect(await fetchScysComments(172, 11408)).toBeNull();
+	});
+});

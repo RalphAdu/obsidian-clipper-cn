@@ -150,3 +150,118 @@ export async function resolveScysImages(html: string): Promise<string> {
 	}
 	return resolved;
 }
+
+export interface ScysChapter {
+	id: number;
+	title: string;
+	content: ScysBlock[];
+}
+
+export interface ScysComment {
+	id: number;
+	user_id: number;
+	title?: string;
+	content: ScysBlock[];
+	comments?: ScysComment[] | null;
+	like_count: number;
+	created_at: number;
+}
+
+export interface ScysUser {
+	id: number;
+	name: string;
+	avatar?: string;
+}
+
+export interface ScysCommentsResult {
+	total: number;
+	items: ScysComment[];
+	users: Map<number, ScysUser>;
+}
+
+export async function fetchScysChapter(courseId: number, chapterId: number): Promise<ScysChapter | null> {
+	try {
+		const res = await fetch(
+			`/search/course/getChapterContent?course_id=${courseId}&chapter_id=${chapterId}`,
+			{ credentials: 'include' }
+		);
+		if (!res.ok) {
+			logger.warn(`[chapter] HTTP ${res.status}`);
+			return null;
+		}
+		const json = await res.json();
+		const chapter = json?.data?.chapter;
+		if (!chapter || !Array.isArray(chapter.content)) return null;
+		return chapter as ScysChapter;
+	} catch (err) {
+		logger.warn(`[chapter] fetch error: ${String(err)}`);
+		return null;
+	}
+}
+
+export async function fetchScysComments(
+	courseId: number,
+	chapterId: number,
+): Promise<ScysCommentsResult | null> {
+	const pageSize = 20;
+	const items: ScysComment[] = [];
+	const users = new Map<number, ScysUser>();
+	let total = 0;
+	let page = 1;
+	const PAGE_CAP = 50;
+
+	while (true) {
+		let json: any;
+		try {
+			const res = await fetch(
+				`/search/course/getCourseComments?course_id=${courseId}&chapter_id=${chapterId}&page=${page}&page_size=${pageSize}&sort_by=most_likes`,
+				{ credentials: 'include' }
+			);
+			if (!res.ok) {
+				if (page === 1) return null;
+				break;
+			}
+			json = await res.json();
+		} catch (err) {
+			logger.warn(`[comments page=${page}] fetch error: ${String(err)}`);
+			if (page === 1) return null;
+			break;
+		}
+
+		const data = json?.data;
+		if (!data) {
+			if (page === 1) return null;
+			break;
+		}
+		total = data.total ?? total;
+		const pageItems: ScysComment[] = Array.isArray(data.items) ? data.items : [];
+		items.push(...pageItems);
+		for (const u of data.extra?.users ?? []) {
+			if (u?.id) users.set(u.id, { id: u.id, name: u.name, avatar: u.avatar });
+		}
+		if (pageItems.length === 0) break;
+		if (items.length >= total) break;
+		page++;
+		if (page > PAGE_CAP) {
+			logger.warn(`[comments] page cap reached at ${PAGE_CAP}, breaking`);
+			break;
+		}
+	}
+	return { total, items, users };
+}
+
+export async function fetchScysCourse(courseId: number): Promise<{ title?: string; author?: string } | null> {
+	try {
+		const res = await fetch(`/search/course/getCourseDetail?course_id=${courseId}`, { credentials: 'include' });
+		if (!res.ok) return null;
+		const json = await res.json();
+		const course = json?.data?.course ?? json?.data;
+		if (!course) return null;
+		return {
+			title: course.title || course.name,
+			author: course.author || course.teacher_name || course.creator_name,
+		};
+	} catch {
+		return null;
+	}
+}

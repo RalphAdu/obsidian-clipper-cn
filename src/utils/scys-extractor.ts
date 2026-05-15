@@ -93,3 +93,56 @@ export function renderScysChapterContent(scysBlocks: ScysBlock[]): string {
 	};
 	return convertBlocksToHtml([page, ...flat]);
 }
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+	// Avoid FileReader so this works in both browser content scripts and the
+	// node test runner (vitest is not configured with jsdom). Same pattern as
+	// background.ts fetchFeishuImagesViaMainWorld L807-813.
+	const buf = await blob.arrayBuffer();
+	const bytes = new Uint8Array(buf);
+	let bin = '';
+	for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+	const base64 = btoa(bin);
+	const mime = blob.type || 'application/octet-stream';
+	return `data:${mime};base64,${base64}`;
+}
+
+async function fetchScysImageL1(scysToken: string): Promise<string | null> {
+	const fileUrl = decodeURIComponent(scysToken.replace(/^scys:/, ''));
+	try {
+		const res = await fetch(fileUrl, { credentials: 'include' });
+		if (!res.ok) {
+			logger.warn(`[scys-img L1] HTTP ${res.status} for ${fileUrl.slice(0, 80)}...`);
+			return null;
+		}
+		const blob = await res.blob();
+		return await blobToDataUrl(blob);
+	} catch (err) {
+		logger.warn(`[scys-img L1] fetch error: ${String(err)}`);
+		return null;
+	}
+}
+
+export async function resolveScysImages(html: string): Promise<string> {
+	const tokenPattern = /feishu-image:\/\/(scys:[^"'\s>]+)/g;
+	const tokens = new Set<string>();
+	let match: RegExpExecArray | null;
+	while ((match = tokenPattern.exec(html)) !== null) {
+		tokens.add(match[1]);
+	}
+	if (tokens.size === 0) return html;
+
+	const replacements = new Map<string, string>();
+	await Promise.all(
+		Array.from(tokens).map(async (token) => {
+			const dataUrl = await fetchScysImageL1(token);
+			if (dataUrl) replacements.set(token, dataUrl);
+		})
+	);
+
+	let resolved = html;
+	for (const [token, dataUrl] of replacements) {
+		resolved = resolved.split(`feishu-image://${token}`).join(dataUrl);
+	}
+	return resolved;
+}

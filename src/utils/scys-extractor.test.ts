@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { isScysCourseUrl, parseScysUrl } from './scys-extractor';
 
 describe('isScysCourseUrl', () => {
@@ -190,5 +190,60 @@ describe('renderScysChapterContent (real fixture)', () => {
 		// again in the outer flat-array iteration).
 		const imageMatches = html.match(/feishu-image:\/\//g) || [];
 		expect(imageMatches.length).toBe(58);
+	});
+});
+
+import { resolveScysImages } from './scys-extractor';
+
+describe('resolveScysImages (L1 same-origin fetch)', () => {
+	const originalFetch = global.fetch;
+
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('replaces scys: token with base64 data URL on success', async () => {
+		const png1x1 = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			headers: new Headers({ 'Content-Type': 'image/png' }),
+			blob: () => Promise.resolve(new Blob([png1x1], { type: 'image/png' })),
+		} as any);
+		const html = '<img src="feishu-image://scys:https%3A%2F%2Fexample.com%2Fa.png">';
+		const resolved = await resolveScysImages(html);
+		expect(resolved).toMatch(/<img src="data:image\/png;base64,[A-Za-z0-9+/=]+">/);
+		expect(resolved).not.toContain('feishu-image://scys:');
+	});
+
+	it('leaves token in place if fetch fails', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: false } as any);
+		const html = '<img src="feishu-image://scys:https%3A%2F%2Fexample.com%2Fa.png">';
+		const resolved = await resolveScysImages(html);
+		expect(resolved).toContain('feishu-image://scys:');
+	});
+
+	it('handles multiple images independently', async () => {
+		let n = 0;
+		global.fetch = vi.fn().mockImplementation(() => {
+			n++;
+			return Promise.resolve({
+				ok: n === 1,
+				headers: new Headers({ 'Content-Type': 'image/png' }),
+				blob: () => Promise.resolve(new Blob([new Uint8Array([n])], { type: 'image/png' })),
+			});
+		});
+		const html =
+			'<img src="feishu-image://scys:https%3A%2F%2Fa">' +
+			'<img src="feishu-image://scys:https%3A%2F%2Fb">';
+		const resolved = await resolveScysImages(html);
+		// First resolved, second left as placeholder
+		expect((resolved.match(/data:image/g) || []).length).toBe(1);
+		expect((resolved.match(/feishu-image:\/\/scys:/g) || []).length).toBe(1);
+	});
+
+	it('is a no-op for HTML with no scys tokens', async () => {
+		global.fetch = vi.fn();
+		const html = '<p>no images here</p><img src="https://example.com/x.png">';
+		const resolved = await resolveScysImages(html);
+		expect(resolved).toBe(html);
+		expect(global.fetch).not.toHaveBeenCalled();
 	});
 });

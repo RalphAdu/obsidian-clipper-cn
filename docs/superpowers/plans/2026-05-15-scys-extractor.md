@@ -10,6 +10,15 @@
 
 **Spec:** [`docs/superpowers/specs/2026-05-15-scys-extractor-design.md`](../specs/2026-05-15-scys-extractor-design.md)
 
+## 自动化基础设施（沿用 BACKLOG §1）
+
+本 plan 复用 cn 仓库已有的飞书裁剪自动化三件套，把 Task 0 fixture 抓取与 Task 11 端到端验收做成**全自动循环**。一次性人工：用户首次手动加载 dev build 到 chrome（5 秒）。
+
+- **Hot-reload (`chrome.alarms`)**（commit `a04bc32`）：webpack rebuild → 扩展自动 reload；content.ts 需 tab navigate 才重新注入
+- **Page-world test bridge**（`src/content.ts` 末尾）：监听 `window.postMessage({type:'__obsidianClipperTestExtract__',testId,uploadUrl})` 触发完整提取管线；当前仅在 feishu/lark origin 响应，本 plan Task 8 扩展支持 scys.com
+- **HTTP receiver**（`/tmp/recv_server.py`）：临时启动，接收大 markdown / fixture，单次 POST 后自动 shutdown
+- **chrome MCP javascript_tool**：page world 触发 bridge + poll localStorage 拿短摘要
+
 ---
 
 ## File Structure
@@ -44,33 +53,81 @@
 
 ---
 
-## Task 0: 准备真实 API fixture
+## Task 0: 准备真实 API fixture（全自动）
+
+**前提**：claude-in-chrome MCP 已连接、scys.com 在某 tab 已登录会话有效
 
 **Files:**
+- Create: `/tmp/recv_server.py`（临时，会话结束可删）
 - Create: `src/utils/fixtures/scys-chapter-11408.json`
 - Create: `src/utils/fixtures/scys-comments-11408.json`
 
-- [ ] **Step 1: 在已登录 scys.com 的 Chrome 标签页 DevTools Console 执行以下脚本抓章节 fixture**
+- [ ] **Step 1: 写 receiver 脚本（落 fixture 用）**
 
-打开 `https://scys.com/course/detail/172?chapterId=11408`，等页面加载完成，DevTools Console 粘贴：
+Create `/tmp/recv_server.py`：
+
+```python
+#!/usr/bin/env python3
+"""One-shot HTTP receiver: writes POST body to file, then shuts down."""
+import sys, http.server, socketserver
+
+OUT_PATH, PORT = sys.argv[1], int(sys.argv[2])
+
+class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(n)
+        with open(OUT_PATH, 'wb') as f:
+            f.write(body)
+        self.send_response(200); self.send_header('Access-Control-Allow-Origin','*'); self.end_headers()
+        self.wfile.write(b'ok')
+        # Schedule shutdown
+        import threading; threading.Thread(target=self.server.shutdown, daemon=True).start()
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin','*')
+        self.send_header('Access-Control-Allow-Methods','POST,OPTIONS')
+        self.send_header('Access-Control-Allow-Headers','Content-Type')
+        self.end_headers()
+    def log_message(self, *a): pass
+
+with socketserver.TCPServer(('127.0.0.1', PORT), H) as srv:
+    srv.serve_forever()
+```
+
+- [ ] **Step 2: 抓章节 fixture（receiver + javascript_tool 协同）**
+
+Bash 启动 receiver 监听 17923：
+
+```bash
+mkdir -p src/utils/fixtures
+lsof -i:17923 -t 2>/dev/null | xargs -r kill -9 2>/dev/null
+nohup python3 /tmp/recv_server.py "$(pwd)/src/utils/fixtures/scys-chapter-11408.json" 17923 > /tmp/recv-chapter.log 2>&1 < /dev/null &
+disown
+sleep 0.5
+```
+
+用 claude-in-chrome `tabs_context_mcp` 找 scys 标签 ID，然后 `javascript_tool`（在 scys.com origin 内运行 fetch 同源，cookie 自动带）：
 
 ```js
 fetch('/search/course/getChapterContent?course_id=172&chapter_id=11408', { credentials: 'include' })
   .then(r => r.json())
-  .then(d => {
-    const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'scys-chapter-11408.json';
-    a.click();
-  });
+  .then(d => fetch('http://127.0.0.1:17923/', { method: 'POST', body: JSON.stringify(d, null, 2) }))
+  .then(r => 'uploaded: ' + r.status);
 ```
 
-把下载的 JSON 移动到 `src/utils/fixtures/scys-chapter-11408.json`。
+Expected: `"uploaded: 200"`. Receiver 写完文件自动 shutdown。
 
-- [ ] **Step 2: 同方式抓 4 页评论合并为单一 fixture**
+- [ ] **Step 3: 抓评论 fixture（4 页合并）**
 
-DevTools Console：
+```bash
+lsof -i:17923 -t 2>/dev/null | xargs -r kill -9 2>/dev/null
+nohup python3 /tmp/recv_server.py "$(pwd)/src/utils/fixtures/scys-comments-11408.json" 17923 > /tmp/recv-comments.log 2>&1 < /dev/null &
+disown
+sleep 0.5
+```
+
+`javascript_tool`：
 
 ```js
 Promise.all([1,2,3,4].map(p =>
@@ -85,19 +142,14 @@ Promise.all([1,2,3,4].map(p =>
     status: pages[0]?.status,
     _meta: { pageCount: pages.length, fetchedAt: new Date().toISOString() },
   };
-  const blob = new Blob([JSON.stringify(merged, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'scys-comments-11408.json';
-  a.click();
-});
+  return fetch('http://127.0.0.1:17923/', { method: 'POST', body: JSON.stringify(merged, null, 2) });
+}).then(r => 'uploaded: ' + r.status);
 ```
 
-把下载的 JSON 移动到 `src/utils/fixtures/scys-comments-11408.json`。
+Expected: `"uploaded: 200"`
 
-- [ ] **Step 3: 验证 fixture 完整性**
+- [ ] **Step 4: 验证 fixture 完整性**
 
-Run:
 ```bash
 jq '.data.chapter.content | length' src/utils/fixtures/scys-chapter-11408.json
 jq '.data.items | length, .data.total, (.data.extra.users | length)' src/utils/fixtures/scys-comments-11408.json
@@ -107,7 +159,7 @@ Expected:
 - chapter content blocks: 应为约 **399** 个（数字可能微小波动）
 - comments items: 应为 **70**；total: **70**；users 数 >= 15
 
-- [ ] **Step 4: Commit fixture**
+- [ ] **Step 5: Commit fixture**
 
 ```bash
 git add -f src/utils/fixtures/scys-chapter-11408.json src/utils/fixtures/scys-comments-11408.json
@@ -1278,7 +1330,72 @@ if (scysContent) {
 }
 ```
 
-- [ ] **Step 4: TypeScript 类型检查**
+- [ ] **Step 4: 扩展 page-world test bridge 支持 scys**
+
+修改 `src/content.ts:602` 当前的 origin 白名单和路由逻辑。
+
+将原有 line ~598-647 整个 `window.addEventListener('message', ...)` 块替换为：
+
+```ts
+window.addEventListener('message', async (event) => {
+  const data = event.data;
+  if (!data || data.type !== '__obsidianClipperTestExtract__') return;
+  const origin = location.hostname;
+  if (!/feishu\.cn$|larksuite\.com$|^scys\.com$/.test(origin)) return;
+  const testId = data.testId;
+  const key = '__obsidianClipperTestResult__:' + testId;
+  try {
+    localStorage.setItem(key, JSON.stringify({ status: 'running' }));
+
+    // Route by URL: scys.com → scys-extractor; feishu/lark → feishu-extractor.
+    let result: { title?: string; content?: string } | null = null;
+    let source: 'scys' | 'feishu' | null = null;
+    if (isScysCourseUrl(document.URL)) {
+      result = await extractScysStructuredContent(document);
+      source = 'scys';
+    } else if (isFeishuDocUrl(document.URL)) {
+      result = await extractFeishuStructuredContent(document);
+      source = 'feishu';
+    } else {
+      localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'unsupported url for bridge' }));
+      return;
+    }
+
+    const content = result?.content || '';
+    const defuddleMod = await import('defuddle/full');
+    const markdown = defuddleMod.createMarkdownContent(content, document.URL);
+
+    // Security: only upload to localhost / 127.0.0.1 (BACKLOG §5.2 option B).
+    if (data.uploadUrl && typeof data.uploadUrl === 'string') {
+      try {
+        const u = new URL(data.uploadUrl);
+        const isLocal = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
+        if (isLocal) {
+          await fetch(data.uploadUrl, { method: 'POST', body: markdown });
+        }
+      } catch { /* best-effort */ }
+    }
+    localStorage.setItem(key, JSON.stringify({
+      status: 'done',
+      source,
+      title: result?.title,
+      contentLength: content.length,
+      contentHead: content.slice(0, 500),
+      contentTail: content.slice(-2000),
+      markdownLength: markdown.length,
+      markdownHead: markdown.slice(0, 500),
+      markdownTail: markdown.slice(-1000),
+      uploadedTo: data.uploadUrl || null,
+    }));
+  } catch (err) {
+    localStorage.setItem(key, JSON.stringify({ status: 'error', error: String(err) }));
+  }
+});
+```
+
+注意：bridge 块依赖 `isScysCourseUrl` / `extractScysStructuredContent` — 已在 Step 1 import。`isFeishuDocUrl` / `extractFeishuStructuredContent` 也已在 import 区。
+
+- [ ] **Step 5: TypeScript 类型检查**
 
 ```bash
 npx tsc --noEmit
@@ -1286,7 +1403,7 @@ npx tsc --noEmit
 
 Expected: no errors
 
-- [ ] **Step 5: 跑全部测试**
+- [ ] **Step 6: 跑全部测试**
 
 ```bash
 npm test
@@ -1294,11 +1411,16 @@ npm test
 
 Expected: all PASS (含现有 feishu / bilibili / scys 等)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/content.ts
-git commit -m "feat(scys): wire scys-extractor into content.ts extraction flow"
+git commit -m "feat(scys): wire scys-extractor into content.ts + extend test bridge
+
+- Add scys-extractor branch to extraction pipeline (parallel to feishu/bilibili).
+- Extend page-world test bridge to route by URL (scys.com → scys-extractor,
+  feishu.cn/larksuite.com → feishu-extractor).
+- Restrict bridge uploadUrl to localhost/127.0.0.1 (BACKLOG §5.2 option B)."
 ```
 
 ---
@@ -1477,105 +1599,210 @@ git commit -m "feat(scys): add image L2 fallback via background MAIN-world fetch
 
 ---
 
-## Task 11: 端到端验收闭环
+## Task 11: 端到端验收（全自动循环）
 
-**Files:**（仅手动验证 + 产出最终修复 commit）
+**前提一次性人工**：用户首次手动加载 dev build 到 chrome（`chrome://extensions/` → 启用开发者模式 → 加载已解压扩展 → 选 `dev/`）。此后所有迭代全自动。
 
-- [ ] **Step 1: dev build 并装扩展**
+**Files:** 仅 markdown 输出 + 最终修复 commit（无新文件）
+
+### 11.1 准备阶段（每个会话一次）
+
+- [ ] **Step 1: 启动 webpack dev:chrome 后台 watch**
 
 ```bash
-npm run dev:chrome
+lsof -i:8080 -t 2>/dev/null | xargs -r kill -9 2>/dev/null  # 确保端口清洁（如有冲突）
+npm run dev:chrome > /tmp/scys-dev-build.log 2>&1 &
+echo $! > /tmp/scys-dev-build.pid
+disown
 ```
 
-Chrome `chrome://extensions/` → 加载已解压扩展 → 选 `dev/` 目录。
-
-(若已加载，按"重新加载"按钮，或等 build-marker 自动触发。)
-
-- [ ] **Step 2: 触发裁剪**
-
-打开 `https://scys.com/course/detail/172?chapterId=11408`，登录后等正文加载，点击扩展图标 → 用默认模板保存到 Obsidian。
-
-- [ ] **Step 3: 读取保存的 md 并跑验收清单**
+确认首次 build 完成：
 
 ```bash
-ls -t "/Users/adu/Documents/Obsidian /Life/Clippings/"*.md | head -1
+sleep 5
+tail -20 /tmp/scys-dev-build.log
+ls -la dev/build-marker.txt
 ```
 
-取最新 .md，用以下 grep 命令逐条验证（替换 `<file>` 为最新文件路径）：
+Expected: `dev/build-marker.txt` 存在且最近修改
+
+- [ ] **Step 2: 确认用户已加载扩展**
+
+需要用户确认：chrome `chrome://extensions/` 中有 "obsidian-web-clipper-cn" 卡片，扩展 ID 为 `emjmdeaegbnlmhieedkmlajpbkpacgok`（BACKLOG §2.8）。
+
+测试方法：在 scys.com tab 跑 `javascript_tool`：
+
+```js
+document.documentElement.getAttribute('data-cn-clipper-build');
+```
+
+Expected: 非 null 时间戳字符串。如果 null → 提示用户加载扩展或刷新 tab。
+
+### 11.2 单轮迭代（循环直至验收通过）
+
+- [ ] **Step 3: 等 webpack 重新 build + chrome.alarms 自动 reload**
+
+修改完代码后：
 
 ```bash
-file="<file>"
+# 等 webpack 写新的 build-marker
+sleep 3
+# 等 chrome.alarms 触发 reload（轮询间隔 3 秒，给个安全窗口）
+sleep 4
+```
+
+- [ ] **Step 4: navigate scys tab 重新注入 content.js**
+
+claude-in-chrome `navigate`：
+
+```
+navigate(tabId, 'https://scys.com/course/detail/172?chapterId=11408')
+```
+
+等 DOM 加载：
+
+```js
+new Promise(r => setTimeout(() => r('ready'), 3000));
+```
+
+验证 content.js 注入：
+
+```js
+document.documentElement.getAttribute('data-cn-clipper-build');
+```
+
+Expected: 时间戳应大于上次记录的值（证明新版本 content.js 已注入）
+
+- [ ] **Step 5: 启动 receiver 接收 markdown**
+
+```bash
+OUT="/Users/adu/Documents/Obsidian /Life/_cn-test/scys-test.md"
+mkdir -p "$(dirname "$OUT")"
+lsof -i:17923 -t 2>/dev/null | xargs -r kill -9 2>/dev/null
+nohup python3 /tmp/recv_server.py "$OUT" 17923 > /tmp/recv-scys.log 2>&1 < /dev/null &
+disown
+sleep 0.5
+```
+
+- [ ] **Step 6: 触发 bridge**
+
+claude-in-chrome `javascript_tool`：
+
+```js
+const testId = 'scys-' + Date.now();
+const key = '__obsidianClipperTestResult__:' + testId;
+localStorage.setItem(key, JSON.stringify({ status: 'pending' }));
+window.postMessage({
+  type: '__obsidianClipperTestExtract__',
+  testId,
+  uploadUrl: 'http://127.0.0.1:17923/'
+}, location.origin);
+testId;
+```
+
+记下返回的 testId。
+
+- [ ] **Step 7: poll localStorage 等结果**
+
+`javascript_tool`（最多 30 秒）：
+
+```js
+new Promise((resolve) => {
+  const testId = 'PASTE_FROM_STEP_6';
+  const key = '__obsidianClipperTestResult__:' + testId;
+  const t0 = Date.now();
+  const check = () => {
+    const raw = localStorage.getItem(key);
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch {}
+    if (parsed && parsed.status !== 'pending' && parsed.status !== 'running') {
+      resolve(parsed);
+    } else if (Date.now() - t0 > 30000) {
+      resolve({ status: 'timeout', last: parsed });
+    } else {
+      setTimeout(check, 500);
+    }
+  };
+  check();
+});
+```
+
+Expected: `{ status: 'done', source: 'scys', title: '02. 积累能力：知识库系统', markdownLength: > 10000, uploadedTo: 'http://127.0.0.1:17923/' }`
+
+- [ ] **Step 8: 读 markdown 跑验收清单**
+
+receiver 已把 markdown 写到 `_cn-test/scys-test.md`：
+
+```bash
+FILE="/Users/adu/Documents/Obsidian /Life/_cn-test/scys-test.md"
+wc -l "$FILE"
+
 echo "==== title ===="
-head -5 "$file" | grep -E '^title:'
+head -8 "$FILE"
 
 echo "==== headings ===="
-echo "Expected h2 count >= 6 (chapter headings rewritten):"
-grep -cE '^## ' "$file"
-echo "Expected h3 count >= 5:"
-grep -cE '^### ' "$file"
-echo "Expected h4 count >= 3:"
-grep -cE '^#### ' "$file"
+echo "h2 (expect >= 6):"; grep -cE '^## ' "$FILE"
+echo "h3 (expect >= 5):"; grep -cE '^### ' "$FILE"
+echo "h4 (expect >= 3):"; grep -cE '^#### ' "$FILE"
 
-echo "==== specific headings ===="
-grep -E '^## (0|1|2)\. ' "$file"
+echo "==== specific body headings (rewritten from h4→h2 etc) ===="
+grep -E '^## (0\.|1\.|2\.) ' "$FILE"
 
 echo "==== images ===="
-echo "Expected: base64 images embedded (>= 50):"
-grep -cE 'data:image/[a-z]+;base64,' "$file"
-echo "Expected: NO oss signed URLs left:"
-grep -cE 'sphere-sh\.oss-cn-shanghai\.aliyuncs\.com' "$file"
+echo "base64 embedded (expect >= 50):"; grep -cE 'data:image/[a-z]+;base64,' "$FILE"
+echo "oss URLs leaked (expect 0):"; grep -cE 'sphere-sh\.oss-cn-shanghai\.aliyuncs\.com' "$FILE"
 
 echo "==== lists ===="
-echo "Expected: ordered list items (>= 10):"
-grep -cE '^[0-9]+\. ' "$file"
-echo "Expected: bullet list items (>= 33):"
-grep -cE '^- ' "$file"
+echo "ordered list items (expect >= 10):"; grep -cE '^[0-9]+\. ' "$FILE"
+echo "bullet list items (expect >= 33):"; grep -cE '^- ' "$FILE"
 
 echo "==== tables ===="
-echo "Expected table separator rows (>= 4):"
-grep -cE '^\|.*\|.*\|$' "$file"
-
-echo "==== callouts ===="
-echo "Expected: body 4 callout blocks render as plain blockquotes (current feishu-extractor behavior)."
-echo "Comment-section quote callouts (one per main comment):"
-grep -cE '> \[!quote\]\+' "$file"
-echo "Body callout blockquotes (lines starting with > but not [!quote]):"
-grep -cE '^> [^[]' "$file" | head -1
+echo "markdown table rows (expect >= 4):"; grep -cE '^\|.*\|.*\|$' "$FILE"
 
 echo "==== comments section ===="
-echo "Expected H2 comments header:"
-grep -E '^## 💬 章节评论' "$file"
-echo "Expected nested replies (> > prefix):"
-grep -cE '^> > \*\*' "$file"
+echo "Expected H2 comments header (1 occurrence):"; grep -cE '^## 💬 章节评论' "$FILE"
+echo "Expected quote callouts (70 main comments, expect ~70):"; grep -cE '^> \[!quote\]\+' "$FILE"
+echo "Expected nested replies (> > prefix, expect >= 9):"; grep -cE '^> > \*\*' "$FILE"
+echo "Expected ❤️ markers (expect >= 24, both main + replies):"; grep -cE '❤️' "$FILE"
 ```
 
-- [ ] **Step 4: 对照 spec §5.3 验收清单逐条勾选**
+- [ ] **Step 9: 分析 fail，修代码，回 Step 3**
 
-记录每条 pass/fail。若有 fail：
+按 spec §5.3 验收清单与上一步 grep 输出逐条比对：
 
-- **图片仍是 OSS URL（L1 失败）**：执行 Task 10（图片 L2 fallback）
-- **某 block 类型未渲染**：检查 feishu-extractor.renderBlock 是否处理该 type，必要时在 scys-extractor 加 fallback
-- **评论嵌套层级错误**：检查 renderOneCommentAsync 的 depth 参数传递
+| 失败模式 | 修复方向 |
+|---|---|
+| 图片仍是 OSS URL（L1 全失败）| 启用 Task 10（L2 background MAIN-world fallback） |
+| 某 block 类型渲染为空 | 检查 feishu-extractor `renderBlock` 是否处理该 type，必要时在 scys flatten 时降级转换 |
+| 评论嵌套层级错（缺 `>>>`）| 检查 `renderOneCommentAsync` 的 depth 参数递归 |
+| heading 层级错（缺 `##` 节标题）| 检查 Task 2 的 HEADING_REWRITE 映射 |
+| title 错（仍是 og:title）| 检查 Task 8 Step 3 的 extractedContent.title 覆盖 |
 
-修复后回 Step 2 重新触发裁剪。
+修代码后回 **Step 3**（等 build + reload）。每轮回路约 15-20 秒。
 
-- [ ] **Step 5: 通过全部验收后，commit 任何修复**
+### 11.3 完成阶段
+
+- [ ] **Step 10: 全部验收通过后，commit 修复（如有）**
 
 ```bash
+git status
+# 若有未 commit 修改：
 git add -A
-git status  # 确认无意外文件
-git commit -m "fix(scys): {根据实际修复填}"
+git commit -m "fix(scys): {填实际修复内容}"
 ```
 
-- [ ] **Step 6: 跑全量构建确保跨浏览器没有 regression**
+- [ ] **Step 11: 跨浏览器全量构建**
 
 ```bash
+# 先停掉 dev watch
+kill $(cat /tmp/scys-dev-build.pid 2>/dev/null) 2>/dev/null
+
 npm run build 2>&1 | tail -30
 ```
 
-Expected: chrome/firefox/safari 三个 build 全部 success。
+Expected: chrome / firefox / safari 三个 build 全部 success。
 
-- [ ] **Step 7: 跑全部单测**
+- [ ] **Step 12: 跑全部单测**
 
 ```bash
 npm test
@@ -1583,13 +1810,31 @@ npm test
 
 Expected: all PASS
 
-- [ ] **Step 8: 最终 commit（如需）**
+- [ ] **Step 13: 在 Obsidian 中目视验证（人工）**
+
+```bash
+open "obsidian://open?vault=Life&file=_cn-test/scys-test"
+```
+
+确认：
+- 文章正文层级合理（章节 H2 → 节 H3 → 子节 H4）
+- 图片全部可见（不是破损图标，不是网络加载状态）
+- 评论以蓝色 quote 块呈现，可折叠
+- 嵌套回复层级清晰
+
+(目视验证 BACKLOG §1.5 提到 `screencapture` 受 macOS 屏幕录制权限限制，仅靠用户肉眼。)
+
+- [ ] **Step 14: 最终 commit + 清理**
 
 ```bash
 git status
-# 若有未 commit 的修改：
+# 任何遗留修改：
 git add -A
 git commit -m "chore(scys): finalize end-to-end acceptance"
+
+# 清理测试文件（验证完毕）
+rm -rf "/Users/adu/Documents/Obsidian /Life/_cn-test"
+lsof -i:17923 -t 2>/dev/null | xargs -r kill -9 2>/dev/null
 ```
 
 ---

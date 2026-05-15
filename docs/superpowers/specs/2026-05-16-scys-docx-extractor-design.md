@@ -251,7 +251,13 @@ const scysContent = (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL
   : null;
 ```
 
-`isScysDocxUrl` import 加到顶部。下游 `if (scysContent) { ... }` 合并逻辑零变化。
+把 `isScysDocxUrl` 加入现有的 `scys-extractor` import 行：
+
+```ts
+import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl } from './utils/scys-extractor';
+```
+
+下游 `if (scysContent) { ... }` 合并逻辑零变化（继续按 `scysContent.title / .author / .content / .wordCount` 字段处理）。
 
 ### 3.8 跨浏览器兼容性
 

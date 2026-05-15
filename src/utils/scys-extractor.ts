@@ -347,6 +347,8 @@ function renderOneComment(comment: ScysComment, users: Map<number, ScysUser>, de
 	return parts.join('\n');
 }
 
+// Sync variant retained for unit tests that don't need image resolution.
+// Production code uses renderScysCommentsAsync (called from extractScysStructuredContent).
 export function renderScysComments(result: ScysCommentsResult): string {
 	if (!result.items.length) return '';
 	const header = `## 💬 章节评论（${result.total} 条）`;
@@ -367,7 +369,8 @@ function countWordsFromBlocks(blocks: FeishuBlock[]): number {
 		const body =
 			b.text || (b as any).heading1 || (b as any).heading2 || (b as any).heading3 ||
 			(b as any).heading4 || (b as any).heading5 || (b as any).heading6 ||
-			b.bullet || b.ordered || b.code || b.quote || b.callout;
+			(b as any).heading7 || (b as any).heading8 || (b as any).heading9 ||
+			b.bullet || b.ordered || b.code || b.quote || b.callout || b.todo;
 		if (!body?.elements) continue;
 		for (const el of body.elements) {
 			const c = el.text_run?.content || '';
@@ -395,9 +398,15 @@ async function renderOneCommentAsync(
 	if (bodyPrefixed) parts.push(bodyPrefixed);
 
 	const replies = Array.isArray(comment.comments) ? comment.comments : [];
-	for (const reply of replies) {
+	// Render sibling replies concurrently (mirrors renderScysCommentsAsync's
+	// top-level concurrency). Order is preserved by Promise.all + sequential
+	// interleave below.
+	const renderedReplies = await Promise.all(
+		replies.map(r => renderOneCommentAsync(r, users, depth + 1))
+	);
+	for (const rendered of renderedReplies) {
 		parts.push(prefix);
-		parts.push(await renderOneCommentAsync(reply, users, depth + 1));
+		parts.push(rendered);
 	}
 	return parts.join('\n');
 }

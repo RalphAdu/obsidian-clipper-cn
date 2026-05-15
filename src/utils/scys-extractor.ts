@@ -1,4 +1,5 @@
 import { createLogger } from './logger';
+import { convertBlocksToHtml } from './feishu-extractor';
 import type { FeishuBlock } from './feishu-extractor';
 
 const logger = createLogger('scys-extractor');
@@ -75,4 +76,9 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 
 	for (const b of blocks) walk(b);
 	return out;
+}
+
+export function renderScysChapterContent(scysBlocks: ScysBlock[]): string {
+	const flat = flattenScysBlocks(scysBlocks);
+	return convertBlocksToHtml(flat);
 }

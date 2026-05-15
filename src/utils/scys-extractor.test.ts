@@ -114,3 +114,64 @@ describe('flattenScysBlocks', () => {
 		expect(flat[0].children).toBeUndefined();
 	});
 });
+
+import fixtureChapter from './fixtures/scys-chapter-11408.json';
+import { renderScysChapterContent } from './scys-extractor';
+
+describe('renderScysChapterContent (real fixture)', () => {
+	const blocks = (fixtureChapter as any).data.chapter.content;
+
+	it('produces HTML containing all chapter h2 headings', () => {
+		const html = renderScysChapterContent(blocks);
+		// HEADING4 (block_type=6) is rewritten to HEADING2 → <h2>
+		expect(html).toContain('<h2>0. 本章概要</h2>');
+		expect(html).toContain('<h2>1. 什么是积累能力</h2>');
+		expect(html).toContain('<h2>2. 积累能力的三个核心技能</h2>');
+	});
+
+	it('produces h3 for HEADING5 (e.g. "2.1 需求判断...")', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toMatch(/<h3>(?:<strong>)?2\.1\s*需求判断/);
+	});
+
+	it('produces h4 for HEADING6 (e.g. "2.1.1 用途...")', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toMatch(/<h4>(?:<strong>)?2\.1\.1\s*用途/);
+	});
+
+	it('renders bullet list block as <ul>', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toMatch(/<ul>[\s\S]*<li>/);
+	});
+
+	it('renders ordered list block as <ol>', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toMatch(/<ol>[\s\S]*<li>/);
+	});
+
+	it('renders callout block as blockquote.feishu-callout', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toContain('class="feishu-callout"');
+	});
+
+	it('renders code block as <pre><code>', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toMatch(/<pre><code>/);
+	});
+
+	it('renders table block', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toMatch(/<table[\s>]/);
+	});
+
+	it('keeps image placeholders with scys: prefixed src for later resolution', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toMatch(/<img src="feishu-image:\/\/scys:[^"]+"/);
+	});
+
+	it('injects scys: token for all image blocks in real fixture', () => {
+		const html = renderScysChapterContent(blocks);
+		const matches = html.match(/feishu-image:\/\/scys:/g) || [];
+		expect(matches.length).toBeGreaterThanOrEqual(50);
+	});
+});

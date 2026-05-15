@@ -605,7 +605,7 @@ function getTextBody(block: FeishuBlock): FeishuTextBody | undefined {
 	}
 }
 
-function convertBlocksToHtml(blocks: FeishuBlock[]): string {
+export function convertBlocksToHtml(blocks: FeishuBlock[]): string {
 	const blockMap = new Map<string, FeishuBlock>();
 	for (const b of blocks) {
 		blockMap.set(b.block_id, b);

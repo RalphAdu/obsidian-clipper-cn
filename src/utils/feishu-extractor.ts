@@ -315,32 +315,25 @@ async function fetchFeishuImageDataUrl(fileToken: string): Promise<string | null
 }
 
 function resolveFeishuFiles(html: string, sourceDocUrl: string): string {
-	const linkPattern = /<a href="feishu-file:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)"(?: data-size="\d+")?>([^<]*)<\/a>/g;
-	const matches: Array<{ full: string; token: string; filename: string }> = [];
+	const linkPattern = /<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">([^<]*)<\/a>/g;
+	const matches: Array<{ full: string; blockId: string; filename: string }> = [];
 	let m: RegExpExecArray | null;
 	while ((m = linkPattern.exec(html)) !== null) {
-		matches.push({ full: m[0], token: m[1], filename: m[2] });
+		matches.push({ full: m[0], blockId: m[1], filename: m[2] });
 	}
 
 	if (matches.length === 0) return html;
 
-	logger.debug(`Resolving ${matches.length} Feishu file(s) -> /file/{token} URL`);
+	logger.debug(`Resolving ${matches.length} Feishu file(s) -> source doc + block anchor`);
 
-	// Build link directly to the Feishu file viewer URL: clicking opens the
-	// attachment's preview/download page (not the parent doc). Format:
-	//   https://{tenant}.feishu.cn/file/{file_token}
-	// Falls back to the source doc URL if origin extraction fails.
-	let fileUrlBase: string;
-	try {
-		fileUrlBase = new URL(sourceDocUrl).origin + '/file/';
-	} catch {
-		fileUrlBase = sourceDocUrl;
-	}
-
+	// Feishu attachments don't have standalone URLs. Instead, link to the
+	// parent doc URL with the file block's id as URL hash — Feishu's docx
+	// reader scrolls the matching block into view on load, so clicking the
+	// link opens the doc with the PDF preview already in viewport.
 	let result = html;
 	for (const item of matches) {
-		const fileUrl = `${fileUrlBase}${item.token}`;
-		const replacement = `<p>📎 <a href="${escapeHtml(fileUrl)}">${escapeHtml(item.filename)}</a></p>`;
+		const url = `${sourceDocUrl}#${item.blockId}`;
+		const replacement = `<p>📎 <a href="${escapeHtml(url)}">${escapeHtml(item.filename)}</a></p>`;
 		result = result.replace(item.full, replacement);
 	}
 	return result;
@@ -707,11 +700,14 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 
 		case FEISHU_BLOCK_TYPE.FILE: {
 			const file = block.file;
-			if (!file?.token || !file?.name) {
+			if (!file?.name || !block.block_id) {
 				return file?.name ? `<p>📎 ${escapeHtml(file.name)}</p>` : '';
 			}
-			const sizeAttr = typeof file.size === 'number' ? ` data-size="${file.size}"` : '';
-			return `<a href="feishu-file://${file.token}" data-filename="${escapeHtml(file.name)}"${sizeAttr}>${escapeHtml(file.name)}</a>`;
+			// Use block_id (not file_token): Feishu doesn't expose attachments
+			// as standalone /file/{token} URLs — they live inside their parent
+			// doc. Anchor with #{block_id} makes the doc scroll to the
+			// attachment when opened.
+			return `<a href="feishu-file-block://${block.block_id}" data-filename="${escapeHtml(file.name)}">${escapeHtml(file.name)}</a>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.TABLE: {

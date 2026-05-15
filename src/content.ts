@@ -13,7 +13,7 @@ import { debugLog } from './utils/debug';
 import { createLogger } from './utils/logger';
 import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bilibili-extractor';
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
-import { extractScysStructuredContent, isScysCourseUrl } from './utils/scys-extractor';
+import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl } from './utils/scys-extractor';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
 const contentLogger = createLogger('Content');
@@ -273,7 +273,7 @@ declare global {
 					return null;
 				})
 				: null;
-			const scysContent = isScysCourseUrl(document.URL)
+			const scysContent = (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL))
 				? await extractScysStructuredContent(document).catch((error) => {
 					contentLogger.warn('Failed to extract scys structured content', { error: String(error) });
 					return null;
@@ -623,7 +623,7 @@ declare global {
 			// Route by URL: scys.com → scys-extractor; feishu/lark → feishu-extractor.
 			let result: { title?: string; content?: string } | null = null;
 			let source: 'scys' | 'feishu' | null = null;
-			if (isScysCourseUrl(document.URL)) {
+			if (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL)) {
 				result = await extractScysStructuredContent(document);
 				source = 'scys';
 			} else if (isFeishuDocUrl(document.URL)) {

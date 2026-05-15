@@ -55,7 +55,7 @@ interface FeishuTextBody {
 	};
 }
 
-interface FeishuBlock {
+export interface FeishuBlock {
 	block_id: string;
 	parent_id?: string;
 	children?: string[];

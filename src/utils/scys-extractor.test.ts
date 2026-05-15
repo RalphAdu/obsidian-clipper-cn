@@ -337,3 +337,109 @@ describe('fetchScysComments', () => {
 		expect(await fetchScysComments(172, 11408)).toBeNull();
 	});
 });
+
+import { renderScysComments, formatScysCommentHeader, ScysComment, ScysCommentsResult } from './scys-extractor';
+
+describe('formatScysCommentHeader', () => {
+	it('formats with user, likes>0, and date', () => {
+		const users = new Map([[1, { id: 1, name: '叁斤' }]]);
+		// 1715000000 unix sec = 2024-05-06 in UTC, allow CN/US TZ slack:
+		const out = formatScysCommentHeader({ user_id: 1, like_count: 9, created_at: 1715000000 } as any, users);
+		expect(out).toMatch(/^\*\*叁斤\*\* · 9 ❤️ · 2024-05-0[6-7]$/);
+	});
+	it('omits ❤️ segment when like_count is 0', () => {
+		const users = new Map([[1, { id: 1, name: '叁斤' }]]);
+		const out = formatScysCommentHeader({ user_id: 1, like_count: 0, created_at: 1715000000 } as any, users);
+		expect(out).toMatch(/^\*\*叁斤\*\* · 2024-05-0[6-7]$/);
+	});
+	it('falls back to anonymous when user not in map', () => {
+		const out = formatScysCommentHeader({ user_id: 999, like_count: 0, created_at: 1715000000 } as any, new Map());
+		expect(out).toMatch(/^\*\*匿名#999\*\* · 2024-05-0[6-7]$/);
+	});
+});
+
+describe('renderScysComments', () => {
+	const baseUsers = new Map([
+		[1, { id: 1, name: '叁斤' }],
+		[2, { id: 2, name: '杨树亮' }],
+		[3, { id: 3, name: 'Gaby' }],
+	]);
+	const mkComment = (id: number, userId: number, likes: number, createdAt: number, content: ScysBlock[], replies?: ScysComment[]): ScysComment => ({
+		id, user_id: userId, like_count: likes, created_at: createdAt, content, comments: replies ?? null,
+	});
+	const textBlock = (s: string): ScysBlock => ({
+		block_id: `t${Math.random().toString(36).slice(2, 10)}`,
+		block_type: 2,
+		text: { elements: [{ text_run: { content: s } }] },
+	});
+
+	it('renders empty section when no items', () => {
+		expect(renderScysComments({ total: 0, items: [], users: baseUsers }).trim()).toBe('');
+	});
+
+	it('renders H2 header and one main comment with body', () => {
+		const result: ScysCommentsResult = {
+			total: 1, users: baseUsers,
+			items: [mkComment(1, 1, 9, 1715000000, [textBlock('hello world')])],
+		};
+		const md = renderScysComments(result);
+		expect(md).toContain('## 💬 章节评论（1 条）');
+		expect(md).toMatch(/> \[!quote\]\+ \*\*叁斤\*\* · 9 ❤️ · 2024-05-0[6-7]/);
+		expect(md).toContain('> hello world');
+	});
+
+	it('renders nested replies with > > prefix and triple-nested with > > >', () => {
+		const lvl3 = mkComment(3, 3, 0, 1715000000, [textBlock('深嵌套')]);
+		const lvl2 = mkComment(2, 2, 2, 1715000000, [textBlock('一级回复')], [lvl3]);
+		const top = mkComment(1, 1, 9, 1715000000, [textBlock('主评论')], [lvl2]);
+		const md = renderScysComments({ total: 1, items: [top], users: baseUsers });
+		expect(md).toMatch(/^> \[!quote\]\+/m);
+		expect(md).toContain('> 主评论');
+		expect(md).toMatch(/> > \*\*杨树亮\*\* · 2 ❤️/);
+		expect(md).toContain('> > 一级回复');
+		expect(md).toMatch(/> > > \*\*Gaby\*\*/);
+		expect(md).toContain('> > > 深嵌套');
+	});
+
+	it('uses total in header even when items < total', () => {
+		const result: ScysCommentsResult = {
+			total: 70, users: baseUsers,
+			items: [mkComment(1, 1, 0, 1715000000, [textBlock('x')])],
+		};
+		expect(renderScysComments(result)).toContain('## 💬 章节评论（70 条）');
+	});
+});
+
+import fixtureComments from './fixtures/scys-comments-11408.json';
+import { ScysUser } from './scys-extractor';
+
+describe('renderScysComments (real fixture)', () => {
+	const fix = fixtureComments as any;
+	const users = new Map<number, ScysUser>();
+	for (const u of fix.data.extra.users) users.set(u.id, u);
+	const result: ScysCommentsResult = {
+		total: fix.data.total,
+		items: fix.data.items,
+		users,
+	};
+
+	it('renders header with 70 total comments', () => {
+		expect(renderScysComments(result)).toContain('## 💬 章节评论（70 条）');
+	});
+
+	it('includes at least one reply nested with > > prefix', () => {
+		const md = renderScysComments(result);
+		expect(md).toMatch(/^> > \*\*/m);
+	});
+
+	it('shows ❤️ for at least one main comment (likes > 0)', () => {
+		const md = renderScysComments(result);
+		expect(md).toMatch(/❤️/);
+	});
+
+	it('emits exactly 70 top-level [!quote]+ markers (one per main comment)', () => {
+		const md = renderScysComments(result);
+		const matches = md.match(/^> \[!quote\]\+/gm) || [];
+		expect(matches.length).toBe(70);
+	});
+});

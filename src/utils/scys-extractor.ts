@@ -268,3 +268,69 @@ export async function fetchScysCourse(courseId: number): Promise<{ title?: strin
 		return null;
 	}
 }
+
+function formatScysDate(unixSec: number): string {
+	const d = new Date(unixSec * 1000);
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
+export function formatScysCommentHeader(comment: ScysComment, users: Map<number, ScysUser>): string {
+	const user = users.get(comment.user_id);
+	const name = user?.name ?? `匿名#${comment.user_id}`;
+	const date = formatScysDate(comment.created_at);
+	const likes = comment.like_count > 0 ? ` · ${comment.like_count} ❤️` : '';
+	return `**${name}**${likes} · ${date}`;
+}
+
+// Simple HTML→markdown bridge scoped to comment-body needs. The chapter
+// rendering pipeline uses turndown downstream; for comments we render to
+// markdown inline so we can prefix each line with `> ` for callout nesting.
+function htmlToMdSafe(html: string): string {
+	let s = html;
+	s = s.replace(/<\/p>\s*<p>/g, '\n\n');
+	s = s.replace(/<p>/g, '').replace(/<\/p>/g, '\n');
+	s = s.replace(/<strong>([\s\S]*?)<\/strong>/g, '**$1**');
+	s = s.replace(/<em>([\s\S]*?)<\/em>/g, '*$1*');
+	s = s.replace(/<code>([\s\S]*?)<\/code>/g, '`$1`');
+	s = s.replace(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g, '[$2]($1)');
+	s = s.replace(/<li>([\s\S]*?)<\/li>/g, '- $1\n');
+	s = s.replace(/<\/?(ul|ol)>/g, '');
+	s = s.replace(/<br\s*\/?>/g, '\n');
+	s = s.replace(/<[^>]+>/g, '');
+	s = s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+	return s.trim();
+}
+
+function prefixLines(text: string, prefix: string): string {
+	return text.split('\n').map(line => line ? `${prefix} ${line}` : prefix.trimEnd()).join('\n');
+}
+
+function renderOneComment(comment: ScysComment, users: Map<number, ScysUser>, depth: number): string {
+	const prefix = Array(depth + 1).fill('>').join(' ');
+	const headerLine = depth === 0
+		? `${prefix} [!quote]+ ${formatScysCommentHeader(comment, users)}`
+		: `${prefix} ${formatScysCommentHeader(comment, users)}`;
+	const bodyHtml = convertBlocksToHtml(flattenScysBlocks(comment.content ?? []));
+	const bodyMd = htmlToMdSafe(bodyHtml);
+	const bodyPrefixed = bodyMd ? prefixLines(bodyMd, prefix) : '';
+
+	const parts: string[] = [headerLine];
+	if (bodyPrefixed) parts.push(bodyPrefixed);
+
+	const replies = Array.isArray(comment.comments) ? comment.comments : [];
+	for (const reply of replies) {
+		parts.push(prefix); // empty quote line as separator
+		parts.push(renderOneComment(reply, users, depth + 1));
+	}
+	return parts.join('\n');
+}
+
+export function renderScysComments(result: ScysCommentsResult): string {
+	if (!result.items.length) return '';
+	const header = `## 💬 章节评论（${result.total} 条）`;
+	const body = result.items.map(item => renderOneComment(item, result.users, 0)).join('\n\n');
+	return `\n\n---\n\n${header}\n\n${body}\n`;
+}

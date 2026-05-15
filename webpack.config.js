@@ -25,12 +25,12 @@ module.exports = (env, argv) => {
 	const isSafari = env.BROWSER === 'safari';
 	const isProduction = argv.mode === 'production';
 
+	// cn 约定：开发与生产构建统一输出到 dist*/。Chrome 等扩展恒定加载 dist/，
+	// 避免出现"watch 在 dev/ 而扩展加载 dist/"导致的代码改了 reload 没反应。
+	// 开发模式仍带 sourcemap + 不 minify（见 devtool / optimization 配置），
+	// production build 写同一目录覆盖之，是预期行为。
 	const getOutputDir = () => {
-		if (isProduction) {
-			return isFirefox ? 'dist_firefox' : (isSafari ? 'dist_safari' : 'dist');
-		} else {
-			return isFirefox ? 'dev_firefox' : (isSafari ? 'dev_safari' : 'dev');
-		}
+		return isFirefox ? 'dist_firefox' : (isSafari ? 'dist_safari' : 'dist');
 	};
 
 	const outputDir = getOutputDir();

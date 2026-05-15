@@ -314,6 +314,69 @@ async function fetchFeishuImageDataUrl(fileToken: string): Promise<string | null
 	}
 }
 
+async function fetchFeishuSheetData(token: string): Promise<{ values: string[][] } | null> {
+	// token = {spreadsheet_token}_{sheet_id} — last underscore is the separator
+	const idx = token.lastIndexOf('_');
+	if (idx < 0) {
+		logger.warn(`Invalid sheet token format: ${token}`);
+		return null;
+	}
+	const ssToken = token.slice(0, idx);
+	const sheetId = token.slice(idx + 1);
+
+	// Feishu's public OpenAPI exposes cell values but not cell styles (bold,
+	// color, etc.) — the /style and /v3 cells endpoints return 404. Bold
+	// detection would require the cookie-based MainWorld pattern used for
+	// images; deferred as a follow-up enhancement.
+	try {
+		const resp = await fetchFeishuApi(
+			`https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/${ssToken}/values_batch_get?ranges=${sheetId}&valueRenderOption=ToString`
+		);
+		const values = (resp?.data?.valueRanges?.[0]?.values as string[][]) || [];
+		return { values };
+	} catch (e) {
+		logger.warn(`Sheet fetch failed [${token}]: ${String(e)}`);
+		return null;
+	}
+}
+
+function renderSheetAsHtmlTable(values: string[][]): string {
+	if (values.length === 0) return '<p>📊 [Sheet 为空]</p>';
+	const escape = (s: any) => escapeHtml(String(s ?? ''));
+
+	const [header, ...rows] = values;
+	const headHtml = `<thead><tr>${header.map((c) => `<th>${escape(c)}</th>`).join('')}</tr></thead>`;
+	const bodyHtml = `<tbody>${rows
+		.map((row) => `<tr>${row.map((c) => `<td>${escape(c)}</td>`).join('')}</tr>`)
+		.join('')}</tbody>`;
+	return `<table>${headHtml}${bodyHtml}</table>`;
+}
+
+async function resolveFeishuSheets(html: string): Promise<string> {
+	const placeholderPattern = /<table data-feishu-sheet="([^"]+)"><\/table>/g;
+	const matches: Array<{ full: string; token: string }> = [];
+	let m: RegExpExecArray | null;
+	while ((m = placeholderPattern.exec(html)) !== null) {
+		matches.push({ full: m[0], token: m[1] });
+	}
+
+	if (matches.length === 0) return html;
+
+	logger.debug(`Resolving ${matches.length} Feishu sheet(s)`);
+
+	// Concurrent fetch all sheets
+	const results = await Promise.all(matches.map((m) => fetchFeishuSheetData(m.token).then((r) => ({ token: m.token, full: m.full, data: r }))));
+
+	let result = html;
+	for (const item of results) {
+		const replacement = item.data
+			? renderSheetAsHtmlTable(item.data.values)
+			: `<p>📊 [Sheet 加载失败: ${escapeHtml(item.token.slice(0, 10))}...]</p>`;
+		result = result.replace(item.full, replacement);
+	}
+	return result;
+}
+
 function resolveFeishuFiles(html: string, sourceDocUrl: string): string {
 	const linkPattern = /<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">([^<]*)<\/a>/g;
 	const matches: Array<{ full: string; blockId: string; filename: string }> = [];
@@ -730,9 +793,17 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 			return renderBlockChildren(block, blockMap);
 		}
 
+		case FEISHU_BLOCK_TYPE.SHEET: {
+			// Embedded spreadsheet: token format is {spreadsheet_token}_{sheet_id}.
+			// Emit a placeholder; resolveFeishuSheets() fetches data + replaces it
+			// with a real HTML table.
+			const token = (block as any).sheet?.token;
+			if (!token) return `<p>📊 [Sheet 无 token]</p>`;
+			return `<table data-feishu-sheet="${token}"></table>`;
+		}
+
 		case FEISHU_BLOCK_TYPE.IFRAME:
 		case FEISHU_BLOCK_TYPE.WIDGET:
-		case FEISHU_BLOCK_TYPE.SHEET:
 		case FEISHU_BLOCK_TYPE.MINDNOTE:
 		case FEISHU_BLOCK_TYPE.DIAGRAM:
 		case FEISHU_BLOCK_TYPE.CHAT_CARD:
@@ -805,7 +876,8 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	const rawContent = convertBlocksToHtml(blocks);
 	const imagesResolved = await resolveFeishuImages(rawContent);
-	const content = resolveFeishuFiles(imagesResolved, doc.URL);
+	const sheetsResolved = await resolveFeishuSheets(imagesResolved);
+	const content = resolveFeishuFiles(sheetsResolved, doc.URL);
 	const title = meta?.title || doc.title || '';
 
 	const textContent = blocks

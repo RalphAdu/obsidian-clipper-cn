@@ -46,6 +46,12 @@
 		{
 			"matches": ["http://*/*", "https://*/*"],
 			"js": ["browser-polyfill.min.js", "content.js"]
+		},
+		{
+			"matches": ["https://scys.com/view/docx/*"],
+			"js": ["scys-docx-patch.js"],
+			"run_at": "document_start",
+			"world": "MAIN"
 		}
 	],
 	"web_accessible_resources": [

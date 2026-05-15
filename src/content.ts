@@ -610,17 +610,36 @@ declare global {
 			}
 			const result = await extractFeishuStructuredContent(document);
 			const content = result?.content || '';
+			// Also run defuddle's HTML→Markdown so callers can verify the final
+			// markdown shape that Obsidian receives.
+			const defuddleMod = await import('defuddle/full');
+			const markdown = defuddleMod.createMarkdownContent(content, document.URL);
+			// If caller passed uploadUrl, POST the full markdown there so the
+			// caller can grab it without size limits on localStorage / message return.
+			if (data.uploadUrl && typeof data.uploadUrl === 'string') {
+				try {
+					await fetch(data.uploadUrl, { method: 'POST', body: markdown });
+				} catch (e) {
+					// best-effort; main result still goes to localStorage
+				}
+			}
 			localStorage.setItem(key, JSON.stringify({
 				status: 'done',
 				title: result?.title,
 				contentLength: content.length,
 				contentHead: content.slice(0, 500),
 				contentTail: content.slice(-2000),
+				markdownLength: markdown.length,
+				markdownHead: markdown.slice(0, 500),
+				markdownTail: markdown.slice(-1000),
 				containsFileLink: /<a href="data:application\/[^"]+">/.test(content),
 				containsDataPdf: content.includes('data:application/pdf;base64,'),
 				containsFallback: content.includes('请到原飞书文档下载'),
 				containsDownloadFailed: content.includes('下载失败'),
 				containsFeishuFilePlaceholder: content.includes('feishu-file://'),
+				markdownContainsFeishuLink: /\[[^\]]*\.pdf\]\(https:\/\/[^\)]*feishu\.cn[^\)]*\)/i.test(markdown),
+				markdownFullSize: markdown.length,
+				uploadedTo: data.uploadUrl || null,
 			}));
 		} catch (err) {
 			localStorage.setItem(key, JSON.stringify({ status: 'error', error: String(err) }));

@@ -13,6 +13,7 @@ import { debugLog } from './utils/debug';
 import { createLogger } from './utils/logger';
 import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bilibili-extractor';
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
+import { extractScysStructuredContent, isScysCourseUrl } from './utils/scys-extractor';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
 const contentLogger = createLogger('Content');
@@ -272,6 +273,12 @@ declare global {
 					return null;
 				})
 				: null;
+			const scysContent = isScysCourseUrl(document.URL)
+				? await extractScysStructuredContent(document).catch((error) => {
+					contentLogger.warn('Failed to extract scys structured content', { error: String(error) });
+					return null;
+				})
+				: null;
 			const extractedContent: { [key: string]: string } = {
 				...defuddled.variables,
 			};
@@ -284,6 +291,14 @@ declare global {
 				extractedContent.bvid = bilibiliContent.bvid;
 				extractedContent.cid = String(bilibiliContent.cid);
 				extractedContent.page = String(bilibiliContent.page);
+			}
+
+			if (scysContent) {
+				extractedContent.title = scysContent.title;
+				extractedContent.author = scysContent.author;
+				extractedContent.content = scysContent.content;
+				extractedContent.wordCount = String(scysContent.wordCount);
+				extractedContent.description = '';
 			}
 
 				// Create a new DOMParser
@@ -599,32 +614,43 @@ declare global {
 		const data = event.data;
 		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
 		const origin = location.hostname;
-		if (!/feishu\.cn$|larksuite\.com$/.test(origin)) return;
+		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$/.test(origin)) return;
 		const testId = data.testId;
 		const key = '__obsidianClipperTestResult__:' + testId;
 		try {
 			localStorage.setItem(key, JSON.stringify({ status: 'running' }));
-			if (!isFeishuDocUrl(document.URL)) {
-				localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'not a feishu doc url' }));
+
+			// Route by URL: scys.com → scys-extractor; feishu/lark → feishu-extractor.
+			let result: { title?: string; content?: string } | null = null;
+			let source: 'scys' | 'feishu' | null = null;
+			if (isScysCourseUrl(document.URL)) {
+				result = await extractScysStructuredContent(document);
+				source = 'scys';
+			} else if (isFeishuDocUrl(document.URL)) {
+				result = await extractFeishuStructuredContent(document);
+				source = 'feishu';
+			} else {
+				localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'unsupported url for bridge' }));
 				return;
 			}
-			const result = await extractFeishuStructuredContent(document);
+
 			const content = result?.content || '';
-			// Also run defuddle's HTML→Markdown so callers can verify the final
-			// markdown shape that Obsidian receives.
 			const defuddleMod = await import('defuddle/full');
 			const markdown = defuddleMod.createMarkdownContent(content, document.URL);
-			// If caller passed uploadUrl, POST the full markdown there so the
-			// caller can grab it without size limits on localStorage / message return.
+
+			// Security: only upload to localhost / 127.0.0.1 (BACKLOG §5.2 option B).
 			if (data.uploadUrl && typeof data.uploadUrl === 'string') {
 				try {
-					await fetch(data.uploadUrl, { method: 'POST', body: markdown });
-				} catch (e) {
-					// best-effort; main result still goes to localStorage
-				}
+					const u = new URL(data.uploadUrl);
+					const isLocal = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
+					if (isLocal) {
+						await fetch(data.uploadUrl, { method: 'POST', body: markdown });
+					}
+				} catch { /* best-effort */ }
 			}
 			localStorage.setItem(key, JSON.stringify({
 				status: 'done',
+				source,
 				title: result?.title,
 				contentLength: content.length,
 				contentHead: content.slice(0, 500),
@@ -632,13 +658,6 @@ declare global {
 				markdownLength: markdown.length,
 				markdownHead: markdown.slice(0, 500),
 				markdownTail: markdown.slice(-1000),
-				containsFileLink: /<a href="data:application\/[^"]+">/.test(content),
-				containsDataPdf: content.includes('data:application/pdf;base64,'),
-				containsFallback: content.includes('请到原飞书文档下载'),
-				containsDownloadFailed: content.includes('下载失败'),
-				containsFeishuFilePlaceholder: content.includes('feishu-file://'),
-				markdownContainsFeishuLink: /\[[^\]]*\.pdf\]\(https:\/\/[^\)]*feishu\.cn[^\)]*\)/i.test(markdown),
-				markdownFullSize: markdown.length,
 				uploadedTo: data.uploadUrl || null,
 			}));
 		} catch (err) {

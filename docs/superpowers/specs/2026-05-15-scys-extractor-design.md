@@ -142,7 +142,9 @@ if (block.block_type === FEISHU_BLOCK_TYPE.IMAGE && block.image?.file_url) {
 "https://scys.com/*"
 ```
 
-（OSS 域 `*.aliyuncs.com` 仅在 L2 路径需要，但 L2 是 MAIN-world fetch 在页面 runtime 里跑，受页面 CORS 而非扩展权限管控——同 feishu 的 `*.feishucontent.com` 当前也不在 host_permissions 里。）
+**用途**：允许 background 用 `chrome.scripting.executeScript` 注入到 scys.com 页面（L2 图片下载路径需要）。注意：L1 路径的同源 fetch 在 content script 内运行，本身不需要 host_permissions（content script 受页面 CORS 管控，不受扩展权限管控）；但 content script 能注入到 scys.com 已由 manifest 的 `content_scripts.matches`（`<all_urls>`）覆盖，所以 L1 路径单看不需要追加权限。host_permissions 的必要性来自 L2 fallback 的 executeScript 注入。
+
+OSS 域 `*.aliyuncs.com` 不需要加入 host_permissions：L2 的 MAIN-world fetch 在页面 runtime 跑，受页面 CORS 而非扩展权限管控——与现有 feishu 的 `*.feishucontent.com` 缺席同理。
 
 ### 3.7 元数据契约
 
@@ -183,14 +185,22 @@ if (scysContent) {
 
 scys docx 用 `heading4/5/6` 三级表达文档内层级（飞书 docx 习惯把 h1~h3 留给版式）。映射为：
 
-| 来源 | 输出 markdown | 示例 |
+| 来源 | 用途 | 输出 |
 |---|---|---|
-| `chapter.title`（API 顶层） | `# {title}` | `# 02. 积累能力：知识库系统` |
-| `block_type=6` (HEADING4) | `## ` | `## 2. 积累能力的三个核心技能` |
-| `block_type=7` (HEADING5) | `### ` | `### 2.1 需求判断…` |
-| `block_type=8` (HEADING6) | `#### ` | `#### 2.1.1 用途…` |
+| `chapter.title`（API 顶层） | **仅写入 frontmatter `title` 字段**，不写入 content HTML | `title: "02. 积累能力：知识库系统"` |
+| `block_type=6` (HEADING4) | content HTML | `<h1>` → markdown `# 2. 积累能力的三个核心技能` |
+| `block_type=7` (HEADING5) | content HTML | `<h2>` → markdown `## 2.1 需求判断…` |
+| `block_type=8` (HEADING6) | content HTML | `<h3>` → markdown `### 2.1.1 用途…` |
 
-现有 `feishu-extractor.renderBlock` 中已有 HEADING1..9 → `<h1>..<h6>`（clamp）映射，无需改动渲染器。
+**避免重复**：chapter.title 不在 content HTML 中作为 h1 重复出现，否则用户笔记会同时有「frontmatter title」+「文件名（来自模板的 {{title}}）」+「正文 h1」三处重复同名标题。content 内最大标题从 HEADING4 起。
+
+现有 `feishu-extractor.renderBlock` 中 HEADING1..9 → `<h1>..<h6>` 的 clamp 映射会让 block_type=6/7/8 输出 `<h1>/<h2>/<h3>`（HEADING1=block_type 3 → h1，HEADING4=block_type 6 → 应是 h4——这里需要确认渲染器实际映射规则，必要时在 scys-extractor 的 flatten 阶段把 block_type 偏移以输出期望层级）。
+
+**实现时确认点**：检查 `feishu-extractor.renderBlock` 对 HEADING4/5/6 的实际输出层级。若它直接映射为 h4/h5/h6，则 scys 内容会从 h4 起步，layout 偏深。两种处理选项实现时择一：
+- 选项 A（推荐）：在 flatten 适配阶段把 scys 的 block_type 6/7/8 改写为 3/4/5（HEADING1/2/3），让渲染器输出 h1/h2/h3
+- 选项 B：保持 block_type 原样，接受 h4/h5/h6 输出，由用户模板/Obsidian 渲染处理
+
+实现阶段先验证 feishu-extractor 当前实际行为再决定，记录在 implementation plan 里。
 
 ## 5. 测试策略
 

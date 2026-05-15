@@ -131,12 +131,16 @@ describe('renderScysChapterContent (real fixture)', () => {
 
 	it('produces h3 for HEADING5 (e.g. "2.1 需求判断...")', () => {
 		const html = renderScysChapterContent(blocks);
+		// heading5 elements in this fixture have bold:false → no <strong> wrapper.
+		// The optional wrapper allowance defends against future bold heading5 data.
 		expect(html).toMatch(/<h3>(?:<strong>)?2\.1\s*需求判断/);
 	});
 
 	it('produces h4 for HEADING6 (e.g. "2.1.1 用途...")', () => {
 		const html = renderScysChapterContent(blocks);
-		expect(html).toMatch(/<h4>(?:<strong>)?2\.1\.1\s*用途/);
+		// heading6 elements in this fixture have bold:true on text_run →
+		// renderTextElements wraps content in <strong>. Required, not optional.
+		expect(html).toMatch(/<h4><strong>2\.1\.1\s*用途/);
 	});
 
 	it('renders bullet list block as <ul>', () => {
@@ -171,7 +175,20 @@ describe('renderScysChapterContent (real fixture)', () => {
 
 	it('injects scys: token for all image blocks in real fixture', () => {
 		const html = renderScysChapterContent(blocks);
+		// Real fixture has exactly 58 image blocks (block_type=27); every one should
+		// produce a scys:-prefixed placeholder in the rendered HTML.
 		const matches = html.match(/feishu-image:\/\/scys:/g) || [];
-		expect(matches.length).toBeGreaterThanOrEqual(50);
+		expect(matches.length).toBe(58);
+	});
+
+	it('does not double-render content nested inside containers', () => {
+		const html = renderScysChapterContent(blocks);
+		// Real fixture has 58 image blocks (block_type=27). Counting feishu-image:
+		// occurrences must equal exactly 58 — duplicates from container double-render
+		// would push the count higher (pre-fix this fixture produced 74 due to
+		// callout/table contents being rendered both inside their container and
+		// again in the outer flat-array iteration).
+		const imageMatches = html.match(/feishu-image:\/\//g) || [];
+		expect(imageMatches.length).toBe(58);
 	});
 });

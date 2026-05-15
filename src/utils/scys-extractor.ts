@@ -80,5 +80,16 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 
 export function renderScysChapterContent(scysBlocks: ScysBlock[]): string {
 	const flat = flattenScysBlocks(scysBlocks);
-	return convertBlocksToHtml(flat);
+	// scys API doesn't include a PAGE block, so synthesise one so convertBlocksToHtml
+	// uses the renderChildren(pageBlock.children, blockMap) path. Otherwise it falls
+	// back to iterating the entire flat array, which re-renders content nested inside
+	// callout/table/grid/quote_container containers (double output).
+	const rootIds = scysBlocks.map(b => b.block_id);
+	const FEISHU_PAGE_TYPE = 1;
+	const page: FeishuBlock = {
+		block_id: '__scys_page__',
+		block_type: FEISHU_PAGE_TYPE,
+		children: rootIds,
+	};
+	return convertBlocksToHtml([page, ...flat]);
 }

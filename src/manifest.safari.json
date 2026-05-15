@@ -17,7 +17,8 @@
 		"<all_urls>",
 		"http://*/*",
 		"https://*/*",
-		"https://scys.com/*"
+		"https://scys.com/*",
+		"https://*.aliyuncs.com/*"
 	],
 	"action": {
 		"default_popup": "popup.html",

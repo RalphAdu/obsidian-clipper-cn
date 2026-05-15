@@ -142,9 +142,9 @@ if (block.block_type === FEISHU_BLOCK_TYPE.IMAGE && block.image?.file_url) {
 "https://scys.com/*"
 ```
 
-**用途**：允许 background 用 `chrome.scripting.executeScript` 注入到 scys.com 页面（L2 图片下载路径需要）。注意：L1 路径的同源 fetch 在 content script 内运行，本身不需要 host_permissions（content script 受页面 CORS 管控，不受扩展权限管控）；但 content script 能注入到 scys.com 已由 manifest 的 `content_scripts.matches`（`<all_urls>`）覆盖，所以 L1 路径单看不需要追加权限。host_permissions 的必要性来自 L2 fallback 的 executeScript 注入。
+**用途**：允许 background 在 scys.com 页面注入辅助逻辑（content-script alone already has this via `content_scripts.matches: <all_urls>`，但显式列出 host_permissions 是好习惯）。
 
-OSS 域 `*.aliyuncs.com` 不需要加入 host_permissions：L2 的 MAIN-world fetch 在页面 runtime 跑，受页面 CORS 而非扩展权限管控——与现有 feishu 的 `*.feishucontent.com` 缺席同理。
+**OSS 图片域**：`https://*.aliyuncs.com/*` 也加入 host_permissions。L2 fallback 改为**直接在 background 上下文 fetch OSS URL** —— 扩展凭 host_permissions 绕过页面 CORS，无需 executeScript（MAIN-world fetch 同样受 OSS CORS 限制，已实测无效）。
 
 ### 3.7 元数据契约
 

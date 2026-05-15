@@ -912,47 +912,29 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 		}
 
 		if (typedRequest.action === 'fetchScysImagesViaMainWorld') {
-			const tabId = sender.tab?.id;
-			if (!tabId) {
-				sendResponse({ success: false, error: 'No tab ID' });
-				return true;
-			}
 			const urls = (typedRequest as any).urls as string[];
 			if (!Array.isArray(urls) || urls.length === 0) {
 				sendResponse({ success: false, error: 'Missing urls' });
 				return true;
 			}
-			// IMPORTANT: Promise chains only — no async/await in injected MAIN-world function
-			// (no __awaiter polyfill is available in page runtime).
-			chrome.scripting.executeScript({
-				target: { tabId },
-				world: 'MAIN',
-				func: (urls: string[]) => {
-					const results: Record<string, string> = {};
-					const fetchOne = function(url: string): Promise<void> {
-						return fetch(url, { credentials: 'include' }).then(function(res: Response) {
-							if (!res.ok) return;
-							const mime = (res.headers.get('Content-Type') || 'image/png').split(';')[0].trim();
-							return res.arrayBuffer().then(function(buf: ArrayBuffer) {
-								const bytes = new Uint8Array(buf);
-								let bin = '';
-								for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
-								results[url] = 'data:' + mime + ';base64,' + btoa(bin);
-							});
-						}).catch(function() { /* ignore */ });
-					};
-					return urls.reduce(function(chain: Promise<void>, u: string) {
-						return chain.then(function() { return fetchOne(u); });
-					}, Promise.resolve()).then(function() {
-						return { success: true as const, results };
-					});
-				},
-				args: [urls],
-			}, (injection: any) => {
-				const out = injection?.[0]?.result;
-				if (out?.success) sendResponse(out);
-				else sendResponse({ success: false, error: 'executeScript no result' });
-			});
+			(async () => {
+				const results: Record<string, string> = {};
+				await Promise.all(urls.map(async (url) => {
+					try {
+						const res = await fetch(url);
+						if (!res.ok) return;
+						const mime = (res.headers.get('Content-Type') || 'image/png').split(';')[0].trim();
+						const buf = await res.arrayBuffer();
+						const bytes = new Uint8Array(buf);
+						let bin = '';
+						for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+						results[url] = `data:${mime};base64,${btoa(bin)}`;
+					} catch (err) {
+						// best-effort; leave unresolved
+					}
+				}));
+				sendResponse({ success: true, results });
+			})();
 			return true;
 		}
 

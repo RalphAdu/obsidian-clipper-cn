@@ -19,7 +19,8 @@
 		"<all_urls>",
 		"http://*/*",
 		"https://*/*",
-		"https://scys.com/*"
+		"https://scys.com/*",
+		"https://*.aliyuncs.com/*"
 	],
 	"optional_host_permissions": [
 		"<all_urls>"

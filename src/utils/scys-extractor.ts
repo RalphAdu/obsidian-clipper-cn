@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import { createLogger } from './logger';
 import { convertBlocksToHtml } from './feishu-extractor';
 import type { FeishuBlock } from './feishu-extractor';
@@ -140,12 +141,38 @@ export async function resolveScysImages(html: string): Promise<string> {
 	if (tokens.size === 0) return html;
 
 	const replacements = new Map<string, string>();
+
+	// L1: same-origin fetch in content-script
 	await Promise.all(
 		Array.from(tokens).map(async (token) => {
 			const dataUrl = await fetchScysImageL1(token);
 			if (dataUrl) replacements.set(token, dataUrl);
 		})
 	);
+
+	// L2: for unresolved tokens, dispatch background MAIN-world fetch
+	const unresolved = Array.from(tokens).filter(t => !replacements.has(t));
+	if (unresolved.length > 0 && typeof browser !== 'undefined') {
+		const urlsToTokens = new Map<string, string>();
+		for (const t of unresolved) {
+			urlsToTokens.set(decodeURIComponent(t.replace(/^scys:/, '')), t);
+		}
+		const urls = Array.from(urlsToTokens.keys());
+		try {
+			const resp = await browser.runtime.sendMessage({
+				action: 'fetchScysImagesViaMainWorld',
+				urls,
+			}) as { success?: boolean; results?: Record<string, string> };
+			if (resp?.success && resp.results) {
+				for (const [url, dataUrl] of Object.entries(resp.results)) {
+					const token = urlsToTokens.get(url);
+					if (token && dataUrl) replacements.set(token, dataUrl);
+				}
+			}
+		} catch (err) {
+			logger.warn(`[scys-img L2] error: ${String(err)}`);
+		}
+	}
 
 	let resolved = html;
 	for (const [token, dataUrl] of replacements) {
@@ -290,29 +317,6 @@ export function formatScysCommentHeader(comment: ScysComment, users: Map<number,
 	return `**${name}**${likes} · ${date}`;
 }
 
-// Simple HTML→markdown bridge scoped to comment-body needs. The chapter
-// rendering pipeline uses turndown downstream; for comments we render to
-// markdown inline so we can prefix each line with `> ` for callout nesting.
-function htmlToMdSafe(html: string): string {
-	let s = html;
-	s = s.replace(/<\/p>\s*<p>/g, '\n\n');
-	s = s.replace(/<p>/g, '').replace(/<\/p>/g, '\n');
-	s = s.replace(/<strong>([\s\S]*?)<\/strong>/g, '**$1**');
-	s = s.replace(/<em>([\s\S]*?)<\/em>/g, '*$1*');
-	s = s.replace(/<code>([\s\S]*?)<\/code>/g, '`$1`');
-	s = s.replace(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g, '[$2]($1)');
-	s = s.replace(/<li>([\s\S]*?)<\/li>/g, '- $1\n');
-	s = s.replace(/<\/?(ul|ol)>/g, '');
-	s = s.replace(/<br\s*\/?>/g, '\n');
-	s = s.replace(/<[^>]+>/g, '');
-	s = s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
-	return s.trim();
-}
-
-function prefixLines(text: string, prefix: string): string {
-	return text.split('\n').map(line => line ? `${prefix} ${line}` : prefix.trimEnd()).join('\n');
-}
-
 // Comment content is a mix of:
 // - block_type=5001 with server-rendered sc_html.content (the actual text)
 // - block_type=27 image blocks (handled via the standard scys: token path)
@@ -327,33 +331,31 @@ function renderCommentBodyHtml(blocks: ScysBlock[]): string {
 	}).join('');
 }
 
-function renderOneComment(comment: ScysComment, users: Map<number, ScysUser>, depth: number): string {
-	const prefix = Array(depth + 1).fill('>').join(' ');
-	const headerLine = depth === 0
-		? `${prefix} [!quote]+ ${formatScysCommentHeader(comment, users)}`
-		: `${prefix} ${formatScysCommentHeader(comment, users)}`;
-	const bodyHtml = renderCommentBodyHtml(comment.content ?? []);
-	const bodyMd = htmlToMdSafe(bodyHtml);
-	const bodyPrefixed = bodyMd ? prefixLines(bodyMd, prefix) : '';
-
-	const parts: string[] = [headerLine];
-	if (bodyPrefixed) parts.push(bodyPrefixed);
-
-	const replies = Array.isArray(comment.comments) ? comment.comments : [];
-	for (const reply of replies) {
-		parts.push(prefix); // empty quote line as separator
-		parts.push(renderOneComment(reply, users, depth + 1));
-	}
-	return parts.join('\n');
+// Convert markdown-style header like "**叁斤** · 9 ❤️ · 2026-05-10" into HTML so downstream
+// defuddle doesn't escape the asterisks.
+function formatHeaderToHtml(header: string): string {
+	// header has the form "**{name}**{optional likes + date}"
+	const m = header.match(/^\*\*([^*]+)\*\*(.*)$/);
+	if (!m) return `<p>${header}</p>`;
+	const [, name, rest] = m;
+	return `<p><strong>${name}</strong>${rest}</p>`;
 }
 
 // Sync variant retained for unit tests that don't need image resolution.
 // Production code uses renderScysCommentsAsync (called from extractScysStructuredContent).
+function renderOneCommentHtml(comment: ScysComment, users: Map<number, ScysUser>): string {
+	const header = formatScysCommentHeader(comment, users);
+	const bodyHtml = renderCommentBodyHtml(comment.content ?? []);
+	const replies = Array.isArray(comment.comments) ? comment.comments : [];
+	const repliesHtml = replies.map(r => renderOneCommentHtml(r, users)).join('');
+	const headerHtml = formatHeaderToHtml(header);
+	return `<blockquote>${headerHtml}${bodyHtml}${repliesHtml}</blockquote>`;
+}
+
 export function renderScysComments(result: ScysCommentsResult): string {
 	if (!result.items.length) return '';
-	const header = `## 💬 章节评论（${result.total} 条）`;
-	const body = result.items.map(item => renderOneComment(item, result.users, 0)).join('\n\n');
-	return `\n\n---\n\n${header}\n\n${body}\n`;
+	const bodies = result.items.map(item => renderOneCommentHtml(item, result.users)).join('');
+	return `<hr><h2>💬 章节评论（${result.total} 条）</h2>${bodies}`;
 }
 
 export interface ScysStructuredContent {
@@ -380,42 +382,25 @@ function countWordsFromBlocks(blocks: FeishuBlock[]): number {
 	return n;
 }
 
-async function renderOneCommentAsync(
+async function renderOneCommentHtmlAsync(
 	comment: ScysComment,
 	users: Map<number, ScysUser>,
-	depth: number,
 ): Promise<string> {
-	const prefix = Array(depth + 1).fill('>').join(' ');
-	const headerLine = depth === 0
-		? `${prefix} [!quote]+ ${formatScysCommentHeader(comment, users)}`
-		: `${prefix} ${formatScysCommentHeader(comment, users)}`;
+	const header = formatScysCommentHeader(comment, users);
 	let bodyHtml = renderCommentBodyHtml(comment.content ?? []);
 	bodyHtml = await resolveScysImages(bodyHtml);
-	const bodyMd = htmlToMdSafe(bodyHtml);
-	const bodyPrefixed = bodyMd ? prefixLines(bodyMd, prefix) : '';
-
-	const parts: string[] = [headerLine];
-	if (bodyPrefixed) parts.push(bodyPrefixed);
-
 	const replies = Array.isArray(comment.comments) ? comment.comments : [];
 	// Render sibling replies concurrently (mirrors renderScysCommentsAsync's
-	// top-level concurrency). Order is preserved by Promise.all + sequential
-	// interleave below.
-	const renderedReplies = await Promise.all(
-		replies.map(r => renderOneCommentAsync(r, users, depth + 1))
-	);
-	for (const rendered of renderedReplies) {
-		parts.push(prefix);
-		parts.push(rendered);
-	}
-	return parts.join('\n');
+	// top-level concurrency). Order is preserved by Promise.all.
+	const repliesHtml = (await Promise.all(replies.map(r => renderOneCommentHtmlAsync(r, users)))).join('');
+	const headerHtml = formatHeaderToHtml(header);
+	return `<blockquote>${headerHtml}${bodyHtml}${repliesHtml}</blockquote>`;
 }
 
 export async function renderScysCommentsAsync(result: ScysCommentsResult): Promise<string> {
 	if (!result.items.length) return '';
-	const header = `## 💬 章节评论（${result.total} 条）`;
-	const bodies = await Promise.all(result.items.map(item => renderOneCommentAsync(item, result.users, 0)));
-	return `\n\n---\n\n${header}\n\n${bodies.join('\n\n')}\n`;
+	const bodies = await Promise.all(result.items.map(item => renderOneCommentHtmlAsync(item, result.users)));
+	return `<hr><h2>💬 章节评论（${result.total} 条）</h2>${bodies.join('')}`;
 }
 
 export async function extractScysStructuredContent(doc: Document): Promise<ScysStructuredContent | null> {

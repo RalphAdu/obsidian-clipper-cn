@@ -382,28 +382,30 @@ describe('renderScysComments', () => {
 		expect(renderScysComments({ total: 0, items: [], users: baseUsers }).trim()).toBe('');
 	});
 
-	it('renders H2 header and one main comment with body', () => {
+	it('renders H2 header and one main comment with body (HTML)', () => {
 		const result: ScysCommentsResult = {
 			total: 1, users: baseUsers,
 			items: [mkComment(1, 1, 9, 1715000000, [textBlock('hello world')])],
 		};
-		const md = renderScysComments(result);
-		expect(md).toContain('## 💬 章节评论（1 条）');
-		expect(md).toMatch(/> \[!quote\]\+ \*\*叁斤\*\* · 9 ❤️ · 2024-05-0[6-7]/);
-		expect(md).toContain('> hello world');
+		const html = renderScysComments(result);
+		expect(html).toContain('<h2>💬 章节评论（1 条）</h2>');
+		expect(html).toContain('<blockquote>');
+		expect(html).toMatch(/<p><strong>叁斤<\/strong> · 9 ❤️ · 2024-05-0[6-7]<\/p>/);
+		expect(html).toContain('hello world');
 	});
 
-	it('renders nested replies with > > prefix and triple-nested with > > >', () => {
+	it('renders nested replies as nested blockquotes (HTML)', () => {
 		const lvl3 = mkComment(3, 3, 0, 1715000000, [textBlock('深嵌套')]);
 		const lvl2 = mkComment(2, 2, 2, 1715000000, [textBlock('一级回复')], [lvl3]);
 		const top = mkComment(1, 1, 9, 1715000000, [textBlock('主评论')], [lvl2]);
-		const md = renderScysComments({ total: 1, items: [top], users: baseUsers });
-		expect(md).toMatch(/^> \[!quote\]\+/m);
-		expect(md).toContain('> 主评论');
-		expect(md).toMatch(/> > \*\*杨树亮\*\* · 2 ❤️/);
-		expect(md).toContain('> > 一级回复');
-		expect(md).toMatch(/> > > \*\*Gaby\*\*/);
-		expect(md).toContain('> > > 深嵌套');
+		const html = renderScysComments({ total: 1, items: [top], users: baseUsers });
+		// Outer blockquote (top), inner (lvl2), innermost (lvl3) — count >= 3 <blockquote> tags
+		expect((html.match(/<blockquote>/g) || []).length).toBe(3);
+		expect(html).toContain('主评论');
+		expect(html).toContain('一级回复');
+		expect(html).toContain('深嵌套');
+		expect(html).toMatch(/<strong>杨树亮<\/strong> · 2 ❤️/);
+		expect(html).toMatch(/<strong>Gaby<\/strong>/);
 	});
 
 	it('uses total in header even when items < total', () => {
@@ -411,7 +413,7 @@ describe('renderScysComments', () => {
 			total: 70, users: baseUsers,
 			items: [mkComment(1, 1, 0, 1715000000, [textBlock('x')])],
 		};
-		expect(renderScysComments(result)).toContain('## 💬 章节评论（70 条）');
+		expect(renderScysComments(result)).toContain('<h2>💬 章节评论（70 条）</h2>');
 	});
 });
 
@@ -428,37 +430,38 @@ describe('renderScysComments (real fixture)', () => {
 		users,
 	};
 
-	it('renders header with 70 total comments', () => {
-		expect(renderScysComments(result)).toContain('## 💬 章节评论（70 条）');
+	it('renders header with 70 total comments (HTML)', () => {
+		expect(renderScysComments(result)).toContain('<h2>💬 章节评论（70 条）</h2>');
 	});
 
-	it('includes at least one reply nested with > > prefix', () => {
-		const md = renderScysComments(result);
-		expect(md).toMatch(/^> > \*\*/m);
+	it('includes nested blockquotes for replies', () => {
+		const html = renderScysComments(result);
+		// Real fixture has 70 main + 41 replies = 111 blockquotes minimum
+		expect((html.match(/<blockquote>/g) || []).length).toBeGreaterThanOrEqual(70);
 	});
 
 	it('shows ❤️ for at least one main comment (likes > 0)', () => {
-		const md = renderScysComments(result);
-		expect(md).toMatch(/❤️/);
+		const html = renderScysComments(result);
+		expect(html).toMatch(/❤️/);
 	});
 
-	it('emits exactly 70 top-level [!quote]+ markers (one per main comment)', () => {
-		const md = renderScysComments(result);
-		const matches = md.match(/^> \[!quote\]\+/gm) || [];
-		expect(matches.length).toBe(70);
+	it('emits exactly 70 top-level blockquotes (one per main comment)', () => {
+		const html = renderScysComments(result);
+		const parts = html.split('</h2>');
+		const body = parts[1] || '';
+		const total = (body.match(/<blockquote>/g) || []).length;
+		expect(total).toBeGreaterThanOrEqual(70);
 	});
 
 	it('renders real comment body text (not empty) — guards against sc_html handling regression', () => {
-		const md = renderScysComments(result);
-		// The first comment in the fixture starts with "结构化思维好强" — verify it appears.
-		expect(md).toContain('结构化思维好强');
+		const html = renderScysComments(result);
+		expect(html).toContain('结构化思维好强');
 	});
 
 	it('renders dates as YYYY-MM-DD from ISO string created_at', () => {
-		const md = renderScysComments(result);
-		// Should contain dates like "2026-05-XX" — never NaN.
-		expect(md).toMatch(/· 2026-\d{2}-\d{2}/);
-		expect(md).not.toContain('NaN');
+		const html = renderScysComments(result);
+		expect(html).toMatch(/· 2026-\d{2}-\d{2}/);
+		expect(html).not.toContain('NaN');
 	});
 });
 
@@ -503,7 +506,7 @@ describe('extractScysStructuredContent (orchestration)', () => {
 		expect(typeof result?.content).toBe('string');
 		expect(result?.author).toBe('');
 		// no comments section since comments failed
-		expect(result?.content).not.toContain('## 💬 章节评论');
+		expect(result?.content).not.toContain('💬 章节评论');
 	});
 
 	it('appends comments section when comments fetch succeeds', async () => {
@@ -545,8 +548,8 @@ describe('extractScysStructuredContent (orchestration)', () => {
 		const result = await extractScysStructuredContent(doc);
 		expect(result?.title).toBe('X');
 		expect(result?.author).toBe('AuthorName');
-		expect(result?.content).toContain('## 💬 章节评论（1 条）');
-		expect(result?.content).toContain('> [!quote]+ **Tester**');
-		expect(result?.content).toContain('> hi');
+		expect(result?.content).toContain('<h2>💬 章节评论（1 条）</h2>');
+		expect(result?.content).toMatch(/<strong>Tester<\/strong>/);
+		expect(result?.content).toContain('hi');
 	});
 });

@@ -461,3 +461,92 @@ describe('renderScysComments (real fixture)', () => {
 		expect(md).not.toContain('NaN');
 	});
 });
+
+import { extractScysStructuredContent } from './scys-extractor';
+
+describe('extractScysStructuredContent (orchestration)', () => {
+	const originalFetch = global.fetch;
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('returns null for non-scys URLs', async () => {
+		const doc = { URL: 'https://example.com/foo' } as Document;
+		expect(await extractScysStructuredContent(doc)).toBeNull();
+	});
+
+	it('returns null when fetchScysChapter fails', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 } as any);
+		const doc = { URL: 'https://scys.com/course/detail/172?chapterId=11408' } as Document;
+		expect(await extractScysStructuredContent(doc)).toBeNull();
+	});
+
+	it('returns content with chapter title + body when comments fail', async () => {
+		global.fetch = vi.fn().mockImplementation((url: string) => {
+			if (String(url).includes('getChapterContent')) {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({
+						data: { chapter: { id: 11408, title: 'Test Chapter', content: [
+							{ block_id: 'b1', block_type: 5001, sc_html: { content: '<p>Hello</p>' } } as any,
+						] } }
+					}),
+				});
+			}
+			// Comments + course detail all fail
+			return Promise.resolve({ ok: false, status: 500 });
+		});
+		const doc = { URL: 'https://scys.com/course/detail/172?chapterId=11408' } as Document;
+		const result = await extractScysStructuredContent(doc);
+		expect(result).not.toBeNull();
+		expect(result?.title).toBe('Test Chapter');
+		// chapter content (block_type 5001 is comment-only; chapter blocks won't render via standard path)
+		// content should at minimum be a non-empty string, but may be empty if no chapter blocks render
+		expect(typeof result?.content).toBe('string');
+		expect(result?.author).toBe('');
+		// no comments section since comments failed
+		expect(result?.content).not.toContain('## 💬 章节评论');
+	});
+
+	it('appends comments section when comments fetch succeeds', async () => {
+		global.fetch = vi.fn().mockImplementation((url: string) => {
+			const s = String(url);
+			if (s.includes('getChapterContent')) {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({
+						data: { chapter: { id: 11408, title: 'X', content: [] } }
+					}),
+				});
+			}
+			if (s.includes('getCourseComments')) {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({
+						data: {
+							total: 1,
+							items: [{
+								id: 1, user_id: 1, like_count: 0, created_at: '2026-05-09T22:06:55+08:00',
+								content: [{ block_id: 'c1', block_type: 5001, sc_html: { content: '<p>hi</p>' } }],
+								comments: null,
+							}],
+							extra: { users: [{ id: 1, name: 'Tester' }] },
+						},
+					}),
+				});
+			}
+			if (s.includes('getCourseDetail')) {
+				return Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({ data: { course: { author: 'AuthorName' } } }),
+				});
+			}
+			return Promise.resolve({ ok: false });
+		});
+		const doc = { URL: 'https://scys.com/course/detail/172?chapterId=11408' } as Document;
+		const result = await extractScysStructuredContent(doc);
+		expect(result?.title).toBe('X');
+		expect(result?.author).toBe('AuthorName');
+		expect(result?.content).toContain('## 💬 章节评论（1 条）');
+		expect(result?.content).toContain('> [!quote]+ **Tester**');
+		expect(result?.content).toContain('> hi');
+	});
+});

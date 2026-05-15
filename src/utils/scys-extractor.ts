@@ -353,3 +353,93 @@ export function renderScysComments(result: ScysCommentsResult): string {
 	const body = result.items.map(item => renderOneComment(item, result.users, 0)).join('\n\n');
 	return `\n\n---\n\n${header}\n\n${body}\n`;
 }
+
+export interface ScysStructuredContent {
+	title: string;
+	author: string;
+	content: string;
+	wordCount: number;
+}
+
+function countWordsFromBlocks(blocks: FeishuBlock[]): number {
+	let n = 0;
+	for (const b of blocks) {
+		const body =
+			b.text || (b as any).heading1 || (b as any).heading2 || (b as any).heading3 ||
+			(b as any).heading4 || (b as any).heading5 || (b as any).heading6 ||
+			b.bullet || b.ordered || b.code || b.quote || b.callout;
+		if (!body?.elements) continue;
+		for (const el of body.elements) {
+			const c = el.text_run?.content || '';
+			n += c.length;
+		}
+	}
+	return n;
+}
+
+async function renderOneCommentAsync(
+	comment: ScysComment,
+	users: Map<number, ScysUser>,
+	depth: number,
+): Promise<string> {
+	const prefix = Array(depth + 1).fill('>').join(' ');
+	const headerLine = depth === 0
+		? `${prefix} [!quote]+ ${formatScysCommentHeader(comment, users)}`
+		: `${prefix} ${formatScysCommentHeader(comment, users)}`;
+	let bodyHtml = renderCommentBodyHtml(comment.content ?? []);
+	bodyHtml = await resolveScysImages(bodyHtml);
+	const bodyMd = htmlToMdSafe(bodyHtml);
+	const bodyPrefixed = bodyMd ? prefixLines(bodyMd, prefix) : '';
+
+	const parts: string[] = [headerLine];
+	if (bodyPrefixed) parts.push(bodyPrefixed);
+
+	const replies = Array.isArray(comment.comments) ? comment.comments : [];
+	for (const reply of replies) {
+		parts.push(prefix);
+		parts.push(await renderOneCommentAsync(reply, users, depth + 1));
+	}
+	return parts.join('\n');
+}
+
+export async function renderScysCommentsAsync(result: ScysCommentsResult): Promise<string> {
+	if (!result.items.length) return '';
+	const header = `## 💬 章节评论（${result.total} 条）`;
+	const bodies = await Promise.all(result.items.map(item => renderOneCommentAsync(item, result.users, 0)));
+	return `\n\n---\n\n${header}\n\n${bodies.join('\n\n')}\n`;
+}
+
+export async function extractScysStructuredContent(doc: Document): Promise<ScysStructuredContent | null> {
+	if (!isScysCourseUrl(doc.URL)) return null;
+	const parsed = parseScysUrl(doc.URL);
+	if (!parsed) return null;
+
+	const chapter = await fetchScysChapter(parsed.courseId, parsed.chapterId);
+	if (!chapter) {
+		logger.warn(`Chapter fetch failed for course=${parsed.courseId} chapter=${parsed.chapterId}`);
+		return null;
+	}
+
+	let html = renderScysChapterContent(chapter.content);
+	html = await resolveScysImages(html);
+
+	const [commentsResult, courseMeta] = await Promise.all([
+		fetchScysComments(parsed.courseId, parsed.chapterId),
+		fetchScysCourse(parsed.courseId),
+	]);
+
+	let commentsMd = '';
+	if (commentsResult && commentsResult.items.length) {
+		commentsMd = await renderScysCommentsAsync(commentsResult);
+	}
+
+	const flatBlocks = flattenScysBlocks(chapter.content);
+	const wordCount = countWordsFromBlocks(flatBlocks);
+
+	return {
+		title: chapter.title,
+		author: courseMeta?.author || '',
+		content: html + commentsMd,
+		wordCount,
+	};
+}

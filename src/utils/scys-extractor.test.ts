@@ -102,4 +102,14 @@ describe('flattenScysBlocks', () => {
 		const innerImg = flat.find(b => b.block_id === 'inner-img');
 		expect(innerImg?.image?.token).toMatch(/^scys:/);
 	});
+
+	it('emits children: undefined (not [] or missing) for leaf blocks', () => {
+		const blocks: ScysBlock[] = [{
+			block_id: 'leaf',
+			block_type: 2,
+			text: { elements: [] },
+		}];
+		const flat = flattenScysBlocks(blocks);
+		expect(flat[0].children).toBeUndefined();
+	});
 });

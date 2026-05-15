@@ -1,4 +1,5 @@
 import { createLogger } from './logger';
+import type { FeishuBlock } from './feishu-extractor';
 
 const logger = createLogger('scys-extractor');
 
@@ -24,8 +25,6 @@ export function parseScysUrl(url: string): { courseId: number; chapterId: number
 		return null;
 	}
 }
-
-import type { FeishuBlock } from './feishu-extractor';
 
 export interface ScysBlock extends Omit<FeishuBlock, 'children'> {
 	children_blocks?: ScysBlock[];
@@ -53,7 +52,11 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 		// Heading rewrite (block_type 6/7/8 → 4/5/6, copy body to new field name)
 		const rewrite = HEADING_REWRITE[flat.block_type];
 		if (rewrite) {
-			flat[rewrite.newField] = flat[rewrite.oldField];
+			const body = flat[rewrite.oldField];
+			if (body === undefined) {
+				logger.warn(`heading rewrite: missing ${rewrite.oldField} on block ${block.block_id}`);
+			}
+			flat[rewrite.newField] = body;
 			delete flat[rewrite.oldField];
 			flat.block_type = rewrite.newType;
 		}

@@ -16,7 +16,8 @@
 	"host_permissions": [
 		"<all_urls>",
 		"http://*/*",
-		"https://*/*"
+		"https://*/*",
+		"https://scys.com/*"
 	],
 	"action": {
 		"default_popup": "popup.html",

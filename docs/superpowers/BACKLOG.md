@@ -306,11 +306,11 @@ dev mode 写 sourcemap 到 dist/，prod mode 覆盖并 minify。每次切换 mod
 ### 2.9 webpack 缓存与"代码改了没编译"
 
 webpack 5 watch + ts-loader 偶尔出现：源文件 mtime 改了，但 webpack 报 `cached modules`，新代码没 emit。两种触发因素：
-1. **缓存目录陈旧**：`rm -rf node_modules/.cache dev/` 强制全量重建
+1. **缓存目录陈旧**：`rm -rf node_modules/.cache dist/` 强制全量重建
 2. **mtime 精度问题**：某些文件系统 mtime 不变（rare on APFS, more common on NFS）— `touch src/xxx.ts` 显式 bump
 
-scys 实施时这两种都遇到过。**症状**：bridge 输出与改前完全一致（长度同、内容同），但 dev/content.js 通过 grep 已含新 string literal。
-**rule-of-thumb**：连续 2 轮端到端测试输出**完全相同**就立即怀疑是缓存问题，先 `du -h dev/content.js` 看时间戳。
+scys 实施时这两种都遇到过。**症状**：bridge 输出与改前完全一致（长度同、内容同），但 dist/content.js 通过 grep 已含新 string literal。
+**rule-of-thumb**：连续 2 轮端到端测试输出**完全相同**就立即怀疑是缓存问题，先 `du -h dist/content.js` 看时间戳。
 
 ### 2.8 cn extension ID（chrome）
 

@@ -356,6 +356,11 @@ describe('formatScysCommentHeader', () => {
 		const out = formatScysCommentHeader({ user_id: 999, like_count: 0, created_at: 1715000000 } as any, new Map());
 		expect(out).toMatch(/^\*\*匿名#999\*\* · 2024-05-0[6-7]$/);
 	});
+	it('accepts ISO 8601 string for created_at (real scys API format)', () => {
+		const users = new Map([[1, { id: 1, name: '叁斤' }]]);
+		const out = formatScysCommentHeader({ user_id: 1, like_count: 0, created_at: '2026-05-09T22:06:55+08:00' } as any, users);
+		expect(out).toMatch(/^\*\*叁斤\*\* · 2026-05-09$/);
+	});
 });
 
 describe('renderScysComments', () => {
@@ -369,8 +374,8 @@ describe('renderScysComments', () => {
 	});
 	const textBlock = (s: string): ScysBlock => ({
 		block_id: `t${Math.random().toString(36).slice(2, 10)}`,
-		block_type: 2,
-		text: { elements: [{ text_run: { content: s } }] },
+		block_type: 5001,
+		sc_html: { content: `<p>${s}</p>` },
 	});
 
 	it('renders empty section when no items', () => {
@@ -441,5 +446,18 @@ describe('renderScysComments (real fixture)', () => {
 		const md = renderScysComments(result);
 		const matches = md.match(/^> \[!quote\]\+/gm) || [];
 		expect(matches.length).toBe(70);
+	});
+
+	it('renders real comment body text (not empty) — guards against sc_html handling regression', () => {
+		const md = renderScysComments(result);
+		// The first comment in the fixture starts with "结构化思维好强" — verify it appears.
+		expect(md).toContain('结构化思维好强');
+	});
+
+	it('renders dates as YYYY-MM-DD from ISO string created_at', () => {
+		const md = renderScysComments(result);
+		// Should contain dates like "2026-05-XX" — never NaN.
+		expect(md).toMatch(/· 2026-\d{2}-\d{2}/);
+		expect(md).not.toContain('NaN');
 	});
 });

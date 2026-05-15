@@ -33,6 +33,9 @@ export interface ScysBlock extends Omit<FeishuBlock, 'children'> {
 	// (sibling to `image`, not nested inside it). image.token still
 	// carries the feishu-style identifier.
 	file_url?: string;
+	// scys comment content uses block_type=5001 with server-rendered HTML
+	// in sc_html.content (instead of feishu's structured text.elements)
+	sc_html?: { content?: string };
 }
 
 const HEADING_REWRITE: Record<number, { newType: number; oldField: keyof ScysBlock; newField: string }> = {
@@ -164,7 +167,7 @@ export interface ScysComment {
 	content: ScysBlock[];
 	comments?: ScysComment[] | null;
 	like_count: number;
-	created_at: number;
+	created_at: number | string;
 }
 
 export interface ScysUser {
@@ -269,8 +272,10 @@ export async function fetchScysCourse(courseId: number): Promise<{ title?: strin
 	}
 }
 
-function formatScysDate(unixSec: number): string {
-	const d = new Date(unixSec * 1000);
+function formatScysDate(ts: number | string): string {
+	// scys API delivers ISO 8601 strings, but the function also accepts unix
+	// seconds for compatibility with synthetic tests.
+	const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
 	const y = d.getFullYear();
 	const m = String(d.getMonth() + 1).padStart(2, '0');
 	const day = String(d.getDate()).padStart(2, '0');
@@ -308,12 +313,26 @@ function prefixLines(text: string, prefix: string): string {
 	return text.split('\n').map(line => line ? `${prefix} ${line}` : prefix.trimEnd()).join('\n');
 }
 
+// Comment content is a mix of:
+// - block_type=5001 with server-rendered sc_html.content (the actual text)
+// - block_type=27 image blocks (handled via the standard scys: token path)
+function renderCommentBodyHtml(blocks: ScysBlock[]): string {
+	return blocks.map(b => {
+		if (b.block_type === 5001) {
+			return b.sc_html?.content ?? '';
+		}
+		// Other block types (esp. image=27) go through the standard chapter pipeline
+		// so the scys:-token injection works.
+		return convertBlocksToHtml(flattenScysBlocks([b]));
+	}).join('');
+}
+
 function renderOneComment(comment: ScysComment, users: Map<number, ScysUser>, depth: number): string {
 	const prefix = Array(depth + 1).fill('>').join(' ');
 	const headerLine = depth === 0
 		? `${prefix} [!quote]+ ${formatScysCommentHeader(comment, users)}`
 		: `${prefix} ${formatScysCommentHeader(comment, users)}`;
-	const bodyHtml = convertBlocksToHtml(flattenScysBlocks(comment.content ?? []));
+	const bodyHtml = renderCommentBodyHtml(comment.content ?? []);
 	const bodyMd = htmlToMdSafe(bodyHtml);
 	const bodyPrefixed = bodyMd ? prefixLines(bodyMd, prefix) : '';
 

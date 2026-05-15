@@ -28,6 +28,26 @@ export function parseScysUrl(url: string): { courseId: number; chapterId: number
 	}
 }
 
+export function isScysDocxUrl(url: string): boolean {
+	try {
+		const u = new URL(url);
+		if (u.hostname !== 'scys.com') return false;
+		return /^\/view\/docx\/[A-Za-z0-9_-]+\/?$/.test(u.pathname);
+	} catch {
+		return false;
+	}
+}
+
+export function parseScysDocxUrl(url: string): { token: string } | null {
+	try {
+		const u = new URL(url);
+		const m = u.pathname.match(/^\/view\/docx\/([A-Za-z0-9_-]+)\/?$/);
+		return m ? { token: m[1] } : null;
+	} catch {
+		return null;
+	}
+}
+
 export interface ScysBlock extends Omit<FeishuBlock, 'children'> {
 	children_blocks?: ScysBlock[];
 	// scys serves the signed OSS URL as a top-level block field
@@ -403,7 +423,7 @@ export async function renderScysCommentsAsync(result: ScysCommentsResult): Promi
 	return `<hr><h2>💬 章节评论（${result.total} 条）</h2>${bodies.join('')}`;
 }
 
-export async function extractScysStructuredContent(doc: Document): Promise<ScysStructuredContent | null> {
+async function extractScysCourseChapter(doc: Document): Promise<ScysStructuredContent | null> {
 	if (!isScysCourseUrl(doc.URL)) return null;
 	const parsed = parseScysUrl(doc.URL);
 	if (!parsed) return null;
@@ -436,4 +456,10 @@ export async function extractScysStructuredContent(doc: Document): Promise<ScysS
 		content: html + commentsMd,
 		wordCount,
 	};
+}
+
+export async function extractScysStructuredContent(doc: Document): Promise<ScysStructuredContent | null> {
+	if (isScysCourseUrl(doc.URL)) return extractScysCourseChapter(doc);
+	// Task 4 will add isScysDocxUrl branch here
+	return null;
 }

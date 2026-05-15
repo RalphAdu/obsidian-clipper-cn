@@ -553,3 +553,38 @@ describe('extractScysStructuredContent (orchestration)', () => {
 		expect(result?.content).toContain('hi');
 	});
 });
+
+import { isScysDocxUrl, parseScysDocxUrl } from './scys-extractor';
+
+describe('isScysDocxUrl', () => {
+	it('matches /view/docx/{token}', () => {
+		expect(isScysDocxUrl('https://scys.com/view/docx/QSn2dD6QnoYlDxxiYItcudnPnZg')).toBe(true);
+		expect(isScysDocxUrl('https://scys.com/view/docx/QSn2dD6QnoYlDxxiYItcudnPnZg/')).toBe(true);
+	});
+	it('rejects course URLs', () => {
+		expect(isScysDocxUrl('https://scys.com/course/detail/172?chapterId=11408')).toBe(false);
+	});
+	it('rejects /view/wiki/* or other view variants', () => {
+		expect(isScysDocxUrl('https://scys.com/view/wiki/ABC')).toBe(false);
+		expect(isScysDocxUrl('https://scys.com/view/sheet/XYZ')).toBe(false);
+	});
+	it('rejects non-scys hosts', () => {
+		expect(isScysDocxUrl('https://example.com/view/docx/X')).toBe(false);
+	});
+	it('rejects malformed URL', () => {
+		expect(isScysDocxUrl('not a url')).toBe(false);
+	});
+});
+
+describe('parseScysDocxUrl', () => {
+	it('extracts token', () => {
+		expect(parseScysDocxUrl('https://scys.com/view/docx/Abc-XYZ_123')).toEqual({ token: 'Abc-XYZ_123' });
+	});
+	it('extracts token with trailing slash', () => {
+		expect(parseScysDocxUrl('https://scys.com/view/docx/Test/')).toEqual({ token: 'Test' });
+	});
+	it('returns null for invalid URL', () => {
+		expect(parseScysDocxUrl('https://scys.com/foo')).toBeNull();
+		expect(parseScysDocxUrl('not a url')).toBeNull();
+	});
+});

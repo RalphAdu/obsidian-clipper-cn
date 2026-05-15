@@ -31,3 +31,14 @@ context/
 
 # Chrome extension signing key (do not commit)
 keys/
+
+# Superpowers work area — local notes (e.g. Feishu credentials) live here.
+# Already-tracked spec / plan / BACKLOG docs are explicitly re-included
+# below; new untracked files in this folder stay private to the local
+# checkout unless promoted via `git add -f`.
+docs/superpowers/
+!docs/superpowers/BACKLOG.md
+!docs/superpowers/specs/
+!docs/superpowers/specs/**
+!docs/superpowers/plans/
+!docs/superpowers/plans/**

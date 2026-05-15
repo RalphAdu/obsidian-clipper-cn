@@ -134,7 +134,7 @@ open "obsidian://open?vault=Life&file=_cn-test/feishu-pdf-test"
 
 ### 1.6 飞书 OpenAPI 凭证
 
-**位置**：`/Users/adu/Workspace/github/obsidian-clipper/feishu.md`
+**位置**：`docs/superpowers/feishu.md`（**git-ignored**，本地有效；新 clone 仓库需手动放入此路径）
 
 **用法**（拿 tenant token + 调 API）：
 ```bash

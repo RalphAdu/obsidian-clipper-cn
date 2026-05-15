@@ -14,7 +14,8 @@
 		"sidePanel",
 		"storage",
 		"scripting",
-		"declarativeNetRequest"
+		"declarativeNetRequest",
+		"alarms"
 	],
 	"host_permissions": [
 		"<all_urls>",

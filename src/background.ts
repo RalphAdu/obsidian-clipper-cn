@@ -17,32 +17,45 @@ const YOUTUBE_INNERTUBE_RULE_ID = 9003;
 // reload the extension when its contents change. Lets `npm run build` trigger
 // an automatic chrome.runtime.reload() so iteration doesn't require clicking
 // the reload button in chrome://extensions every time.
+// Uses chrome.alarms (not setInterval) because MV3 service workers get
+// unloaded after ~30s of idle and setInterval doesn't survive that. The
+// alarm wakes the worker reliably even after it's been put to sleep.
 // Active in all build modes — for users installing from the webstore the
 // marker file is written once at build time and never changes, so this only
 // ever fires for self-built / unpacked installations.
-{
-	let lastBuildMarker: string | null = null;
-	const checkMarker = async () => {
-		try {
-			const url = chrome.runtime.getURL('build-marker.txt');
-			const resp = await fetch(url, { cache: 'no-store' });
-			if (!resp.ok) return;
-			const text = (await resp.text()).trim();
-			if (lastBuildMarker === null) {
-				lastBuildMarker = text;
-				return;
-			}
-			if (lastBuildMarker !== text) {
-				bgLogger.info(`Build marker changed (${lastBuildMarker} -> ${text}), reloading extension`);
-				chrome.runtime.reload();
-			}
-		} catch {
-			// Service worker may be transitioning; ignore and try again next tick
+const HOT_RELOAD_ALARM = 'cn-hot-reload-poll';
+const HOT_RELOAD_MARKER_KEY = 'cnHotReloadLastMarker';
+async function checkBuildMarker() {
+	try {
+		const url = chrome.runtime.getURL('build-marker.txt');
+		const resp = await fetch(url, { cache: 'no-store' });
+		if (!resp.ok) return;
+		const current = (await resp.text()).trim();
+		// Persist last seen marker across service-worker restarts so we don't
+		// erroneously reload after every idle wake-up.
+		const stored = await chrome.storage.session.get(HOT_RELOAD_MARKER_KEY);
+		const last = stored[HOT_RELOAD_MARKER_KEY] as string | undefined;
+		if (!last) {
+			await chrome.storage.session.set({ [HOT_RELOAD_MARKER_KEY]: current });
+			return;
 		}
-	};
-	setInterval(checkMarker, 3000);
-	checkMarker();
+		if (last !== current) {
+			bgLogger.info(`Build marker changed (${last} -> ${current}), reloading extension`);
+			chrome.runtime.reload();
+		}
+	} catch {
+		// Service worker may be transitioning; ignore and retry next alarm
+	}
 }
+// Chrome enforces a 30s minimum for periodInMinutes on packed extensions but
+// allows shorter periods for unpacked / loaded-from-disk extensions. We need
+// the short period to make dev iteration tight.
+chrome.alarms.create(HOT_RELOAD_ALARM, { periodInMinutes: 0.05 }); // every 3 seconds (unpacked)
+chrome.alarms.onAlarm.addListener((alarm) => {
+	if (alarm.name === HOT_RELOAD_ALARM) checkBuildMarker();
+});
+// Also check immediately on startup (e.g. just after install)
+checkBuildMarker();
 
 function fetchBilibiliJsonViaMainWorld(tabId: number, url: string): Promise<any> {
 	if (!isAllowedBilibiliFetchUrl(url)) {

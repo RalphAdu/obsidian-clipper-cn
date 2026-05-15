@@ -780,6 +780,14 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 			return renderBlockChildren(block, blockMap);
 		}
 
+		// VIEW (33) is Feishu's container for embedded attachments / referenced
+		// documents. The actual FILE child sits one level down — must recurse to
+		// render it instead of dropping the whole subtree.
+		case FEISHU_BLOCK_TYPE.VIEW:
+		case FEISHU_BLOCK_TYPE.QUOTE_CONTAINER: {
+			return renderBlockChildren(block, blockMap);
+		}
+
 		case FEISHU_BLOCK_TYPE.IFRAME:
 		case FEISHU_BLOCK_TYPE.WIDGET:
 		case FEISHU_BLOCK_TYPE.SHEET:

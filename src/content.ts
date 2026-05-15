@@ -584,4 +584,47 @@ declare global {
 		}
 	});
 
+	// Page-world visible marker for debugging — write build timestamp to document
+	// root attribute so page-world JS can verify cn content.js injection version.
+	try {
+		document.documentElement.setAttribute('data-cn-clipper-build', String(Date.now()));
+	} catch {}
+
+	// Page-world test bridge: allows automated tests to trigger Feishu extraction
+	// from page-world JS via window.postMessage. Result is written to localStorage
+	// (shared by isolated/page worlds at same origin) so the caller can poll for
+	// completion without holding a synchronous reply channel. Restricted to feishu
+	// origins so arbitrary pages can't probe it.
+	window.addEventListener('message', async (event) => {
+		const data = event.data;
+		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
+		const origin = location.hostname;
+		if (!/feishu\.cn$|larksuite\.com$/.test(origin)) return;
+		const testId = data.testId;
+		const key = '__obsidianClipperTestResult__:' + testId;
+		try {
+			localStorage.setItem(key, JSON.stringify({ status: 'running' }));
+			if (!isFeishuDocUrl(document.URL)) {
+				localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'not a feishu doc url' }));
+				return;
+			}
+			const result = await extractFeishuStructuredContent(document);
+			const content = result?.content || '';
+			localStorage.setItem(key, JSON.stringify({
+				status: 'done',
+				title: result?.title,
+				contentLength: content.length,
+				contentHead: content.slice(0, 500),
+				contentTail: content.slice(-2000),
+				containsFileLink: /<a href="data:application\/[^"]+">/.test(content),
+				containsDataPdf: content.includes('data:application/pdf;base64,'),
+				containsFallback: content.includes('请到原飞书文档下载'),
+				containsDownloadFailed: content.includes('下载失败'),
+				containsFeishuFilePlaceholder: content.includes('feishu-file://'),
+			}));
+		} catch (err) {
+			localStorage.setItem(key, JSON.stringify({ status: 'error', error: String(err) }));
+		}
+	});
+
 })();

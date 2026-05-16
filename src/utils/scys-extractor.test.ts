@@ -310,45 +310,9 @@ describe('flattenScysBlocks', () => {
 		expect(html).not.toMatch(/<h3><strong>/);
 	});
 
-	it('wraps heading with [[SCYS-ALIGN-center]] placeholder when block style.align == 2', () => {
-		// Placeholders survive defuddle's HTML→markdown conversion; markdown-
-		// post-process restores them to real <div align="…"> at the markdown stage.
-		const blocks: ScysBlock[] = [{
-			block_id: 'h', block_type: 5,
-			heading3: {
-				elements: [{ text_run: { content: '零、前言' } }],
-				style: { align: 2 },
-			},
-		}] as any;
-		const html = renderScysChapterContent(blocks);
-		expect(html).toContain('[[SCYS-ALIGN-center]]<h3>零、前言</h3>[[/SCYS-ALIGN]]');
-	});
-
-	it('wraps heading with [[SCYS-ALIGN-right]] placeholder when block style.align == 3', () => {
-		const blocks: ScysBlock[] = [{
-			block_id: 'h', block_type: 5,
-			heading3: {
-				elements: [{ text_run: { content: 'X' } }],
-				style: { align: 3 },
-			},
-		}] as any;
-		const html = renderScysChapterContent(blocks);
-		expect(html).toContain('[[SCYS-ALIGN-right]]<h3>X</h3>[[/SCYS-ALIGN]]');
-	});
-
-	it('renders non-default text_color as [[SCYS-COLOR-N]] placeholder (Image #9 red emphasis)', () => {
-		const blocks: ScysBlock[] = [{
-			block_id: 'p', block_type: 2,
-			text: { elements: [
-				{ text_run: { content: '亦仁老大说过，', text_element_style: { bold: false } } },
-				{ text_run: { content: '默认项目都是通的，默认数据都是假的。', text_element_style: { bold: true, text_color: 1 } } },
-			] },
-		}] as any;
-		const html = renderScysChapterContent(blocks);
-		expect(html).toContain('[[SCYS-COLOR-1]]');
-		expect(html).toContain('默认项目都是通的');
-		expect(html).toContain('[[/SCYS-COLOR]]');
-	});
+	// Note: text_color and block.style.align are intentionally not encoded into
+	// markdown — pure markdown has no color or alignment primitive, and HTML
+	// inline-style attributes get stripped by defuddle's turndown anyway.
 
 	it('merges adjacent <strong> blocks so markdown does not show literal `****`', () => {
 		// Pre-fix: <strong>aa</strong><strong>bb</strong> → markdown **aa****bb**

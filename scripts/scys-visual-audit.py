@@ -38,21 +38,6 @@ def expected_md_type(n):
     if fs >= 16 and fw >= 600: return 'bold_paragraph'
     return 'paragraph'
 
-def has_color_span(md_line: str) -> bool:
-    """True if line contains a <span style="color:…"> wrapper."""
-    return '<span style="color:' in md_line or 'span style="color:' in md_line
-
-def has_align_wrapper(md_lines, line_idx: int) -> bool:
-    """True if md_lines[line_idx] is inside a <div align="…">…</div> block."""
-    # Walk backward for the nearest open / close; the line is wrapped if we
-    # encounter an opening <div align> before a closing </div>.
-    for j in range(line_idx - 1, max(-1, line_idx - 8), -1):
-        if j < 0 or j >= len(md_lines): continue
-        line = md_lines[j]
-        if '</div>' in line: return False
-        if '<div align="' in line: return True
-    return False
-
 def parse_markdown(md):
     body = re.sub(r'^---\n.*?\n---\n', '', md, flags=re.DOTALL)
     lines = body.split('\n')
@@ -109,10 +94,6 @@ OK_MAP = {
 def main():
     dom = json.load(open(DOM_DUMP))
     md = open(VAULT_MD).read()
-    # parse_markdown strips frontmatter and numbers lines from 1 in the body;
-    # mirror that here so has_align_wrapper's line indices align.
-    body = re.sub(r'^---\n.*?\n---\n', '', md, flags=re.DOTALL)
-    md_lines = body.split('\n')
     tokens = parse_markdown(md)
     md_idx = {}
     for i, t in enumerate(tokens):
@@ -142,27 +123,6 @@ def main():
                 'expected': exp, 'actual': act,
                 'fs': d['fontSize'], 'fw': d['fontWeight'], 'docH': d['docHeading'],
                 'text': d['text'][:80], 'md_raw': ct['raw'][:100]})
-        # Extra dimensions (added 2026-05-16): color + center-align must round-trip.
-        # 1. Browser red text (text in non-default color) → markdown must wrap in <span style=color:…>.
-        #    We detect "browser red" by presence of any non-grey/black non-link color in the element.
-        # Exclude colors that are just link blue or scys default neutrals.
-        EXCLUDE_COLORS = {'rgb(100, 106, 115)', 'rgb(51, 112, 255)', 'rgb(31, 35, 41)'}
-        nondef_colors = [c for c in (d.get('colors') or []) if c not in EXCLUDE_COLORS]
-        if nondef_colors and not has_color_span(ct['raw']):
-            # Look in neighbouring lines too — colored runs may span multiple md tokens.
-            window = '\n'.join(md_lines[max(0, ct['line']-2):ct['line']+1])
-            if not has_color_span(window):
-                diffs.append({'dom_idx': d['idx'], 'md_line': ct['line'],
-                    'expected': f'color-span ({nondef_colors[0]})', 'actual': 'no-color-span',
-                    'fs': d['fontSize'], 'fw': d['fontWeight'], 'docH': d['docHeading'],
-                    'text': d['text'][:80], 'md_raw': ct['raw'][:100]})
-        # 2. Browser text-align != left → markdown must be inside a <div align="…">.
-        if d.get('textAlign') in ('center', 'right'):
-            if not has_align_wrapper(md_lines, ct['line'] - 1):
-                diffs.append({'dom_idx': d['idx'], 'md_line': ct['line'],
-                    'expected': f'div-align-{d["textAlign"]}', 'actual': 'no-align-wrapper',
-                    'fs': d['fontSize'], 'fw': d['fontWeight'], 'docH': d['docHeading'],
-                    'text': d['text'][:80], 'md_raw': ct['raw'][:100]})
 
     print(f'DOM nodes: {len(dom)}, MD tokens: {len(tokens)}')
     print(f'Mismatches: {len(diffs)}, Not-found-in-md: {len(missing)}')

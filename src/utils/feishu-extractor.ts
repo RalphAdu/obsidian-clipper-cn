@@ -595,25 +595,13 @@ async function fetchDocumentMeta(documentId: string): Promise<{ title: string; o
 //      1=left (default), 2=center, 3=right. We translate to <div align="…">
 //      wrapper so Obsidian Reading view renders the alignment.
 function renderHeading(level: number, elements: any, style: any): string {
+	// skipBold: heading <h*> tag is already visually bold; nested <strong> →
+	// markdown `## **…**` is noisy and breaks `**` pair counting in adjacent
+	// runs (downstream `****` literal artifacts).
+	// Note: alignment (style.align) is not represented in pure markdown.
 	const inner = renderTextElements(elements, { skipBold: true });
-	const tag = `<h${level}>${inner}</h${level}>`;
-	const align = style?.align;
-	if (align === 2) return `[[SCYS-ALIGN-center]]${tag}[[/SCYS-ALIGN]]`;
-	if (align === 3) return `[[SCYS-ALIGN-right]]${tag}[[/SCYS-ALIGN]]`;
-	return tag;
+	return `<h${level}>${inner}</h${level}>`;
 }
-
-// scys/feishu text_color enum → CSS color. Matches feishu's standard palette
-// (0=default/black, 1=red, 2=orange, 3=yellow, 4=green, 5=cyan, 6=blue, 7=purple).
-const FEISHU_TEXT_COLOR_MAP: Record<number, string> = {
-	1: '#e83e3a',
-	2: '#ff8800',
-	3: '#f5b400',
-	4: '#2dd24d',
-	5: '#28d4e8',
-	6: '#2da3eb',
-	7: '#8e3eea',
-};
 
 interface RenderTextOptions {
 	// Skip <strong> wrapping when bold=true. Used by HEADING* renderers since
@@ -659,15 +647,9 @@ function renderTextElements(elements: FeishuTextBody['elements'], opts: RenderTe
 		if (style?.underline) {
 			html = `<u>${html}</u>`;
 		}
-		// Non-default text_color: wrap with placeholders that survive defuddle's
-		// HTML→markdown conversion (which strips inline style attributes). The
-		// markdown-post-process layer rewrites these to Obsidian-compatible
-		// <span style="color:…"> at the markdown stage. scys author uses red (=1)
-		// for emphasis paragraphs that would otherwise collapse to black.
-		const tc = (style as any)?.text_color;
-		if (typeof tc === 'number' && tc > 0 && FEISHU_TEXT_COLOR_MAP[tc]) {
-			html = `[[SCYS-COLOR-${tc}]]${html}[[/SCYS-COLOR]]`;
-		}
+		// Note: scys/feishu text_color is not encoded into markdown — pure
+		// markdown has no color primitive, and HTML <span style="color:…">
+		// gets stripped by defuddle's turndown anyway. Skip silently.
 		if (style?.link?.url) {
 			try {
 				const decoded = decodeURIComponent(style.link.url);

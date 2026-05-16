@@ -1,0 +1,5548 @@
+[
+  {
+    "data": {
+      "extra": {
+        "users": [
+          {
+            "id": 1505,
+            "name": "英雄哥",
+            "xq_group_number": 7416,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FukKdVJnx7RZqK7LAGW4APe1dWGH"
+          },
+          {
+            "id": 102051,
+            "name": "星光熠熠",
+            "xq_group_number": 18655,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsjsgTJaLrODj7LvdL2_RH8ET2-O"
+          },
+          {
+            "id": 115730,
+            "name": "白也",
+            "xq_group_number": 24696,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrSQjB3GPtqWtm79S9a8Vxk7IFy5"
+          },
+          {
+            "id": 162200,
+            "name": "天气",
+            "xq_group_number": 37976,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrwPgsNClvKc3FbwGPx1dLfpN6x7"
+          },
+          {
+            "id": 216005,
+            "name": "连闯",
+            "xq_group_number": 15850,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/For_LODkj5TSmH49mTtOPNwYB80y"
+          },
+          {
+            "id": 308382,
+            "name": "条形马",
+            "xq_group_number": 392,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjfBLucywFjv6knjWRPeu3gxokLq"
+          },
+          {
+            "id": 439946,
+            "name": "阿彬",
+            "xq_group_number": 48082,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpXnGYmeB2bcfYq1zVBuXCHLv4yz"
+          },
+          {
+            "id": 935712,
+            "name": "咕咕嘎嘎",
+            "xq_group_number": 91838,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FlvGeTxS83rafkarVcu2fPpsae-X"
+          },
+          {
+            "id": 3560696,
+            "name": "Maya",
+            "xq_group_number": 140054,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgGk5gtK3x8xChFl9oge-ZgqnjJc"
+          },
+          {
+            "id": 6820774,
+            "name": "宝宝棒棒棒",
+            "xq_group_number": 158652,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FplPYFoiRQz5eOLEQEVPL3uCOkU_"
+          },
+          {
+            "id": 7806638,
+            "name": "振宇",
+            "xq_group_number": 204325,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqRi9BupkOZJZlsLiI6-oJONJC08"
+          },
+          {
+            "id": 8893657,
+            "name": "阿耀",
+            "xq_group_number": 171595,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fvrver7CcxyAY7v4F0MLo2kWOaLg"
+          },
+          {
+            "id": 9757648,
+            "name": "小黄瓜虫儿",
+            "xq_group_number": 184940,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FlY9IecY-DqnH4DQfGQHa0VeIZsQ"
+          },
+          {
+            "id": 9954278,
+            "name": "ZZ",
+            "xq_group_number": 204254,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FvQorvnDQmdLFEufdzM7lQZSyy7C"
+          },
+          {
+            "id": 10036228,
+            "name": "喝雪碧的路飞",
+            "xq_group_number": 186839,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsrZ90wl5x4P8PEsk9q-Rxi5SV8P"
+          },
+          {
+            "id": 10259994,
+            "name": "六宝",
+            "xq_group_number": 187357,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fh7HYYSkYXQT1KJX69n8Oep7MH9N"
+          },
+          {
+            "id": 10267162,
+            "name": "刘刚",
+            "xq_group_number": 187389,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FolK2xs0dsani5M-hhThQ_Qyf_JN"
+          },
+          {
+            "id": 10510740,
+            "name": "bravo",
+            "xq_group_number": 191312,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgllwMduwKLGxC-vRMFSnOVnv81u"
+          },
+          {
+            "id": 10650316,
+            "name": "Nancy",
+            "xq_group_number": 192057,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FlczXERAL3-YeCBuODsZIHdI5pvc"
+          },
+          {
+            "id": 10922974,
+            "name": "木南风",
+            "xq_group_number": 202034,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuxZfFpTVdfIxUN-Uc6RW0PvbV1b"
+          },
+          {
+            "id": 11635559,
+            "name": "Sophia-hu",
+            "xq_group_number": 203177,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fh77C1GbA_tO-WeFnLJgI_PBVt4f"
+          },
+          {
+            "id": 11661743,
+            "name": "废柴小姐",
+            "xq_group_number": 202063,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FiMAMzml4EufW_iruamzCrGMn1VG"
+          },
+          {
+            "id": 12536971,
+            "name": "南玖",
+            "xq_group_number": 202837,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmGkkWScZW64LkJEMih3HhEpxR8b"
+          },
+          {
+            "id": 12551052,
+            "name": "Self-discipline",
+            "xq_group_number": 201466,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgKBhvd_N9R6ZhEaFTauAByXnSFc"
+          },
+          {
+            "id": 12703063,
+            "name": "子超",
+            "xq_group_number": 201860,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fv6xKxccemM5fwOdRT4sMrzowyrg"
+          }
+        ],
+        "total_comment_count": 131
+      },
+      "items": [
+        {
+          "id": 32879,
+          "user_id": 10922974,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>我更愿意理解成自己是领导，然后使用不同的ai模型就是雇佣员工，给ta下达任务；不同的员工，其知识背景不同，擅长的领域不同，所以有些任务，要交给擅长这个领域的员工，这样完成效果才会更好。这就是“挑对你的马”。</p><p><br></p><p>给员工下达的任务，由于ta对你的习惯、喜好、能力、经历，愿景等等都还不了解，所以需要你提前给ta提供下相关的信息，这样ta就会更了解你，给出的答案会更符合你的需求，这就是“背景文档”，是“事实”，是第一根绳——先给ai事实。</p><p><br></p><p>同时在交代任务时，交代的越明确，任务标准越清晰、越准确，这个员工就越能get到你的需求，越知道自己该往那方面做、该注意哪些事项，才更能产出符合你需求的成果。这就是“挽具”，是第二根绳——把控ai方向。</p><p><br></p><p>员工按照你的要求交付的结果，你不是得再交给其他人检验下嘛，不然万一被ta蒙蔽了怎么办。这就是交叉验证，是第三根绳——结果回传与校验</p><p><br></p><p>所谓的挽具意识，正是说明了同一个员工，在不同人的领导下，其产出是完全不一样的。有些领导下达的任务非常含糊，要让员工反复的去猜领导的意图，这样一是ta要费很多脑细胞（token），二是ta可能猜不准你的真实需求（如果这个员工能力很强，ta可能猜中你真是需求的能力强，所以要用好模型；但这样依然可能产出的结果不是你所想要的）。</p><p>所以就有挽具意识，就是要有下达清晰可操作指令的意识，这样员工只需要按照要求和标准去产出就行了，知道该做什么不该做什么，产出成果也会非常高。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 106,
+          "dislike_count": 0,
+          "comment_count": 4,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T17:51:24+08:00",
+          "updated_at": "2026-05-15T14:27:15+08:00",
+          "comments": [
+            {
+              "id": 47875,
+              "note_id": 32879,
+              "user_id": 308382,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>是的，不错。所以你也不难理解到：新员工入职对应 ai agent 引入项目时要做哪些事？候选人笔试对应选模型的什么环节？</p>"
+                  }
+                }
+              ],
+              "like_count": 8,
+              "review_status": 2,
+              "created_at": "2026-05-08T20:29:36+08:00",
+              "updated_at": "2026-05-13T01:25:03+08:00"
+            },
+            {
+              "id": 47965,
+              "note_id": 32879,
+              "user_id": 12703063,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>论如何经营好一家企业：选对人（AI工具)，做对事(定规矩，定方向），反馈迭代。</p>"
+                  }
+                }
+              ],
+              "like_count": 3,
+              "review_status": 2,
+              "created_at": "2026-05-09T08:32:01+08:00",
+              "updated_at": "2026-05-12T17:13:02+08:00"
+            },
+            {
+              "id": 48076,
+              "note_id": 32879,
+              "user_id": 8893657,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>很有意思的洞察</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-09T19:24:19+08:00",
+              "updated_at": "2026-05-09T19:24:19+08:00"
+            },
+            {
+              "id": 48166,
+              "note_id": 32879,
+              "user_id": 9954278,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>有同感</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-10T09:55:36+08:00",
+              "updated_at": "2026-05-10T09:55:36+08:00"
+            }
+          ],
+          "latest_like_users": [
+            {
+              "id": 4000806,
+              "name": "橘子🍊",
+              "xq_group_number": 146775,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fk2j--u9n7DcLPbZ5fSOZcYVpZf5"
+            },
+            {
+              "id": 6802415,
+              "name": "浮生",
+              "xq_group_number": 158185,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fj11zwP96W2DqhyIJsSNxJ0E_rtf"
+            },
+            {
+              "id": 208401,
+              "name": "Christopher",
+              "xq_group_number": 36793,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpEi3Kgh84QG-NpRBNFTWjMTgyzZ"
+            }
+          ]
+        },
+        {
+          "id": 33559,
+          "user_id": 308382,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>写得还行。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 23,
+          "dislike_count": 0,
+          "comment_count": 1,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T21:21:55+08:00",
+          "updated_at": "2026-05-14T08:14:17+08:00",
+          "comments": [
+            {
+              "id": 49244,
+              "note_id": 33559,
+              "user_id": 115730,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>马老师谦虚了​​​😎​</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-13T15:11:42+08:00",
+              "updated_at": "2026-05-13T15:11:42+08:00"
+            }
+          ],
+          "latest_like_users": [
+            {
+              "id": 2738510,
+              "name": "tian",
+              "xq_group_number": 137308,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fni9_-3ANUfyuYST0jN4E0JWfWKd"
+            },
+            {
+              "id": 210066,
+              "name": "海渊",
+              "xq_group_number": 37018,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgB78-ukUYNRBBGOM69cVU07buu_"
+            },
+            {
+              "id": 115730,
+              "name": "白也",
+              "xq_group_number": 24696,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrSQjB3GPtqWtm79S9a8Vxk7IFy5"
+            }
+          ]
+        },
+        {
+          "id": 31969,
+          "user_id": 1505,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>初听今晚的启航大会，没听太懂条形马老师的内容。可是，熬夜看到航海手册的这里：思考能力，我突然明白了挽具工程是什么？</p><p><br></p><p>我在使用Ai的过程中遇到的很多问题，原来我也没有答案，或者比较模糊，不知道为什么Ai会胡说八道，换了窗口还要重复以前的很多背景词，出来的结果刚开始还好，后面越来越差……我想用AiAgent来解放自己的创作工作，我只专注于我的思考，我有很多创意点子，只是苦于无法自己用代码实现，或Agent实现，而卡住了。</p><p><br></p><p>而今晚，我突然看到了前面的光！我也看到了自己踩过的坑。</p><p>今晚，我很开心，我看到了解决我关于Ai的很多思考和困惑的可能性答案，我看到了希望，我也看到了我的那个看似不可实现的梦，猛然间可以实现了，且距离越来越近了！</p><p><br></p><p>感谢生财！感谢老师！感谢付出的圈友们！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 7,
+          "dislike_count": 0,
+          "comment_count": 1,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T01:32:50+08:00",
+          "updated_at": "2026-05-14T02:45:29+08:00",
+          "comments": [
+            {
+              "id": 47879,
+              "note_id": 31969,
+              "user_id": 308382,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>不客气。</p>"
+                  }
+                }
+              ],
+              "like_count": 1,
+              "review_status": 2,
+              "created_at": "2026-05-08T20:34:08+08:00",
+              "updated_at": "2026-05-09T06:31:43+08:00"
+            }
+          ],
+          "latest_like_users": [
+            {
+              "id": 730634,
+              "name": "风",
+              "xq_group_number": 71124,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fom6R-tujyJkfZ_R8-y0kHZAPc8N"
+            },
+            {
+              "id": 608642,
+              "name": "奇奇",
+              "xq_group_number": 55196,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsVt6MQUzUtVVEHkJ9cdGVqelVBK"
+            },
+            {
+              "id": 1167108,
+              "name": "方知有",
+              "xq_group_number": 99896,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqyGiClAJMxFnwlspw7KCXYsTziL"
+            }
+          ]
+        },
+        {
+          "id": 38397,
+          "user_id": 7806638,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>01.有了更多实操体感后，回过头来再看，可能会有新的理解。（实践-认识-再实践-再认识）</p><p>02.更上一层的用法，是挽具工程（Harness Engineering）—— 研究怎么给 AI 搭一整套工作框架（目标、边界、工具、反馈环），让它能自己跑、自己纠偏</p><p>3.语音输入法：强烈推荐，比打字快 3-5 倍。（我是用微信语音输入法，疯狂输出，开车时也可以输出，而且不断反馈碰撞）</p><p>4.很多时候 AI 答不好，不是 AI 不行，而是你只调用了它的第一层。比如你让 Gemini 写调研报告，明明它背后连着谷歌庞大的数据源和大量专业学术报告，你却只在窗口里跟它空盘逻辑，不让它调起搜索引擎，调用这些优质数据（第二层）。这就像是骑着赛马当驴使。</p><p>5.路径二：让 AI 自动化收集事实</p><p>如果你有独特的信息源（比如公司内部的飞书文档、自己积累的资料库），可以把它们和 AI 打通，让 AI 需要时自己去查。这块属于 AI Agent 进阶玩法，后面的「执行能力」模块会专门展开，这里混个眼熟即可。</p><p>6.把真实（实践反馈结果）再喂给AI，再和AI进行对话</p><p>7.注意：现实回传的反馈周期可能比较长，14 天航海期内你不一定能跑完一个完整的大目标。但至少跑一次最小动作的回传，哪怕只是聊一位从业者然后回传感受，你就完整体验了这个闭环，让 AI 接触现实。</p><p>8.和 AI 的协作关系就会从\"人肉中间件\"切换到\"决策人 + 执行体\"，这才是对话外脑真正的姿势。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 6,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T00:20:18+08:00",
+          "updated_at": "2026-05-15T14:06:12+08:00",
+          "latest_like_users": [
+            {
+              "id": 208401,
+              "name": "Christopher",
+              "xq_group_number": 36793,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpEi3Kgh84QG-NpRBNFTWjMTgyzZ"
+            },
+            {
+              "id": 134929,
+              "name": "庆珠",
+              "xq_group_number": 39798,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqHM7ihcvgzPQPs3JTc3t50vKL1X"
+            },
+            {
+              "id": 871298,
+              "name": "七分",
+              "xq_group_number": 91318,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fjq1NS70AfziNecf3YceVo4oVKlB"
+            }
+          ]
+        },
+        {
+          "id": 39924,
+          "user_id": 10510740,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>感觉内容有点繁琐了，一个简单的事说的有点复杂，且篇幅过长，不利于阅读体验</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 5,
+          "dislike_count": 0,
+          "comment_count": 1,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T21:58:33+08:00",
+          "updated_at": "2026-05-15T12:42:58+08:00",
+          "comments": [
+            {
+              "id": 48458,
+              "note_id": 39924,
+              "user_id": 3560696,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>同感</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-11T00:00:03+08:00",
+              "updated_at": "2026-05-11T00:00:03+08:00"
+            }
+          ],
+          "latest_like_users": [
+            {
+              "id": 12399347,
+              "name": "悠悠",
+              "xq_group_number": 203737,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FhMP-pgYWkmr_I6pSVvkY0enb62d"
+            },
+            {
+              "id": 460267,
+              "name": "好运.",
+              "xq_group_number": 36678,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fm0B7ignSIgsWsrKI4i5qor2pD6r"
+            },
+            {
+              "id": 695014,
+              "name": "炎培",
+              "xq_group_number": 61229,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmiYu_3gz4r1IgyvIiq8_Uphu0MQ"
+            }
+          ]
+        },
+        {
+          "id": 33525,
+          "user_id": 216005,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>都是干货啊，读完这个感觉以前自己用Ai的水平就是幼儿园级别🤣</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 5,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T21:16:54+08:00",
+          "updated_at": "2026-05-14T08:14:33+08:00",
+          "latest_like_users": [
+            {
+              "id": 2738510,
+              "name": "tian",
+              "xq_group_number": 137308,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fni9_-3ANUfyuYST0jN4E0JWfWKd"
+            },
+            {
+              "id": 6785,
+              "name": "曾永富",
+              "xq_group_number": 11219,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fr_HDYyjQbbXTKm_qbOmuldztA8h"
+            },
+            {
+              "id": 12382940,
+              "name": "轩辕|爱看书|北京",
+              "xq_group_number": 202769,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Ftkb9RtxvCPeZ0rz69fTty7OAxS1"
+            }
+          ]
+        },
+        {
+          "id": 35688,
+          "user_id": 439946,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>我和ai聊了一下，我说上下文工程像是一个芯片，而挽具工程更像是芯片链接的各个系统。</p><p>ai说得把例子升级一下，上下文工程更像是赛车引擎，提供核心目标和动力；挽具工程更像是车辆组件与维修团队，让动力受控、安全、可持续。</p><p>我觉得比较贴切。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 3,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T13:43:54+08:00",
+          "updated_at": "2026-05-15T07:50:28+08:00",
+          "latest_like_users": [
+            {
+              "id": 238407,
+              "name": "邵邵",
+              "xq_group_number": 62555,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjolPv6m2Plf2ldNINkIfhrM4N4L"
+            },
+            {
+              "id": 2469234,
+              "name": "沐沐",
+              "xq_group_number": 119983,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fn5dG9YVZpTqPayP7WlRvcm5xm7w"
+            },
+            {
+              "id": 308382,
+              "name": "条形马",
+              "xq_group_number": 392,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjfBLucywFjv6knjWRPeu3gxokLq"
+            }
+          ]
+        },
+        {
+          "id": 32652,
+          "user_id": 11661743,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>同样是展览收集的问题，我对比了国内的几个模型，https://my.feishu.cn/wiki/MvZpwYzicix8JkkQEW1cO9DVnBb?from=from_copylink发现kimi2.6和deepseek 完成度相对不多，这两个模型的优势在于更好滴理解意图，给我展示了备注/票价/预约信息，更有助于我过去参观展览。其中智谱清言5.0，信源非常突出，133个信源，分布比较平均牛了。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 3,
+          "dislike_count": 0,
+          "comment_count": 3,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T16:22:28+08:00",
+          "updated_at": "2026-05-12T03:14:53+08:00",
+          "comments": [
+            {
+              "id": 47781,
+              "note_id": 32652,
+              "user_id": 11661743,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>然后我有提出了一个微信公众号大V相关的问题，元宝并没有饮用这个IP的公众号信息？！同时豆包的信源竟然接近50%都来自字节系。其他大模型比较偏爱的信源：纸媒的线上网站比如中国新闻网，还有传统门户网站：凤凰网、搜狐网，还有就是知乎和豆瓣～</p>"
+                  }
+                }
+              ],
+              "like_count": 1,
+              "review_status": 0,
+              "created_at": "2026-05-08T16:24:49+08:00",
+              "updated_at": "2026-05-10T13:47:01+08:00",
+              "children": [
+                {
+                  "id": 47783,
+                  "note_id": 32652,
+                  "parent_id": 47781,
+                  "user_id": 11661743,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>综上，现在其实在传统网站发文章的成本非常低，因此针对垂直领域的传播是不是可以基于用户经常在大模型上提的问题，反推我要在传统网站发什么文章，从而做推广～另外值得关注的就是豆瓣和知乎的内容营销咯～</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 7,
+                  "review_status": 2,
+                  "created_at": "2026-05-08T16:25:59+08:00",
+                  "updated_at": "2026-05-14T02:47:19+08:00"
+                },
+                {
+                  "id": 47874,
+                  "note_id": 32652,
+                  "parent_id": 47783,
+                  "user_id": 308382,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>你已经通过反过来想，摸到了 GEO 的门径啦。🎉 恭喜！</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 4,
+                  "review_status": 2,
+                  "created_at": "2026-05-08T20:27:57+08:00",
+                  "updated_at": "2026-05-12T17:17:01+08:00"
+                }
+              ]
+            }
+          ],
+          "latest_like_users": [
+            {
+              "id": 11403932,
+              "name": "李迪伦",
+              "xq_group_number": 196664,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fkv0JBtMrE89yA2oBp2hNdEhrX-6"
+            },
+            {
+              "id": 9675558,
+              "name": "锅包小圆",
+              "xq_group_number": 196917,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjLqyp0U7mTzYcw3rvp9uIEz9SPN"
+            },
+            {
+              "id": 12781352,
+              "name": "lulu",
+              "xq_group_number": 204563,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Frh3G2C0uWrwTu2SRhFtIZWv8MWd"
+            }
+          ]
+        },
+        {
+          "id": 31991,
+          "user_id": 162200,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>手册全部做了一遍，我发现最有用的一个改变是，不用语音输入，通过打字输入，大脑会过滤掉很多东西，而用语音输入，会把自己很多内心真正的想法发布出来。</p><p>其带来的问题只有一个，就是字数太多，显得啰嗦</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 3,
+          "dislike_count": 0,
+          "comment_count": 1,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T09:58:57+08:00",
+          "updated_at": "2026-05-14T02:47:58+08:00",
+          "comments": [
+            {
+              "id": 47878,
+              "note_id": 31991,
+              "user_id": 308382,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>这就要提到模型的 input 价格总是比 output 价格便宜了——基于这个事实，不要怕输入时啰嗦。</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-08T20:31:54+08:00",
+              "updated_at": "2026-05-08T20:31:54+08:00"
+            }
+          ],
+          "latest_like_users": [
+            {
+              "id": 730634,
+              "name": "风",
+              "xq_group_number": 71124,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fom6R-tujyJkfZ_R8-y0kHZAPc8N"
+            },
+            {
+              "id": 442831,
+              "name": "大风商业流量",
+              "xq_group_number": 44677,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FhmD-a2q50OJAL7VsreNgGqM781F"
+            },
+            {
+              "id": 57113,
+              "name": "柱石",
+              "xq_group_number": 22182,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuSVKPQdFXNwnInTcOZrwTt3hQdF"
+            }
+          ]
+        },
+        {
+          "id": 31917,
+          "user_id": 102051,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>极其详尽👍值得温故而知新好几次。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 3,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-07T20:24:20+08:00",
+          "updated_at": "2026-05-14T08:16:24+08:00",
+          "latest_like_users": [
+            {
+              "id": 2738510,
+              "name": "tian",
+              "xq_group_number": 137308,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fni9_-3ANUfyuYST0jN4E0JWfWKd"
+            },
+            {
+              "id": 12695758,
+              "name": "包大人",
+              "xq_group_number": 201908,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsC3cKW_frkaonossnPpFISrtvDn"
+            },
+            {
+              "id": 833419,
+              "name": "金钱逻辑",
+              "xq_group_number": 81736,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FhXpKMULIihl2Ilv5SN_mMcDtcy7"
+            }
+          ]
+        },
+        {
+          "id": 51107,
+          "user_id": 10267162,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>做了一些笔记，收获良多。我之前学习生财AI宝典时，让AI整理笔记。这次完全是自己手敲的，而且是完成作业后，又重新看了一遍后整理的，加深印象。</p>"
+              }
+            },
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-13/065c221d73314f65a2be600497529480/20260513-223353.jpeg"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-13/065c221d73314f65a2be600497529480/20260513-223353.jpeg"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 2,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-13T22:36:57+08:00",
+          "updated_at": "2026-05-15T07:33:59+08:00",
+          "latest_like_users": [
+            {
+              "id": 2057125,
+              "name": "梦吟～生财产品经理",
+              "xq_group_number": 115273,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpgJr41QSGwLwhpk3pCmi-iVVdCG"
+            },
+            {
+              "id": 10267162,
+              "name": "刘刚",
+              "xq_group_number": 187389,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FolK2xs0dsani5M-hhThQ_Qyf_JN"
+            }
+          ]
+        },
+        {
+          "id": 38767,
+          "user_id": 10650316,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>我把上面的杭州提示词，放进chatgpt、元宝、豆包、gemini，跑出来的结果和上面的结果差很多。在我看来，chatgpt排第一、元宝第二、gemini第三，豆包第四。四家的答复如图所示。我也去百度了所有的官网信息，信息都是正确的，甚至从列举的展会时间点，chatgpt和gemini的时间比元宝的所列的展会时间跨度更长，我查了下，都是真实的。所以引发一个问题，也就是同一个模型，是不是在不同人的使用习惯后，他回答问题的方式已经改变了，不能直接说哪个更好，应该比拼的是哪个模型最了解你，或者说你用哪个模型最久。本想都贴出来对比答案的，只能贴一张。这是GPT的答复，是最全的。</p>"
+              }
+            },
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-10/e3b953b85ff24c64a2447237b23d3e13/chatgpt.png"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-10/e3b953b85ff24c64a2447237b23d3e13/chatgpt.png"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 2,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T11:54:32+08:00",
+          "updated_at": "2026-05-15T09:14:18+08:00",
+          "latest_like_users": [
+            {
+              "id": 80435,
+              "name": "大歪小阿娄",
+              "xq_group_number": 23776,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FraAIBXYAM8vHuE_RpcTvZaHjZGo"
+            },
+            {
+              "id": 1251344,
+              "name": "金铭",
+              "xq_group_number": 51356,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fi52OYKB3erfFagXCI2MWfnCrx8T"
+            }
+          ]
+        },
+        {
+          "id": 34462,
+          "user_id": 10036228,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>不要想着AI是万能的，只有已经被你想得足够完整足够清楚的事情，具象的表达给AI，它能给你想要的结果，是执行你的思路产生的结果。</p><p><br></p><p>如果需求想清楚了，那一定是可以完整的表达出来，执行的选择方式可以交给AI，比如：</p><p>想做一个面向抖音创作者的视频生产小工具，视频sop明显，要求仅需及格，视频产出效率要求极高，剪映操作成本高，可以脚本化实施，这是背景；</p><p>用于cps创作，图片拼接，曼波音频，素材相对单一，拼接方式相对单一，这是实施注意点；</p><p>选取2-3个cps曼波视频，分别截图5秒、10秒、15秒......的帧画面给AI参照，这是成果参照；</p><p>最后，字节系的模型优先，但其他模型做出来也能大差不差，而且本身对视频的要求比较低，也是够用的，选马的环节；</p><p>这是是产品设计的基础思路，也基本对应老师的思路，过程中需要时刻记住目标，不和剪映比专业，不追求视频美观度，及时校准方向，仅当作MVP，却是五脏俱全的完整思路，也是驯马的思路。</p><p><br></p><p>如果需求没想清楚，就不要想着AI给你做出来了。。。或者与AI共创，先想清楚需求，反问AI也是在反问自己，到底想要什么样的答案</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 2,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T23:16:34+08:00",
+          "updated_at": "2026-05-09T02:07:16+08:00",
+          "latest_like_users": [
+            {
+              "id": 10036228,
+              "name": "喝雪碧的路飞",
+              "xq_group_number": 186839,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsrZ90wl5x4P8PEsk9q-Rxi5SV8P"
+            },
+            {
+              "id": 308382,
+              "name": "条形马",
+              "xq_group_number": 392,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjfBLucywFjv6knjWRPeu3gxokLq"
+            }
+          ]
+        },
+        {
+          "id": 49957,
+          "user_id": 935712,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>首先，我觉得这其中有一些专业名词不太方便理解，我用自己的话结合实践经验来解释一下。从下往上看：结果回传（验）其实我认为这就是“验”。怎么验？就是用其他 AI 验一下第一个 AI 的话，看它有没有胡说八道。就像“验牌”一样，用结果去验证 AI 的准确性。把控 AI 方向最主要是明确你要干嘛。要给 AI 一个具体的指令，说明你要干什么、要得到什么东西。细节操作在细节上要养成一些习惯：(a) 重申重点：比如收束意图、重申重点。(b) 聊长开新窗：如果内容太长，它也会提醒你“一窗一次”，避免干扰。© 利用记忆功能：把一些东西丢到记忆库里，不用每次都反复提醒。异常处理与约束我在这部分唯一学到的就是“异常处理”，还有就是先给约束条件。计划与执行分离一般来说，我现在的干活方式都是先开一个窗口跟 AI 聊明白问题，然后再直接丢过去让 AI 去执行。也就是说，计划和执行是分开的。对抗式追问我反正认为 AI 不一定全对，它给出的结论，我要先质疑一下。先给事实这个确实很有用。以前我给的事实信息比较少，现在我觉得最有价值的就是给它一个事实文档，这个相对来说比较有参考价值。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-13T17:36:43+08:00",
+          "updated_at": "2026-05-16T01:34:46+08:00",
+          "latest_like_users": [
+            {
+              "id": 13874440,
+              "name": "燕子",
+              "xq_group_number": 203614,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FhtiV5P1KFd93LXqMbdoOO6GaMdB"
+            }
+          ]
+        },
+        {
+          "id": 39523,
+          "user_id": 12551052,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>在读到上下文这里的时候，一句话一句话印象非常深刻，就是说如果不给AI事实的话，那你们就是在虚空对虚空的对话是毫无意义的。然后我就具体的去问了AI那应该给AI哪些事实呢？继续往下升会发现很多时候对话的起点竟然都是错的？这话的起点应该是你给AI一些事实的数据，首先让AI帮你定义问题。因为有时候由于自己的认知的限制，自己首先提出的问题就是模糊的，所以呢，在具体的让AI帮你去分析问题或者去干活的时候首先可以让AI帮你去基于一大堆的事实帮你去定义问题。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T19:47:23+08:00",
+          "updated_at": "2026-05-13T08:31:23+08:00",
+          "latest_like_users": [
+            {
+              "id": 8902836,
+              "name": "笑笑",
+              "xq_group_number": 171518,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkbQatdZ9WsGo1Bi4U6baRzJeIvi"
+            }
+          ]
+        },
+        {
+          "id": 35072,
+          "user_id": 10259994,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>按照老师的指引，跑了一次个人优势的诊断，热血沸腾，很有用</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T07:18:58+08:00",
+          "updated_at": "2026-05-09T08:38:10+08:00",
+          "latest_like_users": [
+            {
+              "id": 308382,
+              "name": "条形马",
+              "xq_group_number": 392,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjfBLucywFjv6knjWRPeu3gxokLq"
+            }
+          ]
+        },
+        {
+          "id": 33310,
+          "user_id": 12536971,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>真的用了一下午的时间慢慢的读完这些内容，对于新手的我来说，宏观的思维使用逻辑已经搭建好，但是具体的实操细节一定是需要慢慢打磨的，感觉任重道远，但相信前路一定是光明的</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T20:37:57+08:00",
+          "updated_at": "2026-05-14T03:38:31+08:00",
+          "latest_like_users": [
+            {
+              "id": 16735,
+              "name": "悠然",
+              "xq_group_number": 23528,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fh770GDwTk3s9rZMbfPZ1qRRfMBk"
+            }
+          ]
+        },
+        {
+          "id": 32950,
+          "user_id": 9757648,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>今天一整天都在企业培训中，忙碌的学习了这次航海的第一天，还需要慢慢消化，本身也是AI小白，但是在如何问，怎么问，有了一个深深地概念，而且实际的操作了两把，很是受益。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T18:34:17+08:00",
+          "updated_at": "2026-05-08T14:53:20+08:00",
+          "latest_like_users": [
+            {
+              "id": 3548431,
+              "name": "昊",
+              "xq_group_number": 163358,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fg0S1gALdrzANyBJ8qNUO9Kxv5Xl"
+            }
+          ]
+        },
+        {
+          "id": 32766,
+          "user_id": 6820774,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>截止到目前，我做了3.5页的笔记，开始实操上手!期待我的结果</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T17:06:12+08:00",
+          "updated_at": "2026-05-08T13:18:50+08:00",
+          "latest_like_users": [
+            {
+              "id": 701780,
+              "name": "阿木",
+              "xq_group_number": 50933,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fo0hKio-BTDuOTzvzcF2juM0Cy4N"
+            }
+          ]
+        },
+        {
+          "id": 32124,
+          "user_id": 11635559,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>个人看完的理解是首先要有一个很清晰的个人背景介绍的上下文联系，然后给出事实的数据，不会跳出框架给出离谱的建议和分析。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T11:41:03+08:00",
+          "updated_at": "2026-05-08T09:14:26+08:00",
+          "latest_like_users": [
+            {
+              "id": 507466,
+              "name": "吴海晖",
+              "xq_group_number": 13447,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrTn18_1JVKdYmJg_4-9719bbwVf"
+            }
+          ]
+        }
+      ],
+      "total": 120
+    },
+    "status": 0
+  },
+  {
+    "data": {
+      "extra": {
+        "users": [
+          {
+            "id": 56788,
+            "name": "五四青年",
+            "xq_group_number": 8826,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrrUAm_Z88OcYzJ6x0dBuiii7nGp"
+          },
+          {
+            "id": 230473,
+            "name": "灵一",
+            "xq_group_number": 43587,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmUz114entpAw0TLvhsSdXhJb7XX"
+          },
+          {
+            "id": 231167,
+            "name": "励志30岁退休的男人",
+            "xq_group_number": 40818,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkRz3NP0_-8TfWv15xSm5LOeC4SH"
+          },
+          {
+            "id": 283486,
+            "name": "AI问答小助手",
+            "xq_group_number": 84947,
+            "avatar": "https://search01.shengcaiyoushu.com/public/upload/2025-12-02/c58fc7e8e85040f282f69793bfc44827/Snipaste_2025-12-02_14-30-42.png"
+          },
+          {
+            "id": 568746,
+            "name": "Adam",
+            "xq_group_number": 51588,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjJuzN927gosZlFJuNluomXQBpPo"
+          },
+          {
+            "id": 935712,
+            "name": "咕咕嘎嘎",
+            "xq_group_number": 91838,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FlvGeTxS83rafkarVcu2fPpsae-X"
+          },
+          {
+            "id": 1264252,
+            "name": "玲玲",
+            "xq_group_number": 84252,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjfD8ynjZEYTtIjZsdedsdGQWy9I"
+          },
+          {
+            "id": 1780760,
+            "name": "海涛",
+            "xq_group_number": 201103,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fu3F_w6qJPqCzJS6QYlU2qbmHwp1"
+          },
+          {
+            "id": 2320412,
+            "name": "马北海",
+            "xq_group_number": 201909,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgzfaxqObZtZ55g0skoO_0LTfVRI"
+          },
+          {
+            "id": 2530884,
+            "name": "Xiaowei",
+            "xq_group_number": 121827,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgymT6nL9OgIv6z8h9Ap79QUVCRV"
+          },
+          {
+            "id": 2555674,
+            "name": "伍海凤",
+            "xq_group_number": 196222,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fv2WpMB2RgDfJEnrsYLjG6iduzgR"
+          },
+          {
+            "id": 2738510,
+            "name": "tian",
+            "xq_group_number": 137308,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fni9_-3ANUfyuYST0jN4E0JWfWKd"
+          },
+          {
+            "id": 3799999,
+            "name": "🌈",
+            "xq_group_number": 143269,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FoDcuXmTomZrue14dK53kQdrIJdZ"
+          },
+          {
+            "id": 6782592,
+            "name": "甘甘",
+            "xq_group_number": 173878,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FshTP4QlgkJMEARRT7tigP7B7Wy8"
+          },
+          {
+            "id": 7531514,
+            "name": "小新同学",
+            "xq_group_number": 203547,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmwI3NdS7svO5LxNdDfhV6pQeT3q"
+          },
+          {
+            "id": 9247770,
+            "name": "小小",
+            "xq_group_number": 174339,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Ft3LEPPTRPVbHXGjSpOxMX87M6R6"
+          },
+          {
+            "id": 9591597,
+            "name": "金子",
+            "xq_group_number": 179961,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FoySdqbrcYIMuQtwJMznDFPCMiCw"
+          },
+          {
+            "id": 11043548,
+            "name": "姣子Aimee",
+            "xq_group_number": 204660,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuuTRNu3QXK5CxllD52X2qCH31jO"
+          },
+          {
+            "id": 11055103,
+            "name": "良见爱早睡",
+            "xq_group_number": 202499,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fm7V13DjIpwXkGldzteNxtYBRn-L"
+          }
+        ],
+        "total_comment_count": 121
+      },
+      "items": [
+        {
+          "id": 32059,
+          "user_id": 2320412,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>干货满满，虽然看的有点儿懵，多看几次实操一下或许会有很大的进步</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 1,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T11:11:13+08:00",
+          "updated_at": "2026-05-08T09:14:27+08:00",
+          "latest_like_users": [
+            {
+              "id": 507466,
+              "name": "吴海晖",
+              "xq_group_number": 13447,
+              "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrTn18_1JVKdYmJg_4-9719bbwVf"
+            }
+          ]
+        },
+        {
+          "id": 58284,
+          "user_id": 6782592,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>反复看了两遍，手写了一次笔记，学得很慢，一边学一边对照自己在AI使用中的感受和技巧，发现自己一直用的是上下文工程，虽然很多操作上重合了，但是学下来发现自己很多未注意的细节，这些细节都在影响我使用AI的效果，例如没有回传结果这个动作，因此无法优化AI的准确性。另外提供事实背景的时候，虽然自己已经建立了背景文档，但是这个背景文档的准确性还可以进一步优化，例如使用AI向我提问的方式，来进一步沉淀我的背景信息，做到更加客观和细致。总的来说，我觉得非常棒，既有底层的方法论又有使用的技巧。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-16T04:28:44+08:00",
+          "updated_at": "2026-05-16T04:28:44+08:00"
+        },
+        {
+          "id": 57784,
+          "user_id": 1264252,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>看不懂，不知道从何下手，都是理论的</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-15T22:37:42+08:00",
+          "updated_at": "2026-05-15T22:37:42+08:00"
+        },
+        {
+          "id": 57494,
+          "user_id": 11043548,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>学习心得 之思考对话模块</p><p>印象最深刻的有～</p><p>1 发展进程的迭代</p><p>提示词工程-上下文工程-挽具工程</p><p>2 因需选马（即CCL Ai工具）</p><p>比如，国内 侧重短视频，选择豆包Ai，因为它属于“字节跳动”家族～擅长短视频内容等</p><p>比如，国内 侧重公众号，选择元宝Ai，它属于“腾讯家族”，“调用体系”与“公众号”自动打通</p><p>其它国外的Ai工具也类似～Claude宪法基础 抓重点、ChatGPT类似 商业路线更全面、Gemini属于“Google家族”，调用“论文、全球搜索引擎”更全面</p><p>3 挽具三绳</p><p>①我是事实②目标方向③结果回馈</p>"
+              }
+            },
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-15/022d69c1a64a437893d9d590e4999081/mmexportc73b8fafd668274cd7b4129419f13fce_1778850196352.webp"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-15/022d69c1a64a437893d9d590e4999081/mmexportc73b8fafd668274cd7b4129419f13fce_1778850196352.webp"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-15T21:13:14+08:00",
+          "updated_at": "2026-05-15T21:13:14+08:00"
+        },
+        {
+          "id": 57372,
+          "user_id": 1780760,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>​😀​同一个问题，一样的自然语言，不同的模型，结果天差地别，我先说结论：chatgpt完爆豆包，ds，我感觉国外的主流大模型和国内这几个压根不在同一个圈层，国外智力水平就像是一个博士生一样，分析问题透彻，答案落地可实操，方向明确，而且套话谄媚的少。国内某些方面简直了，和一样小学生水平差不多。当然也有可能我样本太少，判断有误，欢迎一起交流哦</p>"
+              }
+            },
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-15/b566eba12e02479a8278c2e407b3a1f4/whiteboard_exported_image.png"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-15/b566eba12e02479a8278c2e407b3a1f4/whiteboard_exported_image.png"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-15T20:25:32+08:00",
+          "updated_at": "2026-05-15T20:25:32+08:00"
+        },
+        {
+          "id": 55861,
+          "user_id": 11055103,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>用手机看手册，划不动，是什么原因!</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-15T10:14:52+08:00",
+          "updated_at": "2026-05-15T10:14:52+08:00",
+          "tag_list": [
+            {
+              "id": 1,
+              "name": "问题请教",
+              "type": 1,
+              "status": 1,
+              "biz_type": 300
+            }
+          ]
+        },
+        {
+          "id": 55054,
+          "user_id": 9247770,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>我还是有点不太理解：</p><p>老师说AI Agent=harness + model ，也就是说AI Agent就像是多了一个帮你干活的人，会处理事情，model是他的大脑，harness是他的躯壳，就是给大脑配一个身体，然后躯壳和大脑是可以组装的，比如用国外的躯壳+国内的大脑，也就是课程提到的海外工具加国产大模型内核。那这里的挽具，就像是配备一个躯壳的意思。</p><p><br></p><p>但是后面提到搭harness，是给事实，给方向，让结果回传，这个更像是给这个人发出指令的限制，比如，你帮我干个活，我会多给事实，让你清楚干什么活，明确哪些要干，哪些不要干，以及干的怎么样。这的搭挽具，更像是对这个人发出指令的注意事项。</p><p><br></p><p>所以这个挽具指的是配套给大脑的躯壳，还是指使用好大脑的注意事项，或者是指给大脑配备的工具人，既要考虑用的是哪国人，又要考虑给他怎么发指令。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-15T00:42:07+08:00",
+          "updated_at": "2026-05-15T00:42:07+08:00",
+          "tag_list": [
+            {
+              "id": 1,
+              "name": "问题请教",
+              "type": 1,
+              "status": 1,
+              "biz_type": 300
+            }
+          ]
+        },
+        {
+          "id": 54513,
+          "user_id": 2530884,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>用好ai的核心就是要明确你的目标，让ai了解你的情况，大白话角度，把它当成一个人，告诉它你的情况，在这个基础上进行拓展，用的过程中可能会偏离方向，但是要用好挽具工程、上下文工程，不是提示词模板</p>"
+              }
+            },
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-14/e14b4460c5e6432a95c1f01178591846/微信图片_20260514224139_858_41.jpg"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-14/e14b4460c5e6432a95c1f01178591846/微信图片_20260514224139_858_41.jpg"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-14T22:49:15+08:00",
+          "updated_at": "2026-05-14T22:49:15+08:00"
+        },
+        {
+          "id": 53156,
+          "user_id": 2738510,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>值得反复看的内容！！感谢！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-14T16:16:58+08:00",
+          "updated_at": "2026-05-14T16:16:58+08:00"
+        },
+        {
+          "id": 52988,
+          "user_id": 230473,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>今天学到的精髓是：结果回传</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-14T15:26:38+08:00",
+          "updated_at": "2026-05-14T15:26:38+08:00"
+        },
+        {
+          "id": 50640,
+          "user_id": 231167,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>我总结的：</p><p><br></p><p>适合的模型 X 足够的上下文 X 告诉它什么是好，什么不能干 X 回传结果</p><p><br></p><p>即然AI没有好的标准，人也不知道什么是好的标准。这个时候，怎么知道自己和AI讨论的标准是适合且足够好的呢？</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 1,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-13T21:12:10+08:00",
+          "updated_at": "2026-05-13T13:12:18+08:00",
+          "comments": [
+            {
+              "id": 49343,
+              "note_id": 50640,
+              "user_id": 283486,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "（参考来源：<reference data-ref=\"\"></reference>）"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-13T21:12:17+08:00",
+              "updated_at": "2026-05-13T21:12:17+08:00"
+            }
+          ],
+          "tag_list": [
+            {
+              "id": 1,
+              "name": "问题请教",
+              "type": 1,
+              "status": 1,
+              "biz_type": 300
+            }
+          ]
+        },
+        {
+          "id": 50192,
+          "user_id": 2555674,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>以往一直是对话的形式来跟AI沟通，通过老师的分享，完全打破AI认识思维，更好的下达任务，通过问答式找到天赋和擅长的领域，脑洞大开，让结果一步步逐渐清醒，找到内心最想要的东西，感谢老师的精彩分享！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-13T18:58:43+08:00",
+          "updated_at": "2026-05-13T18:58:43+08:00"
+        },
+        {
+          "id": 50057,
+          "user_id": 7531514,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>一个字一个字看下来，深刻体会，基于事实跟 ai 对话得到更恰当的结果，给方向约束和目标，接着做好追问反问等技巧，再做交叉验证，最终结果反馈给 ai，让ai 继续总结，覆写到个人背景和对话，保存到一个文档，下次用，直接丢文档进去给 ai，这样的话，效率最高，如果对话过长，那就另外总结，再开多一个窗口，一个事情一个对话这是必须的，不然会避免上下文污染。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-13T18:11:15+08:00",
+          "updated_at": "2026-05-13T18:11:15+08:00"
+        },
+        {
+          "id": 49956,
+          "user_id": 935712,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>首先，我觉得这其中有一些专业名词不太方便理解，我用自己的话结合实践经验来解释一下。从下往上看：结果回传（验）其实我认为这就是“验”。怎么验？就是用其他 AI 验一下第一个 AI 的话，看它有没有胡说八道。就像“验牌”一样，用结果去验证 AI 的准确性。把控 AI 方向最主要是明确你要干嘛。要给 AI 一个具体的指令，说明你要干什么、要得到什么东西。细节操作在细节上要养成一些习惯：(a) 重申重点：比如收束意图、重申重点。(b) 聊长开新窗：如果内容太长，它也会提醒你“一窗一次”，避免干扰。© 利用记忆功能：把一些东西丢到记忆库里，不用每次都反复提醒。异常处理与约束我在这部分唯一学到的就是“异常处理”，还有就是先给约束条件。计划与执行分离一般来说，我现在的干活方式都是先开一个窗口跟 AI 聊明白问题，然后再直接丢过去让 AI 去执行。也就是说，计划和执行是分开的。对抗式追问我反正认为 AI 不一定全对，它给出的结论，我要先质疑一下。先给事实这个确实很有用。以前我给的事实信息比较少，现在我觉得最有价值的就是给它一个事实文档，这个相对来说比较有参考价值。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-13T17:36:41+08:00",
+          "updated_at": "2026-05-13T17:36:41+08:00"
+        },
+        {
+          "id": 48927,
+          "user_id": 9591597,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>这节最让我花时间是我自己的自我分析文档，这个部分花了我3天时间，给AI尽量星系的上下文。然后现在我觉得有点意识的掌握如何给上下文，指令方向和结果回传了。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-13T11:17:36+08:00",
+          "updated_at": "2026-05-13T11:17:36+08:00"
+        },
+        {
+          "id": 46391,
+          "user_id": 568746,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>不同血统的AI擅长的东西不一样，取长补短+交叉验证很重要</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-12T18:02:22+08:00",
+          "updated_at": "2026-05-12T18:02:22+08:00"
+        },
+        {
+          "id": 46390,
+          "user_id": 568746,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>不同血统的AI擅长的东西不一样，取长补短+交叉验证很重要</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-12T18:02:21+08:00",
+          "updated_at": "2026-05-12T18:02:21+08:00"
+        },
+        {
+          "id": 46277,
+          "user_id": 56788,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>非常系统使用AI的经验分享，真棒啊，通俗易懂，很有指导价值</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-12T17:23:58+08:00",
+          "updated_at": "2026-05-12T17:23:58+08:00"
+        },
+        {
+          "id": 46276,
+          "user_id": 56788,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>非常系统使用AI的经验分享，真棒啊，通俗易懂，很有指导价值</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-12T17:23:57+08:00",
+          "updated_at": "2026-05-12T17:23:57+08:00"
+        },
+        {
+          "id": 45929,
+          "user_id": 3799999,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>虽然这一章节学习的知识比较多，但是大概框架还是了解了，今天实操了一下，应该是之后越打磨AI，越把AI用到实际工作和生活中，越多用，到后来才可以用好，终于理解了这个概念，教练们讲课也是煞费苦心！！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-12T15:33:06+08:00",
+          "updated_at": "2026-05-12T15:33:06+08:00"
+        }
+      ],
+      "total": 120
+    },
+    "status": 0
+  },
+  {
+    "data": {
+      "extra": {
+        "users": [
+          {
+            "id": 6785,
+            "name": "曾永富",
+            "xq_group_number": 11219,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fr_HDYyjQbbXTKm_qbOmuldztA8h"
+          },
+          {
+            "id": 210351,
+            "name": "林泓毅",
+            "xq_group_number": 40611,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FobRHZI01zI2bnEAwNdpnDpCIWa6"
+          },
+          {
+            "id": 308382,
+            "name": "条形马",
+            "xq_group_number": 392,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjfBLucywFjv6knjWRPeu3gxokLq"
+          },
+          {
+            "id": 860765,
+            "name": "多拉",
+            "xq_group_number": 60691,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FtWyN0_CrTTKdJC-CpZxM1ClszT0"
+          },
+          {
+            "id": 1157671,
+            "name": "图南",
+            "xq_group_number": 98689,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fio5tw18c8CZpPwVPRSkJMVMDe-_"
+          },
+          {
+            "id": 1224832,
+            "name": "akira",
+            "xq_group_number": 200876,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrU3mQFrwn8D5Ecfrbova0gHXzfR"
+          },
+          {
+            "id": 2472973,
+            "name": "佳🦋",
+            "xq_group_number": 125897,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjFcf-rFiYOhzEfJg9oxaROem1my"
+          },
+          {
+            "id": 5829342,
+            "name": "南京圈友152841",
+            "xq_group_number": 152841,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrjszQlKpFjB9beduY7Lx5W-XYBH"
+          },
+          {
+            "id": 6410093,
+            "name": "邵大宝",
+            "xq_group_number": 155760,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkSKJ1RgGi5WZ40v0IofxSsBLPaj"
+          },
+          {
+            "id": 7668048,
+            "name": "天天",
+            "xq_group_number": 161971,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpDDAfg_vzWO5cjWMWFxkiJRBiwI"
+          },
+          {
+            "id": 7809980,
+            "name": "邓媛媛",
+            "xq_group_number": 199377,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FheCFLte3m7CoEmSLUT4wPdgehtY"
+          },
+          {
+            "id": 8192482,
+            "name": "Givenchy",
+            "xq_group_number": 168077,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fjj2rd6aa8IjVwx4PzqfXRQ1X4vS"
+          },
+          {
+            "id": 8247241,
+            "name": "陈自东",
+            "xq_group_number": 179995,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FoC6AcpP6Bzq7yZVg5WJVTuG1pN2"
+          },
+          {
+            "id": 9603132,
+            "name": "弱水三千",
+            "xq_group_number": 180033,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmKB7FEU8VyUWr96W1GQe8gkO1tB"
+          },
+          {
+            "id": 10081011,
+            "name": "默默",
+            "xq_group_number": 186197,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqpphNWFgJ26P_aC9w84z2KFxCzT"
+          },
+          {
+            "id": 10383940,
+            "name": "Göodmorning",
+            "xq_group_number": 188785,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fgo2R9p5RVd404ckmD4cSotn2qEv"
+          },
+          {
+            "id": 12468635,
+            "name": "Gniy.",
+            "xq_group_number": 201019,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Ftbp_fp1xTUoxrVEjFeEPxO4sJDE"
+          },
+          {
+            "id": 12580623,
+            "name": "1ou",
+            "xq_group_number": 201539,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpQLDFmcgeUoNS5srgg7hfMAfQ0Q"
+          },
+          {
+            "id": 12772943,
+            "name": "知溪",
+            "xq_group_number": 202192,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fg_mITYCOM_FZnMCL75ptWEMPxc6"
+          },
+          {
+            "id": 12865290,
+            "name": "天！空",
+            "xq_group_number": 201665,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrHLbS4KsKW-epFyqjXMWXrheYRA"
+          },
+          {
+            "id": 12871440,
+            "name": "青",
+            "xq_group_number": 201652,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsMO5Klxv_FvFCnXgnjPiF4rtMTb"
+          }
+        ],
+        "total_comment_count": 124
+      },
+      "items": [
+        {
+          "id": 45233,
+          "user_id": 10383940,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>需要好好反复学习！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-12T09:49:48+08:00",
+          "updated_at": "2026-05-12T09:49:48+08:00"
+        },
+        {
+          "id": 43881,
+          "user_id": 8192482,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>这个样的话就要求个人得知道什么是正确的方向或者要对这件事有评判标准，就像在约束那里，很多人包括我自己都不知道自己想要什么。这种情况是通过反问AI去获得认知，找几个优质对标输入获得方向，然后再交叉验证和结果回传去确定方向吗？这种方法是对的么？</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 4,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T22:24:25+08:00",
+          "updated_at": "2026-05-13T06:36:58+08:00",
+          "comments": [
+            {
+              "id": 48866,
+              "note_id": 43881,
+              "user_id": 8192482,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>各位老师，如果在一个陌生的领域里是如何确定方向的呢，如何做好挽具的呢？</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-11T22:28:05+08:00",
+              "updated_at": "2026-05-11T22:28:05+08:00",
+              "children": [
+                {
+                  "id": 49161,
+                  "note_id": 43881,
+                  "parent_id": 48866,
+                  "user_id": 308382,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>如果你是在一个陌生的领域，且无法获得这个领域的有效帮助到话，我想告诉你，你所遇到到——这不是一个知道终极答案的过程，而是一个摸着石头过河的过程。每一次的答案，都想办法送到真实世界中去检验，拿些检验收集到的事实、数据、反馈，再返回到 AI 中看看下一步往哪里去更合适。</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 0,
+                  "review_status": 2,
+                  "created_at": "2026-05-13T00:26:10+08:00",
+                  "updated_at": "2026-05-13T00:26:10+08:00"
+                },
+                {
+                  "id": 49239,
+                  "note_id": 43881,
+                  "parent_id": 49161,
+                  "user_id": 8192482,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>感谢条形吗老师🙏</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 0,
+                  "review_status": 2,
+                  "created_at": "2026-05-13T14:36:57+08:00",
+                  "updated_at": "2026-05-13T14:36:57+08:00"
+                },
+                {
+                  "id": 49162,
+                  "note_id": 43881,
+                  "parent_id": 48866,
+                  "user_id": 308382,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>陌生领域让人迷茫，但想清楚或多看案例看清楚，在这个领域里，什么成果是好成果。这很重要。</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 0,
+                  "review_status": 2,
+                  "created_at": "2026-05-13T00:27:13+08:00",
+                  "updated_at": "2026-05-13T00:27:13+08:00"
+                }
+              ]
+            }
+          ],
+          "tag_list": [
+            {
+              "id": 1,
+              "name": "问题请教",
+              "type": 1,
+              "status": 1,
+              "biz_type": 300
+            }
+          ]
+        },
+        {
+          "id": 43780,
+          "user_id": 1224832,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>先看一遍，回头在来重温一下</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T22:08:33+08:00",
+          "updated_at": "2026-05-11T22:08:33+08:00"
+        },
+        {
+          "id": 43771,
+          "user_id": 10081011,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>本节课程的重要收获：</p><p>1.思考能力的本质，是消除模糊</p><p>2.脑子里有了基本概念。AI是马，驾驭它我需要挽具；上下文&gt;提示词，事实会打败逻辑；AI挽具的三股绳，给事实，定方向，回传结果；学到了交叉验证和事实验证</p><p>3.制作个人背景文档；开始使用语音输入法；我得搭好挽具，让AI自己去跑</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T22:07:28+08:00",
+          "updated_at": "2026-05-11T22:07:28+08:00"
+        },
+        {
+          "id": 43768,
+          "user_id": 12871440,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>这一章内容满满对于新人来说真的是有够干货的，干到有点噎人了。总之大致的方向我已经清楚了，现在可能需要一些训练去验证一下。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T22:06:33+08:00",
+          "updated_at": "2026-05-11T22:06:33+08:00"
+        },
+        {
+          "id": 43202,
+          "user_id": 5829342,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>结果回传，学到了！要让Ai看到他自己做的结果！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T20:06:23+08:00",
+          "updated_at": "2026-05-11T20:06:23+08:00"
+        },
+        {
+          "id": 42806,
+          "user_id": 860765,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>好有道理，但又没搞明白，有道理在哪里？</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T17:24:56+08:00",
+          "updated_at": "2026-05-11T17:24:56+08:00"
+        },
+        {
+          "id": 41729,
+          "user_id": 2472973,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>我的理解是挽具工程的核心，就是一个不断明确，细化，纠偏需求的循环过程。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T13:46:51+08:00",
+          "updated_at": "2026-05-11T13:46:51+08:00"
+        },
+        {
+          "id": 41602,
+          "user_id": 7668048,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p><br></p><p>看完不跟着操作，确实有点懵，在日常生活和工作中对AI的应用确实是在当人肉中间件，所以接下来希望能够有更深一步的学习和进步</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T11:57:47+08:00",
+          "updated_at": "2026-05-11T11:57:47+08:00"
+        },
+        {
+          "id": 40966,
+          "user_id": 6785,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>要求越具体，场景越真实，业务越聚焦，得出的结果就更精准。其实人也一样，只要找到一个专业，不断深耕才会有好的结果。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T11:21:35+08:00",
+          "updated_at": "2026-05-11T11:21:35+08:00"
+        },
+        {
+          "id": 40938,
+          "user_id": 1157671,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-11/6791b1a1b8954f75ae1071c1062ac294/exported_image.png"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-11/6791b1a1b8954f75ae1071c1062ac294/exported_image.png"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T11:06:52+08:00",
+          "updated_at": "2026-05-11T11:06:52+08:00"
+        },
+        {
+          "id": 40836,
+          "user_id": 210351,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>需要多看几篇才能吃透！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-11T10:05:44+08:00",
+          "updated_at": "2026-05-11T10:05:44+08:00"
+        },
+        {
+          "id": 40238,
+          "user_id": 12865290,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>反复看了几遍，很有收获。一直觉得自己对AI比较熟悉，23年开始使用的。但是我对AI理解和较全面的认识还是这里，让我学习到怎么根据事情去挑AI(挑马)，怎么去搭好挽具（事实、方向、结果反馈），边学边做很有进步，打好基础，树立挽具意识，换什么AI都不怕了！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T22:59:29+08:00",
+          "updated_at": "2026-05-10T22:59:29+08:00"
+        },
+        {
+          "id": 40215,
+          "user_id": 8247241,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>上下文工程和挽具工程 ，一个是自动化工厂，一个是来料加工。后者是前者的一部分，是它的子集。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T22:55:11+08:00",
+          "updated_at": "2026-05-10T22:55:11+08:00"
+        },
+        {
+          "id": 40079,
+          "user_id": 9603132,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>ChatGPT比豆包要高一个维度。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T22:31:52+08:00",
+          "updated_at": "2026-05-10T22:31:52+08:00"
+        },
+        {
+          "id": 40007,
+          "user_id": 6410093,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>真的诶，跟培训员工是一样的！之前学习创业基础的时候老师说要敢于招人，招人的第一步就是建立工作SOP，越详细越好，员工按流程执行就可以了；对于AI挽具工程-第一次听说，学完了我觉得是一样的，而且两者都是越用越顺手，把工作方向边界定好，我只要做分析和决策，其他的事情只要规定的事无巨细，员工和AI都不会走偏，而且会随着对我思路和行为模式的了解，越来越达到我要的预期</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T22:16:59+08:00",
+          "updated_at": "2026-05-10T22:16:59+08:00"
+        },
+        {
+          "id": 39546,
+          "user_id": 12772943,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>在 AI 方面，我是纯小白，听了条形码老师的课，听得懵懵懂懂。听过了就听过了。今天重温了一遍对话外脑，感觉还是有很大的收获。还需要再反复多看几遍。也许才能领悟得更深。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T19:57:23+08:00",
+          "updated_at": "2026-05-10T19:57:23+08:00"
+        },
+        {
+          "id": 39170,
+          "user_id": 12468635,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>哈哈哈哈没啥的，只是让 AI 把马鞍指的位置给修正了一下</p>"
+              }
+            },
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-10/cc78e2d8f9994f0fbd18061aaa77d2f0/微信图片_20260510163826_10_333.png"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-10/cc78e2d8f9994f0fbd18061aaa77d2f0/微信图片_20260510163826_10_333.png"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T16:41:16+08:00",
+          "updated_at": "2026-05-10T16:41:16+08:00"
+        },
+        {
+          "id": 39076,
+          "user_id": 7809980,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>又听了一遍直播回放，又来读一遍条形马老师写的这个手册，一边看一边整理笔记，感觉清晰了一些，接下来就是实操了……</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T15:53:13+08:00",
+          "updated_at": "2026-05-10T15:53:13+08:00"
+        },
+        {
+          "id": 39047,
+          "user_id": 12580623,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>课程解决了我好几个疑惑，也验证了我一些使用习惯是良好的：</p><p>1、开新的对话框，但是ai的回单把过去的内容带过来了</p><p>解决思路：人物信息模板---需要持续更新</p><p>2、多ai使用上</p><p>过去是把任务的不同节点分配给不同ai，防止ai的过度讨好；更有效地方式应该是交叉和结果回传</p><p>3、模型选择上</p><p>过去是凭感觉，现在从数据训练视角理解不同ai的差异，以及从任务的结果去选择更适合的ai</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T15:34:15+08:00",
+          "updated_at": "2026-05-10T15:34:15+08:00"
+        }
+      ],
+      "total": 120
+    },
+    "status": 0
+  },
+  {
+    "data": {
+      "extra": {
+        "users": [
+          {
+            "id": 6304,
+            "name": "巫婆",
+            "xq_group_number": 29388,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsiCmPcryjvADPmSm8mV7VIg_O7_"
+          },
+          {
+            "id": 138350,
+            "name": "杨树亮",
+            "xq_group_number": 28698,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuElKA0bQGZo3RN01Ext9v10rVr-"
+          },
+          {
+            "id": 283486,
+            "name": "AI问答小助手",
+            "xq_group_number": 84947,
+            "avatar": "https://search01.shengcaiyoushu.com/public/upload/2025-12-02/c58fc7e8e85040f282f69793bfc44827/Snipaste_2025-12-02_14-30-42.png"
+          },
+          {
+            "id": 439946,
+            "name": "阿彬",
+            "xq_group_number": 48082,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpXnGYmeB2bcfYq1zVBuXCHLv4yz"
+          },
+          {
+            "id": 452801,
+            "name": "李不理之",
+            "xq_group_number": 136982,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FlG6qiUtw5Zfi86IWohAoZO1yKl_"
+          },
+          {
+            "id": 455606,
+            "name": "谢谢",
+            "xq_group_number": 57612,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fsu1hrTvIwrG1N1CQjpNDyyMYJw2"
+          },
+          {
+            "id": 491239,
+            "name": "孙大圣",
+            "xq_group_number": 91493,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fk4o7Rl08L_yebT4OGAH9Y-K44Ub"
+          },
+          {
+            "id": 503869,
+            "name": "南方",
+            "xq_group_number": 56129,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkzMVKKzy52gnsU3IM5hNbRB5_Es"
+          },
+          {
+            "id": 701780,
+            "name": "阿木",
+            "xq_group_number": 50933,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fo0hKio-BTDuOTzvzcF2juM0Cy4N"
+          },
+          {
+            "id": 861230,
+            "name": "刘呈",
+            "xq_group_number": 85385,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fr9GXofX4JlFujxBKlOhUrl--Q5T"
+          },
+          {
+            "id": 1090533,
+            "name": "国际范",
+            "xq_group_number": 100255,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrsvZ6wqUIhrbClBYmvyDwFYqFGm"
+          },
+          {
+            "id": 1235976,
+            "name": "WalkieMan",
+            "xq_group_number": 31131,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmqLaw8jb5diLOQuzWBfVQdA8LPM"
+          },
+          {
+            "id": 1780760,
+            "name": "海涛",
+            "xq_group_number": 201103,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fu3F_w6qJPqCzJS6QYlU2qbmHwp1"
+          },
+          {
+            "id": 9786090,
+            "name": "云中熹露",
+            "xq_group_number": 182788,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FhSIYzkKbl1TTJWUMLjm6aHZcJo3"
+          },
+          {
+            "id": 10622401,
+            "name": "北齐",
+            "xq_group_number": 191745,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FoJZ36XKzl9hYTcuzw9T1IWsgwqW"
+          },
+          {
+            "id": 10831225,
+            "name": "枫奇",
+            "xq_group_number": 202228,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Ft9gBIkKsq3zYae7kmyppIUPTAGn"
+          },
+          {
+            "id": 11460751,
+            "name": "志国",
+            "xq_group_number": 201951,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqO0Mp03baB9kvZsJB3-ISPI86bs"
+          },
+          {
+            "id": 11534057,
+            "name": "田闯",
+            "xq_group_number": 198342,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FhfrJQOq5eoBKhdukMLA-GqGAg4h"
+          },
+          {
+            "id": 11905955,
+            "name": "ptwm",
+            "xq_group_number": 201597,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuZ4SkaTBypIqnUYeyBPl-YzBFKH"
+          },
+          {
+            "id": 12188742,
+            "name": "fan",
+            "xq_group_number": 200265,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsGVxv0vQ60MaBKPgiK06GTOgK3A"
+          },
+          {
+            "id": 12606326,
+            "name": "SY",
+            "xq_group_number": 201092,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjiOV8Jt1SK3awi3W2eEdpLoOS7k"
+          },
+          {
+            "id": 13855374,
+            "name": "公道的侠",
+            "xq_group_number": 73182,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fl0VtWPWlLgFZHlItxjp43mOTQHK"
+          }
+        ],
+        "total_comment_count": 129
+      },
+      "items": [
+        {
+          "id": 38857,
+          "user_id": 455606,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>非常非常用心的教程，是我看过最好的AI入门手册，让我大开眼界，AI认知+选AI+挽具工程真的让我真正的入门了AI，感谢条形马老师，感谢生财团队用心的航海。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T13:24:32+08:00",
+          "updated_at": "2026-05-10T13:24:32+08:00"
+        },
+        {
+          "id": 38716,
+          "user_id": 10622401,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>好，我个人称为使用ai的心法</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T11:19:55+08:00",
+          "updated_at": "2026-05-10T11:19:55+08:00"
+        },
+        {
+          "id": 38708,
+          "user_id": 12188742,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<ol><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>选择AI工具。你有几个擅长不同领域的助手/员工，需要了解他们擅长的领域。这个就是我们经常提到的：选人比培训人更重要。</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>背景+目标。手册里面提到的“事实完整 × 方向明确”。我的理解，就是告诉AI，现在是一个什么样的事情，客观准确全面告诉他，我想要一个什么结果？这个结果/目标可以是宽泛的，再进一步去拆分。</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>比较有意思的细节。我理解挺重要的，就是目标的拆解和分析。比如：手册里面“小红书笔记对标  挽具怎么搭？”手册里面提到了“标题、开头”之类的，如果对于全新手的自己未必知道这些点，及这些点的重要性。就需要开放性的问，然后再收敛&amp;追问。</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>\" 结果回传\"就是根据AI的输出，加上你个人的关注的点，二次追问和细化及调整方向。比如“小红书笔记”，可以侧重标题，就正对标题部分细化精修。这一部分我的理解和“第二股绳”要表达的是一个意思。或许我没理解第二股绳的意思。</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>“结果会传”，可以把这个方案丢给另一个员工，让他去check，挑战。</li></ol><p>总结：</p><ol><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>你最好是一个逻辑清晰的人。知道要什么，去哪里去。</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>你有几个优秀的员工，擅长不同领域。告诉他们背景+目标，要结果。</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>根据给出的结果，加上自己的喜好（目标侧重点），追问+细化。进一步要结果。如果结果不满意，直接挑战质问，调整。</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>把上述结果，交个另一个员工，问这个方案是否有完善的地方。</li></ol>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T11:14:29+08:00",
+          "updated_at": "2026-05-10T11:14:29+08:00"
+        },
+        {
+          "id": 38468,
+          "user_id": 701780,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>二刷了一遍这节，比第一次看的收获大的多了</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-10T01:00:07+08:00",
+          "updated_at": "2026-05-10T01:00:07+08:00"
+        },
+        {
+          "id": 38108,
+          "user_id": 9786090,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>终于对挽具工程和上下文工程有了更清晰的认知，接下来，我将从梳理个人的背景出发，学习调动AI的基础能力和工具能力。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T23:34:25+08:00",
+          "updated_at": "2026-05-09T23:34:25+08:00"
+        },
+        {
+          "id": 37885,
+          "user_id": 452801,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>如果你不能给到ai具体的问题想法以及事实，结合你个人背景的话，那ai给你的东西将是他结合行业平均水平的东西，ai就像是一个拥有了神兵利器的人，但是光拥有神兵利器也打不过魔王，你的学习功法，如何更好使用这个神兵利器才能事半功倍。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T23:03:14+08:00",
+          "updated_at": "2026-05-09T23:03:14+08:00"
+        },
+        {
+          "id": 37864,
+          "user_id": 6304,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>好干货的内容👍</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T23:00:23+08:00",
+          "updated_at": "2026-05-09T23:00:23+08:00"
+        },
+        {
+          "id": 37361,
+          "user_id": 861230,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>原来现在还是停留在一问一答的阶段</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T21:35:21+08:00",
+          "updated_at": "2026-05-09T21:35:21+08:00"
+        },
+        {
+          "id": 37282,
+          "user_id": 13855374,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>事实大于上下文，上下文大于提示词</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T21:08:47+08:00",
+          "updated_at": "2026-05-09T21:08:47+08:00"
+        },
+        {
+          "id": 37001,
+          "user_id": 11534057,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>今天花了一个小时去看文章，写了个总结。然后我又花了3个小时问了一下ChatGPT，然后我又用Kimi和豆包分别交叉验证了一下，我发现Kimi更理性。</p><p>但是我发现ChatGPT还是有讨好的属性在。必须要告诉他，我要听真话，就是让他更一针见血。</p><p>但是这里还是有一个问题，哪怕我把我的这个背景全部交代了一遍，我在跟他说的时候，我感觉他说的东西还是词不达意，这个需要思考一下怎么去补充信息。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T19:21:51+08:00",
+          "updated_at": "2026-05-09T19:21:51+08:00"
+        },
+        {
+          "id": 36968,
+          "user_id": 11460751,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p><br></p><p><br></p><p>1. 如何放大AI的三层能力？</p><p>核心逻辑：AI模型（基座）与需求的匹配度，决定AI能力的发挥上限，具体步骤如下：明确目标，拆解目标实现所需的核心元素（子目标）；了解不同AI模型的长处与短板，建立模型认知；将子目标与模型进行匹配，优先选择匹配度高的模型。</p><p>2. AI辅助的有效性公式（必背）AI辅助的有效性 ≈ 背景完整 × 方向明确 × 结果回传背景完整：AI具备完成任务所需的事实依据、参考信息（避免“无米之炊”）；方向明确：需求、目标、意图传达清晰，引导AI聚焦核心关注点；结果回传：将AI输出结果与自身期望对比，把效果反馈给AI，让下一轮输出更精准、更系统。</p><p>3. 结果回传与校验（避免AI出错）核心：通过事实校验AI答案，确保结果准确可用，两种实用方式：交叉验证：用不同AI模型核对同一问题，验证结果一致性；数据质问：用真实数据、案例反问AI，验证结论的合理性。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T19:09:00+08:00",
+          "updated_at": "2026-05-09T19:09:00+08:00"
+        },
+        {
+          "id": 36395,
+          "user_id": 138350,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>飞书自带的语音输入法也很好用，它能自动润色，分行，小龙虾场景很棒</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T17:23:35+08:00",
+          "updated_at": "2026-05-09T17:23:35+08:00"
+        },
+        {
+          "id": 36221,
+          "user_id": 1090533,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>方法太有用了，让我明确了ai如何用，才能发挥最大威力​🫡​</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T16:51:04+08:00",
+          "updated_at": "2026-05-09T16:51:04+08:00"
+        },
+        {
+          "id": 36034,
+          "user_id": 503869,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>​😀​</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T15:53:05+08:00",
+          "updated_at": "2026-05-09T15:53:05+08:00"
+        },
+        {
+          "id": 35603,
+          "user_id": 10831225,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p><br></p><p><br></p><p>我觉得这个关于就是讨好偏见这里有一个问题。就是说到这个讨好偏见的偏差，带出的三个反直觉的推论。一个是生硬的对抗式提问。还有一个就是提问的反向陷阱。其实看到这里就会想到：“如何提出不生硬的对抗式提问？”，然后还有就是“如何提问，不会给AI制造反向的陷阱？”但是呢第三条\"真正有效的反制,把它放在一个无法讨好你的局\"这里有三点，\"开独立窗口、换独立角色、换独立模型\"。其实我觉得并没有解决刚刚以上两点带出的问题，想请教一下</p><p><br></p><p>“如何提出不生硬的对抗式提问？”</p><p>“如何提问，不会给AI制造反向的陷阱？”</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 9,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T13:02:15+08:00",
+          "updated_at": "2026-05-12T01:40:49+08:00",
+          "comments": [
+            {
+              "id": 47995,
+              "note_id": 35603,
+              "user_id": 283486,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "（参考来源：<a href=\"https://scys.com/articleDetail/xq_topic/55188525422455544\" onclick=\"event.stopPropagation();\" target=\"_blank\">AI让人变笨？胡说！细数50条...</a> ）"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-09T13:02:27+08:00",
+              "updated_at": "2026-05-09T13:02:27+08:00"
+            },
+            {
+              "id": 47997,
+              "note_id": 35603,
+              "user_id": 10831225,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>尝试问了3个不同的LLM，首先是chatgpt（字数超过留言文字，先文字后图）</p><p><br></p><p>这张图里讲的方向，其实有一定道理，但它把问题说得有点“绝对化”了。AI 确实存在：迎合倾向（为了提高“用户满意度”）不确定时会补全（也就是“幻觉”）会受到提问方式影响但并不意味着：“一质疑 AI 就一定改口”“AI 只会讨好”“对抗式提问无效”真正关键的是：你不是要“压 AI”，而是要“改变 AI 的判定目标”。你一旦只是情绪式质疑：“你错了吧？”“你确定？”“再严格一点”模型会把这理解成：“用户可能不满意了，我应该调整语气、降低冲突、增加让步。”于是就容易“改口”。但如果你把问题改成：“请进入验证模式”“请不要优先照顾我的感受”“请列出支持与反对证据”“请给出置信度和不确定点”AI 的优化目标就会变成：校验推理证据一致性而不是“让你舒服”。这才是核心。一、为什么“生硬对抗”会反弹？因为很多“对抗式提问”其实是：❌ 情绪型攻击比如：“你这不是胡说吗？”“你再想想？”“你明显错了”“你确定？”这些话没有提供：新信息新约束新验证目标模型只能推测：“用户不满意。”于是它会：降低语气开始让步改口重新组织答案注意：这不一定是“认错”，而是“重新适配用户”。二、真正有效的“非生硬对抗”重点不是“攻击 AI”。而是：让 AI 进入“校验态”“辩论态”“审计态”。你是在切换任务模式。比如：方法1：要求“反证”不要说：❌“你确定吗？”改成：✅“请站在反方角度，找出你刚才答案中最可能错误的3个点。”这个非常有效。因为：它不会触发“安抚用户”而是触发“内部一致性检查”这是高级提问方式。方法2：要求置信度比如：✅“你对这个结论的置信度是多少？哪些部分最不确定？”这会逼 AI：区分“确定”和“猜测”主动暴露薄弱环节而不是一味嘴硬。方法3：要求证据链比如：✅“请把你得出这个结论的推理链拆开。”✅“哪些是事实，哪些是推测，哪些是经验判断？”这个特别重要。因为 AI 很容易把：事实推断补全混成一个流畅答案。你拆开后，质量会高很多。方法4：多模型交叉这也是图里提到的。确实有效。因为不同模型：RLHF风格不同训练数据不同推理偏好不同你可以：ChatGPT → 先生成Claude → 找逻辑漏洞Gemini → 查事实Grok → 看是否过度政治正确这时候：你不是“和AI吵架”。而是：让 AI 们互相制衡。这比“你确定吗”强很多。三、“你确定吗”为什么容易触发反向陷阱？因为这句话本质上没有信息量。AI 无法判断：你是真的发现错误还是只是怀疑还是情绪不满于是它会倾向：“那我谨慎一点。”然后开始：加免责声明降低确定性甚至改口尤其是 RLHF 强的模型更明显。</p>"
+                  }
+                },
+                {
+                  "image": {
+                    "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-09/200eee272e184f60960d0abd4b75accc/微信图片_2026-05-09_131204_234.png"
+                  },
+                  "block_type": 27,
+                  "document_id": "",
+                  "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-09/200eee272e184f60960d0abd4b75accc/微信图片_2026-05-09_131204_234.png"
+                }
+              ],
+              "like_count": 3,
+              "review_status": 0,
+              "created_at": "2026-05-09T13:14:51+08:00",
+              "updated_at": "2026-05-13T05:12:46+08:00",
+              "children": [
+                {
+                  "id": 47999,
+                  "note_id": 35603,
+                  "parent_id": 47997,
+                  "user_id": 10831225,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>然后，生财卡bug了？无法粘贴文字，元宝和豆包回答文字发不了</p>"
+                      }
+                    },
+                    {
+                      "image": {
+                        "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-09/f13bffb50ff94ea8916840df558f5ff7/43f3b921-e656-4a4b-b726-aaf6628e8ed7.png"
+                      },
+                      "block_type": 27,
+                      "document_id": "",
+                      "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-09/f13bffb50ff94ea8916840df558f5ff7/43f3b921-e656-4a4b-b726-aaf6628e8ed7.png"
+                    }
+                  ],
+                  "like_count": 1,
+                  "review_status": 2,
+                  "created_at": "2026-05-09T13:21:52+08:00",
+                  "updated_at": "2026-05-09T08:37:59+08:00"
+                }
+              ]
+            },
+            {
+              "id": 48012,
+              "note_id": 35603,
+              "user_id": 439946,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>看了你的所有评论，我个人认为，既然ai的讨好偏见是既存的事实，我们使用的时候其实不需要纠结“如何提出不生硬的对抗式提问？”和“如何提问，不会给AI制造反向的陷阱？”，因为让它自己检查自己本身就有问题，换句话说，我们作为人类个体，通过自检发现漏洞的可能都不大。教练给出的，直接新开一个窗口，让它不知道我究竟要什么，它自然无从“讨好”，来达到我们验证的目的更简单也更效率。</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-09T14:38:27+08:00",
+              "updated_at": "2026-05-09T14:38:27+08:00",
+              "children": [
+                {
+                  "id": 48151,
+                  "note_id": 35603,
+                  "parent_id": 48012,
+                  "user_id": 10831225,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>圈友你好，感谢你能回复我。其实咱们俩的思路不是冲突的，是顺序不一样：你说的“新开窗口 / 独立模型”，是 AI 已经长出 “讨好的皮”、出现偏差后的兜底方案；而我纠结的“提问优化”，是在 AI 启动讨好机制前的前置预防。</p><p>我想做的，是先通过提问方式，让 AI 从一开始就进入 “事实校验模式”，而不是随口提问，等它讨好我，再用独立窗口去拆穿。毕竟每次都换窗口、换模型，都会有成本，能在源头进行优化，比随口问，出现问题再换，更高效。应该是这样的逻辑顺序。</p><p>另外，其实我也不认同 “人自检发现漏洞不大” 的说法：航海这节刚好也讲提升思维能力，自检还是很关键的。人自身先\"自检\"自己提问的方式，定方向，再途中才约束、验证（换独立角色、换重开窗口、换模型）才能不让 AI怕跑偏。而航海作业要求提问者先“自检”的方法，如图所示，也刚好有效论证了这一点。然后我把我的纠结问向AI，AI的说的优化方法（如上）其实有可采纳之处,最后很高兴能与圈友你展开交流讨论，才有助于我梳理得更清楚​,感谢🥰</p>"
+                      }
+                    },
+                    {
+                      "image": {
+                        "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-10/c9b5f07a69a04194a99853e576c17cbc/微信图片_2026-05-10_071802_571.png"
+                      },
+                      "block_type": 27,
+                      "document_id": "",
+                      "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-10/c9b5f07a69a04194a99853e576c17cbc/微信图片_2026-05-10_071802_571.png"
+                    }
+                  ],
+                  "like_count": 0,
+                  "review_status": 2,
+                  "created_at": "2026-05-10T07:43:43+08:00",
+                  "updated_at": "2026-05-10T07:43:43+08:00"
+                },
+                {
+                  "id": 48530,
+                  "note_id": 35603,
+                  "parent_id": 48151,
+                  "user_id": 439946,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>谢谢圈友，受教了。</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 1,
+                  "review_status": 2,
+                  "created_at": "2026-05-11T10:10:31+08:00",
+                  "updated_at": "2026-05-11T17:41:30+08:00"
+                },
+                {
+                  "id": 48658,
+                  "note_id": 35603,
+                  "parent_id": 48530,
+                  "user_id": 10831225,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>没有没有🤝​​🤝​相互学习，共同进步!</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 0,
+                  "review_status": 2,
+                  "created_at": "2026-05-11T14:02:21+08:00",
+                  "updated_at": "2026-05-11T14:02:21+08:00"
+                }
+              ]
+            }
+          ],
+          "tag_list": [
+            {
+              "id": 1,
+              "name": "问题请教",
+              "type": 1,
+              "status": 1,
+              "biz_type": 300
+            }
+          ]
+        },
+        {
+          "id": 35563,
+          "user_id": 1235976,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>用ai已经有一段时间，来解决工作上的各种问题。但是今天系统性的把这一课读下来，才发现有许多细节我遗漏了。收获还是很大的。做了不少笔记。值了。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T12:40:26+08:00",
+          "updated_at": "2026-05-09T12:40:26+08:00"
+        },
+        {
+          "id": 35366,
+          "user_id": 1780760,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>AI自身很强，学会驾驭AI会让AI更强。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T11:14:02+08:00",
+          "updated_at": "2026-05-09T11:14:02+08:00"
+        },
+        {
+          "id": 35254,
+          "user_id": 12606326,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>前前后后花了差不多半天时间都还没看完，知识量真的是极其庞大</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T10:27:05+08:00",
+          "updated_at": "2026-05-09T10:27:05+08:00"
+        },
+        {
+          "id": 35244,
+          "user_id": 491239,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>哈哈哈，两种对话方式结合起来～～</p>"
+              }
+            },
+            {
+              "image": {
+                "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-09/a82965b8456a40db9f9cfef4576520b3/IMG_1793.png"
+              },
+              "block_type": 27,
+              "document_id": "",
+              "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-09/a82965b8456a40db9f9cfef4576520b3/IMG_1793.png"
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T10:20:46+08:00",
+          "updated_at": "2026-05-09T10:20:46+08:00"
+        },
+        {
+          "id": 35229,
+          "user_id": 11905955,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>修正了之前一些使用 AI 的错误或不够友好的方式。</p><p><br></p><p>虽然之前用过“交叉比较”这种模式，但问题在于：</p><p>1. 海外模型用起来不是很方便，和国内AI做交叉比较困难一点；</p><p>2. 国内模型在交叉比较时，有时会发现它们互相诋毁或者互相“掐架”，不好总结。</p><p><br></p><p>学了这一篇之后，我感觉可能是自己问问题的方式不对，问题描述得比较模糊，而且老是带有自己主观的一些臆想，导致不能很客观地反映问题。</p><p><br></p><p>所以后期我还会继续反复学习这一篇，认真总结和了解需要注意的案例，把这套“马具”配好。希望在之后的 AI 使用过程中，这些内容能对我有所帮助，取得更好的效果。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T10:13:12+08:00",
+          "updated_at": "2026-05-09T10:13:12+08:00"
+        }
+      ],
+      "total": 120
+    },
+    "status": 0
+  },
+  {
+    "data": {
+      "extra": {
+        "users": [
+          {
+            "id": 36729,
+            "name": "魅影",
+            "xq_group_number": 1761,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fv2VbhFc1Wgs97Fkg3_dLYkIXfzj"
+          },
+          {
+            "id": 37215,
+            "name": "大强哥",
+            "xq_group_number": 28750,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fg2XDUKg3amUar1-BloFEaQAlUsx"
+          },
+          {
+            "id": 126690,
+            "name": "小方",
+            "xq_group_number": 202472,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuRSb9plMyITcxDviPLdruHa2vE_"
+          },
+          {
+            "id": 204671,
+            "name": "钥匙先生",
+            "xq_group_number": 25407,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FntVvf_7G47WQZ271jzcgRyBRkhN"
+          },
+          {
+            "id": 242465,
+            "name": "Van",
+            "xq_group_number": 41520,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FlEaSQlItwzNAmAaJvZMrGjBkSs7"
+          },
+          {
+            "id": 308382,
+            "name": "条形马",
+            "xq_group_number": 392,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjfBLucywFjv6knjWRPeu3gxokLq"
+          },
+          {
+            "id": 439946,
+            "name": "阿彬",
+            "xq_group_number": 48082,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpXnGYmeB2bcfYq1zVBuXCHLv4yz"
+          },
+          {
+            "id": 491239,
+            "name": "孙大圣",
+            "xq_group_number": 91493,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fk4o7Rl08L_yebT4OGAH9Y-K44Ub"
+          },
+          {
+            "id": 503869,
+            "name": "南方",
+            "xq_group_number": 56129,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkzMVKKzy52gnsU3IM5hNbRB5_Es"
+          },
+          {
+            "id": 593808,
+            "name": "A大熊",
+            "xq_group_number": 108995,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FhdXvQxgi37xCox9QuvecqKAQ-qE"
+          },
+          {
+            "id": 701780,
+            "name": "阿木",
+            "xq_group_number": 50933,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fo0hKio-BTDuOTzvzcF2juM0Cy4N"
+          },
+          {
+            "id": 816305,
+            "name": "Hey!David",
+            "xq_group_number": 88496,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqR1kr46UfHoylpWtG7g_5lCcqiw"
+          },
+          {
+            "id": 1219867,
+            "name": "缇娜",
+            "xq_group_number": 114102,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FiyBQ3fdI_tbW4o7vOPq_SW23SQq"
+          },
+          {
+            "id": 2728149,
+            "name": "Kiki",
+            "xq_group_number": 125017,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FvNWi1EEIKYTZgPXFaMR23L5M47m"
+          },
+          {
+            "id": 3560696,
+            "name": "Maya",
+            "xq_group_number": 140054,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgGk5gtK3x8xChFl9oge-ZgqnjJc"
+          },
+          {
+            "id": 4414183,
+            "name": "范真俊",
+            "xq_group_number": 150778,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fi47_56SMIT7CUnSfTwXBKbhv5cF"
+          },
+          {
+            "id": 7910824,
+            "name": "刚子",
+            "xq_group_number": 203182,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fuw7EPIUNbPkESD83efCug7R5nJS"
+          },
+          {
+            "id": 8256643,
+            "name": "Alex Peng©²⁰¹⁹",
+            "xq_group_number": 202440,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FudeB4GxO2Uu-1fquyHGmAE2v5Jz"
+          },
+          {
+            "id": 9716819,
+            "name": "博同学",
+            "xq_group_number": 195269,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkmlYx_2DRff0Acny695QGLVjy90"
+          },
+          {
+            "id": 10295868,
+            "name": "Joy",
+            "xq_group_number": 203656,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FvaOK9NUyeniVYC09jxlS-EcP0Ng"
+          },
+          {
+            "id": 10813797,
+            "name": "橘子",
+            "xq_group_number": 197935,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FoLQEu1Bkg9-l4dMHv8js2Cuo9lY"
+          },
+          {
+            "id": 11376104,
+            "name": "胖胖橘猫猫",
+            "xq_group_number": 202038,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmdQop6pRQMc8P7Ie3I3hCO9hsWD"
+          },
+          {
+            "id": 11590370,
+            "name": "Server Online",
+            "xq_group_number": 201536,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuoxFK29NwiVk4uhocTayQbYeKB0"
+          }
+        ],
+        "total_comment_count": 123
+      },
+      "items": [
+        {
+          "id": 35047,
+          "user_id": 816305,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>跟看完直播一个感觉，条形码老师，你是真教啊！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T03:08:20+08:00",
+          "updated_at": "2026-05-09T03:08:20+08:00"
+        },
+        {
+          "id": 34903,
+          "user_id": 36729,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>图1是我问Gemini，第一步给了背景文档，第二步进行约束并指出问题，第三轮问答又重申不实的问题，接下来进行对抗式询问。图2是在豆包上进行交叉验证。如果不运用这些技能在第一步我就停止了，我并不能准确分析出我该往哪个方向进行，该做什么，对于给出的答案该执行的事情还是模糊的。</p><p>本节课程对于工具的使用有了一定的认识，之前对于这方面的思考欠缺，总想着用最好的工具，但是应该擅长的AI做擅长的事情。并且了解了挽具，去把控AI的方向，之前总是觉得输出答案不够满意又不知道如何让她调整。</p><p>收获很大，谢谢老师！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T00:25:33+08:00",
+          "updated_at": "2026-05-09T00:25:33+08:00"
+        },
+        {
+          "id": 34851,
+          "user_id": 9716819,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>先花 30 分钟写一版粗糙的个人背景文档，不求完美。写完后再让 AI 反问你补充缺失信息。这样比坐在那里想“我到底该怎么写”更容易推进。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-09T00:07:40+08:00",
+          "updated_at": "2026-05-09T00:07:40+08:00"
+        },
+        {
+          "id": 34615,
+          "user_id": 8256643,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>干货满满，跟着老师和ai对话，每次都有新的感悟，新人学习起来有点吃力，今天学习了第一遍 ，感觉学到的不够，明天再学习一遍</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T23:35:00+08:00",
+          "updated_at": "2026-05-08T23:35:00+08:00"
+        },
+        {
+          "id": 34538,
+          "user_id": 10813797,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p><br></p><p><br></p><p>刚刚读完第一章，五个\"抓狂时刻\"里中了三个——AI 永远在夸我、给正确的废话、聊着聊着失忆。之前一直以为是模型不够强，换了好几个也没改善。读到\"上下文 &gt; 提示词\"那个杭州展览的对比实验才反应过来，问题出在我每次打开窗口只丢一句提示词就等结果，从来没想过要给 AI 先塞事实。</p><p>试着按三股绳的思路，花半小时给自己写了一份个人背景文档，然后让 Claude 帮我分析优势和发展方向。最让我意外的是对抗式追问那一步——它一开始给的结论听起来挺合理，我追问了一句\"你是从我背景里的哪句话推出这个结论的\"，它列出来的依据里有一条其实是我三年前做着玩的项目，根本不是我想继续走的方向。如果没追问这一下，我可能就拿着一个偏差的结论开始行动了。</p><p>三股绳里目前最有体感的是第一股（给事实）和第二股里的对抗式追问。下一步打算把第三股绳跑通——挑一个建议去现实里试一下，把结果回传给 AI，看看它能不能越用越准。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T23:25:37+08:00",
+          "updated_at": "2026-05-08T23:25:37+08:00"
+        },
+        {
+          "id": 34367,
+          "user_id": 491239,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>挽具的最后呈现，就是一套提示词？</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 3,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T23:07:06+08:00",
+          "updated_at": "2026-05-10T16:02:27+08:00",
+          "comments": [
+            {
+              "id": 48013,
+              "note_id": 34367,
+              "user_id": 439946,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>不是，是一套系统。</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-09T14:40:53+08:00",
+              "updated_at": "2026-05-09T14:40:53+08:00"
+            },
+            {
+              "id": 48046,
+              "note_id": 34367,
+              "user_id": 308382,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>不是。</p>"
+                  }
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-09T16:38:25+08:00",
+              "updated_at": "2026-05-09T16:38:25+08:00",
+              "children": [
+                {
+                  "id": 48461,
+                  "note_id": 34367,
+                  "parent_id": 48046,
+                  "user_id": 3560696,
+                  "content": [
+                    {
+                      "block_type": 5001,
+                      "document_id": "",
+                      "sc_html": {
+                        "content": "<p>那是什么呢？</p>"
+                      }
+                    }
+                  ],
+                  "like_count": 0,
+                  "review_status": 2,
+                  "created_at": "2026-05-11T00:02:26+08:00",
+                  "updated_at": "2026-05-11T00:02:26+08:00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 34156,
+          "user_id": 4414183,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>收获很大，原来里面有这么多技巧</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T22:42:51+08:00",
+          "updated_at": "2026-05-08T22:42:51+08:00"
+        },
+        {
+          "id": 33870,
+          "user_id": 7910824,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>对AI的理解有了更深层次的认知</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T22:06:24+08:00",
+          "updated_at": "2026-05-08T22:06:24+08:00"
+        },
+        {
+          "id": 33836,
+          "user_id": 503869,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>​😀​</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T22:03:02+08:00",
+          "updated_at": "2026-05-08T22:03:02+08:00"
+        },
+        {
+          "id": 33593,
+          "user_id": 242465,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>干货满满</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T21:28:06+08:00",
+          "updated_at": "2026-05-08T21:28:06+08:00"
+        },
+        {
+          "id": 33542,
+          "user_id": 701780,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>这章真的得好好多看两遍，感觉就是一上来就开了个大招，得好好消化一下</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T21:19:24+08:00",
+          "updated_at": "2026-05-08T21:19:24+08:00"
+        },
+        {
+          "id": 33263,
+          "user_id": 2728149,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>听完条形马老师的内容感觉自己有点像听天书，后续又回到手册重新看了一遍，感觉有了一个大致的框架，之前确实对ai了解的太少了，时代进步的很快，如果还只是停留在原地真的很可怕，内心感叹AI 真的在改变世界。虽然起步晚，但是我相信持续研究一定能利用 AI 搭建自己想要的小助理。很感谢生财，第一次参加航海开了眼界！感谢各位老师的分享～</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T20:24:12+08:00",
+          "updated_at": "2026-05-08T20:24:12+08:00"
+        },
+        {
+          "id": 33254,
+          "user_id": 126690,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>内容很丰富，拆解到位，明白了很多底层逻辑，不虚此行，加油！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T20:21:20+08:00",
+          "updated_at": "2026-05-08T20:21:20+08:00"
+        },
+        {
+          "id": 32997,
+          "user_id": 10295868,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>文档真的好详细，虽然自己也用了几年AI了，但很多专业名词第一次听到或了解到。以前用AI的过程中总是感觉自己还是没有利用好AI，但就是不懂自己的操作失误在哪里，这次算是真正找到了一直困扰自己的根本性原因，感谢老师们，感谢生财！​👍​​👍​​👍​</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T18:57:38+08:00",
+          "updated_at": "2026-05-08T18:57:38+08:00"
+        },
+        {
+          "id": 32987,
+          "user_id": 593808,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>今天用GPT对话了个人背景分析的事情。感觉像是头痛医头脚痛医脚的西医开药式的诊断。目前感觉有点一般，再用其他的模型验证一遍看看。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T18:53:42+08:00",
+          "updated_at": "2026-05-08T18:53:42+08:00"
+        },
+        {
+          "id": 32925,
+          "user_id": 37215,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>好长，干货满满，值得多读几遍</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T18:22:09+08:00",
+          "updated_at": "2026-05-08T18:22:09+08:00"
+        },
+        {
+          "id": 32856,
+          "user_id": 11376104,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>用好 AI 的关键不是背提示词模板，而是学会给它完整的事实背景、明确的方向指引、真实的结果反馈。把 AI 当成需要驾驭的马,而不是无所不知的神。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T17:43:07+08:00",
+          "updated_at": "2026-05-08T17:43:07+08:00"
+        },
+        {
+          "id": 32840,
+          "user_id": 204671,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>看完这一章收获非常大，原来各个模型都有各自擅长的领域。学到了，感谢！！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T17:36:34+08:00",
+          "updated_at": "2026-05-08T17:36:34+08:00"
+        },
+        {
+          "id": 32824,
+          "user_id": 11590370,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>内容很丰富，按部就班，逐步加深知识积累。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T17:26:51+08:00",
+          "updated_at": "2026-05-08T17:26:51+08:00"
+        },
+        {
+          "id": 32753,
+          "user_id": 1219867,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>实用性很强，需要注意的细节很多比如第三部  最后的结果回馈和我们使用AI 时候的细节定位边界把控等等，感恩遇见！希望大家拿到自己的结果​😀​</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T17:03:43+08:00",
+          "updated_at": "2026-05-08T17:03:43+08:00"
+        }
+      ],
+      "total": 120
+    },
+    "status": 0
+  },
+  {
+    "data": {
+      "extra": {
+        "users": [
+          {
+            "id": 118874,
+            "name": "mangb",
+            "xq_group_number": 18476,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fhm3hRWOTdFz8OqFN3KyHPjSADkL"
+          },
+          {
+            "id": 123133,
+            "name": "惠一",
+            "xq_group_number": 7433,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgTa8sq2GIFB40FYm5wacgHHG-3s"
+          },
+          {
+            "id": 450947,
+            "name": "flychen",
+            "xq_group_number": 55232,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fmwj7Wvn2BKD1gGyYN2HvY_B1fxg"
+          },
+          {
+            "id": 678292,
+            "name": "Amanda（七七）",
+            "xq_group_number": 61178,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpSGKSOIZ1jsgwmlFR2lLzcdPPe2"
+          },
+          {
+            "id": 810686,
+            "name": "、God",
+            "xq_group_number": 86058,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FtLO4tlI0ngeTQ1bHy7LyojK8V56"
+          },
+          {
+            "id": 1161691,
+            "name": "阿兜@生财有术",
+            "xq_group_number": 100077,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjHFvRfJvWiUM-AuJLbSlSJQrmnh"
+          },
+          {
+            "id": 3285392,
+            "name": "Wenthkim",
+            "xq_group_number": 135357,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FoR1RMKFi_rtrfQGzF0iUvXuD_Rb"
+          },
+          {
+            "id": 7808708,
+            "name": "王伟",
+            "xq_group_number": 201375,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqSdJadR1Nu2iPdWTjhcwd7IjVO0"
+          },
+          {
+            "id": 8202974,
+            "name": "石在｜实在",
+            "xq_group_number": 168709,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmsrlzZy_DW2JgsYH_CvyQwVBBW9"
+          },
+          {
+            "id": 9500901,
+            "name": "国境以南",
+            "xq_group_number": 176186,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FsdB97FABjofu0WLfm9V84XvzZIk"
+          },
+          {
+            "id": 10292225,
+            "name": "周卉",
+            "xq_group_number": 188569,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FjUOQ7le-fmlqTnQ0H5FOsb_x7q7"
+          },
+          {
+            "id": 11635559,
+            "name": "Sophia-hu",
+            "xq_group_number": 203177,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fh77C1GbA_tO-WeFnLJgI_PBVt4f"
+          },
+          {
+            "id": 11822804,
+            "name": "黄昏知道",
+            "xq_group_number": 203263,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FpFOJZ89ZlSRi02isWZ2Q6-HZOh_"
+          },
+          {
+            "id": 12116399,
+            "name": "鹏行天下",
+            "xq_group_number": 201573,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fp1qYk8HtZWsegd-LYWeO8D_xhMk"
+          },
+          {
+            "id": 12130238,
+            "name": "A我有两只小小猪",
+            "xq_group_number": 202419,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FgGDrNyyf4NeJwS5Ul1lN5RdkeDp"
+          },
+          {
+            "id": 12281746,
+            "name": "恩泽Matt",
+            "xq_group_number": 200782,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FqQXRfZF4xzpTfKfx4BQVCQsYUwF"
+          },
+          {
+            "id": 12373225,
+            "name": "🐳TricSuMer",
+            "xq_group_number": 200818,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkZj0XiPzldoSQeW976n-tHdLFX0"
+          },
+          {
+            "id": 12439253,
+            "name": "夏安",
+            "xq_group_number": 201828,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FmTKDqCEg_sK1rzN_Hw3l8gSsGl2"
+          },
+          {
+            "id": 12579490,
+            "name": "行动派健身",
+            "xq_group_number": 201602,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FryQFVg_2_rowmeVFSa2cnh7dfmR"
+          },
+          {
+            "id": 13072791,
+            "name": "上*",
+            "xq_group_number": 202211,
+            "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FkZPnn3scy7myxvCTpUEBhNIdUfv"
+          }
+        ],
+        "total_comment_count": 121
+      },
+      "items": [
+        {
+          "id": 32663,
+          "user_id": 12130238,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>讲的很详细，值得温故知新，但是里面很多内容还是看不懂</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T16:27:35+08:00",
+          "updated_at": "2026-05-08T16:27:35+08:00"
+        },
+        {
+          "id": 32632,
+          "user_id": 12116399,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>实操性确实很强，我之前用Ai工具很多遍，也踩过很多坑，看到老师的手写稿突然茅塞顿开的感觉，慢慢理解提示词、上下文和提示词的关系了，加油！</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T16:14:15+08:00",
+          "updated_at": "2026-05-08T16:14:15+08:00"
+        },
+        {
+          "id": 32626,
+          "user_id": 9500901,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>把我最近的状态完美的具象化了。在自己的工作流中，知道该怎么去做，但是没有形成更系统的认知。现在有了。赞</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T16:12:29+08:00",
+          "updated_at": "2026-05-08T16:12:29+08:00"
+        },
+        {
+          "id": 32517,
+          "user_id": 12373225,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>这得多读几遍，跟着操作才能完全啃下来，太酷啦😘</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T15:23:40+08:00",
+          "updated_at": "2026-05-08T15:23:40+08:00"
+        },
+        {
+          "id": 32506,
+          "user_id": 123133,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>看完了，最重要的就是做了</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T15:18:36+08:00",
+          "updated_at": "2026-05-08T15:18:36+08:00"
+        },
+        {
+          "id": 32401,
+          "user_id": 810686,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>谢谢教练对ai 的理解又上了一个台阶</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T14:26:09+08:00",
+          "updated_at": "2026-05-08T14:26:09+08:00"
+        },
+        {
+          "id": 32242,
+          "user_id": 8202974,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>从第一步开始做</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T13:01:44+08:00",
+          "updated_at": "2026-05-08T13:01:44+08:00"
+        },
+        {
+          "id": 32208,
+          "user_id": 12281746,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>重温知识基础，</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T12:27:10+08:00",
+          "updated_at": "2026-05-08T12:27:10+08:00"
+        },
+        {
+          "id": 32198,
+          "user_id": 450947,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>看完了，也跟着实操了下，得多了一个个人背景文档，和个人天赋与商业潜力分析报告；现在对挽具有了一些理解。要再回过来把昨天的直播听下。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T12:21:09+08:00",
+          "updated_at": "2026-05-08T12:21:09+08:00"
+        },
+        {
+          "id": 32197,
+          "user_id": 450947,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>看完了，也跟着实操了下，得多了一个个人背景文档，和个人天赋与商业潜力分析报告；现在对挽具有了一些理解。要再回过来把昨天的直播听下。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T12:21:07+08:00",
+          "updated_at": "2026-05-08T12:21:07+08:00"
+        },
+        {
+          "id": 32153,
+          "user_id": 10292225,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>以前在用AI时会把一些需要他参考的模板和内容发给AI，让他先总结和学习。在没有学这堂课之前，不知道这些东西就是属于上下文。这次学完后，一方面明白了从专业的用AI的习惯和方法来说自己的做得对的部分是哪些？同时又有了在对的基础之上，更系统化应该怎么样把AI用得更好的系统认知。所以参加这次大航海之前，我以为我一直在AI小白的层面，但实际上我只是没有办法系统化的把自己用AI的一种习惯或者能力总结出来，经过了这一次学习以后在肯定了自己的使用习惯和能力基础之外又通过再次的学习进行了确认巩固和完善。这是进入航海第1天学习最大的体会和收获。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T11:54:55+08:00",
+          "updated_at": "2026-05-08T11:54:55+08:00"
+        },
+        {
+          "id": 32149,
+          "user_id": 118874,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>执行细节很多，肯定是只看教程是学不会的。那就在做的过程中，边执行，边思考，边记录，边学会。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T11:53:25+08:00",
+          "updated_at": "2026-05-08T11:53:25+08:00"
+        },
+        {
+          "id": 32125,
+          "user_id": 11635559,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>个人看完的理解是首先要有一个很清晰的个人背景介绍的上下文联系，然后给出事实的数据，不会跳出框架给出离谱的建议和分析。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T11:41:06+08:00",
+          "updated_at": "2026-05-08T11:41:06+08:00"
+        },
+        {
+          "id": 31998,
+          "user_id": 13072791,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>高手！！！ 总结下：思考力取决于“收于放”的平衡。倒是没想到claude 和gpt一伙的。claude出的内容更工整、更结构化。gpt更细节点。关注下元宝。</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T10:33:11+08:00",
+          "updated_at": "2026-05-08T10:33:11+08:00"
+        },
+        {
+          "id": 31990,
+          "user_id": 12439253,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>边看边用，感触好深。以前用ai感觉非常吃力，帮助也没有很大，今天读的过程中随手用gemini解决了个网页端的问题，非常通畅，突然想起来遇到类似的问题的时候搞半天也没解决，这感觉太棒了</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T09:43:33+08:00",
+          "updated_at": "2026-05-08T09:43:33+08:00"
+        },
+        {
+          "id": 31977,
+          "user_id": 3285392,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>应该怎么交任务呢，是在打卡上面交吗？</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 1,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-08T09:04:11+08:00",
+          "updated_at": "2026-05-08T02:37:35+08:00",
+          "comments": [
+            {
+              "id": 47654,
+              "note_id": 31977,
+              "user_id": 1161691,
+              "content": [
+                {
+                  "block_type": 5001,
+                  "document_id": "",
+                  "sc_html": {
+                    "content": "<p>群公告里有哦，或者航海页面也可以提交～</p>"
+                  }
+                },
+                {
+                  "image": {
+                    "token": "https://search01.shengcaiyoushu.com/public/upload/2026-05-08/3b5d0268420e46d5a4817b0645004ed9/微信图片_20260508103657_19_415.png"
+                  },
+                  "block_type": 27,
+                  "document_id": "",
+                  "file_url": "https://search01.shengcaiyoushu.com/public/upload/2026-05-08/3b5d0268420e46d5a4817b0645004ed9/微信图片_20260508103657_19_415.png"
+                }
+              ],
+              "like_count": 0,
+              "review_status": 2,
+              "created_at": "2026-05-08T10:37:34+08:00",
+              "updated_at": "2026-05-08T10:37:34+08:00"
+            }
+          ]
+        },
+        {
+          "id": 31954,
+          "user_id": 12579490,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>果然是实战派，干货。读一遍没理解，要反复多读</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-07T23:07:23+08:00",
+          "updated_at": "2026-05-07T23:07:23+08:00"
+        },
+        {
+          "id": 31953,
+          "user_id": 11822804,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>尝试用AI生成了大佬的md个人背景文档用于AI写作，打开了新思路。​👍​</p><p>还有AI是一匹马，使用者是骑手的思路也很有启发。​😁​</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-07T23:06:54+08:00",
+          "updated_at": "2026-05-07T23:06:54+08:00"
+        },
+        {
+          "id": 31941,
+          "user_id": 7808708,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>拜读了。不过还是没能理解，需要继续打磨，嚼碎</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-07T22:30:37+08:00",
+          "updated_at": "2026-05-07T22:30:37+08:00"
+        },
+        {
+          "id": 31918,
+          "user_id": 678292,
+          "note_type": 2,
+          "title": "课程评论",
+          "content": [
+            {
+              "block_type": 5001,
+              "document_id": "",
+              "sc_html": {
+                "content": "<p>实操性很强啊👍</p>"
+              }
+            }
+          ],
+          "meta": {
+            "course_comment": {
+              "course_id": 172,
+              "chapter_id": 11407
+            }
+          },
+          "is_private": 0,
+          "is_featured": 0,
+          "review_status": 2,
+          "like_count": 0,
+          "dislike_count": 0,
+          "comment_count": 0,
+          "anchor_count": 0,
+          "favorite_count": 0,
+          "created_at": "2026-05-07T20:46:49+08:00",
+          "updated_at": "2026-05-07T20:46:49+08:00"
+        }
+      ],
+      "total": 120
+    },
+    "status": 0
+  }
+]

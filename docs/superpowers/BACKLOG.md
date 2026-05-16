@@ -98,12 +98,12 @@ const r = JSON.parse(raw);
 
 ### 1.3 HTTP receiver 落地大 markdown
 
-**脚本**：`/tmp/recv_server.py`（每次会话临时创建）
+**脚本**：`scripts/recv-server.py`（已沉淀进项目；曾在 /tmp 临时维护，2026-05-16 挪入仓库以便版本化 + 跨机复用）
 
 **用法**（仅传端口，按请求 `?path=` 落盘）：
 ```bash
-pkill -f recv_server.py 2>/dev/null
-nohup python3 /tmp/recv_server.py 17923 > /tmp/recv.log 2>&1 < /dev/null &
+pkill -f recv-server.py 2>/dev/null
+nohup python3 scripts/recv-server.py 17923 > /tmp/recv.log 2>&1 < /dev/null &
 disown
 ```
 
@@ -112,12 +112,14 @@ disown
 curl -X POST "http://127.0.0.1:17923/save?path=/Users/adu/Documents/Obsidian /Life/_cn-test/x.md" -d @body
 ```
 
-**当前特性（2026-05-16 升级，scys docx 视觉对比迭代时）**：
+**特性**：
 - **多次接收**（不再 single-shot shutdown，方便迭代连发多次 POST）
 - **支持 `?path=<绝对路径>` 请求参数**（按 client 指定落盘；缺省退化到 `/tmp/feishu-out.md`）
 - **CORS + Chrome PNA 头**：`Access-Control-Allow-Private-Network: true` —— HTTPS 页面（scys.com 等）的 content-script `fetch` 到 `http://127.0.0.1` 必须有此头，否则被 Chrome 拒绝并报 `TypeError: Failed to fetch`（参见 §2.13）
 
 **为什么需要**：chrome MCP `javascript_tool` 返回值有大小限制（约几 KB），>100KB markdown 走不出来。HTTP POST 突破这个限制。
+
+**为什么沉淀到项目而非 /tmp**：本质上是 dev tool（与 `scripts/obsidian-verify.sh` 同类），不会打包进扩展。版本化 + fresh clone 即用。/tmp 只放 runtime log（`/tmp/recv.log`）。
 
 ### 1.4 Obsidian vault 路径速查
 

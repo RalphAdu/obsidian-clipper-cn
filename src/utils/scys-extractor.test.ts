@@ -1,5 +1,52 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { isScysCourseUrl, parseScysUrl } from './scys-extractor';
+import { autolinkBareUrls } from './feishu-extractor';
+
+describe('autolinkBareUrls (bare URL → clickable anchor; scys puts URLs in plain content)', () => {
+	it('wraps a bare https URL into <a href=...>', () => {
+		const out = autolinkBareUrls('See https://example.com for more');
+		expect(out).toBe('See <a href="https://example.com">https://example.com</a> for more');
+	});
+	it('wraps URL when preceded by Chinese punctuation (the GFM autolink failure mode)', () => {
+		// scys article body: "补上当时的生财好事：https://t.zsxq.com/uFfmH" — bare URL after
+		// fullwidth colon. GFM autolink fails here so Obsidian shows inert text.
+		const out = autolinkBareUrls('补上当时的生财好事：https://t.zsxq.com/uFfmH');
+		expect(out).toContain('<a href="https://t.zsxq.com/uFfmH">https://t.zsxq.com/uFfmH</a>');
+	});
+	it('strips trailing ASCII sentence-ending punctuation from the URL', () => {
+		const out = autolinkBareUrls('see https://example.com.');
+		expect(out).toBe('see <a href="https://example.com">https://example.com</a>.');
+	});
+	it('does not double-wrap URLs already inside an <a> tag', () => {
+		const input = 'before <a href="https://example.com">https://example.com</a> after';
+		expect(autolinkBareUrls(input)).toBe(input);
+	});
+	it('autolinks URL outside an anchor while leaving anchored URL untouched', () => {
+		const input = '<a href="https://kept.com">kept</a> and https://wrap.com';
+		const out = autolinkBareUrls(input);
+		expect(out).toContain('<a href="https://kept.com">kept</a>');
+		expect(out).toContain('<a href="https://wrap.com">https://wrap.com</a>');
+		expect((out.match(/<a href=/g) || []).length).toBe(2);
+	});
+	it('handles multiple bare URLs in one string', () => {
+		const out = autolinkBareUrls('a https://a.com b https://b.com c');
+		expect((out.match(/<a href=/g) || []).length).toBe(2);
+	});
+	it('is a no-op when no http(s) URL is present', () => {
+		expect(autolinkBareUrls('plain text 中文')).toBe('plain text 中文');
+	});
+	it('stops URL at Chinese closing punctuation (e.g. "。" should not be inside the href)', () => {
+		const out = autolinkBareUrls('请看 https://example.com。然后...');
+		// URL must not contain the 。 terminator
+		expect(out).toContain('<a href="https://example.com">https://example.com</a>');
+		expect(out).not.toContain('href="https://example.com。');
+	});
+	it('escapes attribute-breaking characters in href', () => {
+		// & in URL query must not break out of href attribute
+		const out = autolinkBareUrls('https://x.com/?a=1&b=2');
+		expect(out).toMatch(/href="https:\/\/x\.com\/\?a=1&amp;b=2"/);
+	});
+});
 
 describe('isScysCourseUrl', () => {
 	it('matches scys course detail URL with chapterId', () => {
@@ -1041,6 +1088,31 @@ describe('scys article fixture — real 55188248 (zsxq topic mirror)', () => {
 		// Sampling a couple of known sections from the article
 		expect(html).toMatch(/<h2>[^<]*垂直小号[^<]*<\/h2>/);
 	});
+
+	// Regression 2026-05-16: scys topic blocks have no link metadata on text_runs;
+	// URLs sit as plain content. Without autolinking, Obsidian renders them as
+	// inert text (GFM autolink breaks on adjacent CJK punctuation).
+	it('wraps every bare URL in the body into a clickable <a href="…">', () => {
+		// Fixture has 5 distinct bare URLs in the body text content.
+		const bodyUrls = [
+			'https://t.zsxq.com/uFfmH',
+			'https://scys.com/articleDetail/xq_topic/8852214148411152',
+			'https://user.benfuip.com/main/memberLogin',
+			'https://user.benfuvip.com/main/register?aff=496724970',
+			'https://www.bitbrowser.cn/?signup=1',
+		];
+		for (const u of bodyUrls) {
+			// Note: query strings get & → &amp; via escapeAttr; match either form.
+			const escaped = u.replace(/&/g, '&amp;');
+			expect(html).toMatch(new RegExp(`<a href="${escaped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`));
+		}
+	});
+
+	it('produces no surviving bare URL outside of an <a> tag in body html', () => {
+		// Strip anchor blocks, then scan for any remaining bare URL.
+		const stripped = html.replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, '');
+		expect(stripped).not.toMatch(/https?:\/\//);
+	});
 });
 
 describe('scys article comments fixture — real 55188248 (11 pages, 262 incl. replies)', () => {
@@ -1093,6 +1165,18 @@ describe('scys article comments fixture — real 55188248 (11 pages, 262 incl. r
 	it('renders "回复 @{name}" on replies that target a specific user', () => {
 		const html = renderScysArticleComments(allItems, total);
 		expect(html).toMatch(/· 回复 @[^<]+</);
+	});
+
+	// Regression 2026-05-16: scys server-renders comment content as HTML but
+	// does NOT wrap URLs in <a>. The article fixture has exactly 1 such comment.
+	// Without renderOneArticleCommentHtml's autolink pass, Obsidian shows it
+	// as inert text.
+	it('autolinks bare URLs found inside comment content (server-rendered HTML)', () => {
+		const html = renderScysArticleComments(allItems, total);
+		// The one comment with a URL points to another scys topic, terminated by
+		// Chinese ）— must not be inside the href, must be outside as plain char.
+		expect(html).toMatch(/<a href="https:\/\/scys\.com\/articleDetail\/xq_topic\/5122542855245514">/);
+		expect(html).not.toMatch(/href="[^"]*）/);
 	});
 });
 

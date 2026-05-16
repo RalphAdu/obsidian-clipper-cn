@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 import { createLogger } from './logger';
-import { convertBlocksToHtml } from './feishu-extractor';
+import { convertBlocksToHtml, autolinkBareUrls } from './feishu-extractor';
 import type { FeishuBlock } from './feishu-extractor';
 
 const logger = createLogger('scys-extractor');
@@ -671,7 +671,9 @@ export function formatScysArticleCommentHeader(comment: ScysArticleComment): str
 
 function renderOneArticleCommentHtml(c: ScysArticleComment): string {
 	const header = formatScysArticleCommentHeader(c);
-	const body = (c.content ?? '') + renderCommentImages(c.images);
+	// scys server-renders comment content as HTML but does NOT wrap URLs in
+	// <a>; autolink so Obsidian gets clickable [url](url) markdown.
+	const body = autolinkBareUrls(c.content ?? '') + renderCommentImages(c.images);
 	const replies = Array.isArray(c.replies) ? c.replies : [];
 	const repliesHtml = replies.map(renderOneArticleCommentHtml).join('');
 	return `<blockquote>${header}${body}${repliesHtml}</blockquote>`;

@@ -631,10 +631,51 @@ function renderTextElements(elements: FeishuTextBody['elements']): string {
 			} catch {
 				html = `<a href="${escapeAttr(style.link.url)}">${html}</a>`;
 			}
+		} else {
+			// Autolink bare URLs in content. scys (esp. /articleDetail/xq_topic/)
+			// strips link metadata and leaves URLs as plain strings in content;
+			// GFM autolink fails when a CJK punctuation (e.g. "：") sits directly
+			// before the URL, so Obsidian renders it as inert text. Wrap explicitly
+			// so it becomes [url](url) in markdown.
+			html = autolinkBareUrls(html);
 		}
 
 		return html;
 	}).join('');
+}
+
+// Wraps bare http(s) URLs in <a href="…">…</a>. Skips URLs already inside an
+// anchor (defense against double-wrapping when called on rich HTML like
+// server-rendered comment content) and trailing punctuation that's almost
+// certainly not part of the URL (Chinese/ASCII sentence terminators and
+// matching brackets).
+export function autolinkBareUrls(html: string): string {
+	// Stop URL at whitespace, HTML metacharacters, or common Chinese/ASCII
+	// closing punctuation that won't be part of a URL.
+	const URL_RE = /https?:\/\/[^\s<>"'）)】」』，。；：、！？]+/g;
+	const wrapOne = (url: string): string => {
+		const trailing = url.match(/[.,;:!?)\]}>'"]+$/);
+		let core = url;
+		let tail = '';
+		if (trailing) {
+			core = url.slice(0, -trailing[0].length);
+			tail = trailing[0];
+		}
+		return `<a href="${escapeAttr(core)}">${core}</a>${tail}`;
+	};
+	// Split on existing <a>…</a> blocks; only autolink the segments outside.
+	// Anchor opening tags may carry any attributes (href, target, …).
+	const ANCHOR_RE = /<a\b[^>]*>[\s\S]*?<\/a>/gi;
+	const parts: string[] = [];
+	let last = 0;
+	let m: RegExpExecArray | null;
+	while ((m = ANCHOR_RE.exec(html)) !== null) {
+		parts.push(html.slice(last, m.index).replace(URL_RE, wrapOne));
+		parts.push(m[0]); // keep existing anchor untouched
+		last = m.index + m[0].length;
+	}
+	parts.push(html.slice(last).replace(URL_RE, wrapOne));
+	return parts.join('');
 }
 
 function getTextBody(block: FeishuBlock): FeishuTextBody | undefined {

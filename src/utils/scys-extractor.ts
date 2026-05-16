@@ -50,6 +50,11 @@ export function parseScysDocxUrl(url: string): { token: string } | null {
 
 export interface ScysBlock extends Omit<FeishuBlock, 'children'> {
 	children_blocks?: ScysBlock[];
+	// scys docx encrypted JSON nests container children in a `node` field
+	// (block_type=19 callout). The container also carries `children: string[]`
+	// of the same ids (Feishu native format). Course path uses children_blocks
+	// instead; both shapes coexist across scys data sources.
+	node?: ScysBlock[];
 	// scys serves the signed OSS URL as a top-level block field
 	// (sibling to `image`, not nested inside it). image.token still
 	// carries the feishu-style identifier.
@@ -69,11 +74,19 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 	const out: FeishuBlock[] = [];
 
 	function walk(block: ScysBlock, parentId?: string): void {
-		const childBlocks = block.children_blocks ?? [];
-		const childIds = childBlocks.map(c => c.block_id);
+		// Support two scys data shapes:
+		// - course: block.children_blocks = ScysBlock[] (derive children ids from it)
+		// - docx:   block.node = ScysBlock[] PLUS block.children = string[] (Feishu native)
+		const childBlocks = block.children_blocks ?? block.node ?? [];
+		// Prefer existing children:string[] (docx); else derive from childBlocks (course).
+		const existingChildren = Array.isArray((block as any).children) &&
+			typeof (block as any).children[0] === 'string'
+			? (block as any).children as string[]
+			: null;
+		const childIds = existingChildren ?? childBlocks.map(c => c.block_id);
 
-		// Shallow copy without children_blocks
-		const { children_blocks: _drop, ...rest } = block;
+		// Shallow copy without nest-wrapper fields
+		const { children_blocks: _dropCB, node: _dropNode, ...rest } = block;
 		const flat: any = { ...rest, parent_id: parentId, children: childIds.length ? childIds : undefined };
 
 		// Heading rewrite (block_type 6/7/8 → 4/5/6, copy body to new field name)
@@ -115,8 +128,17 @@ export function renderScysChapterContent(scysBlocks: ScysBlock[]): string {
 		block_type: FEISHU_PAGE_TYPE,
 		children: rootIds,
 	};
-	return convertBlocksToHtml([page, ...flat]);
+	const html = convertBlocksToHtml([page, ...flat]);
+	// defuddle/markdown.js:653 unconditionally strips the first `# ...\n+` line
+	// as a presumed doc title (to avoid duplicate H1 + frontmatter title).
+	// scys docx HEADING1 blocks (e.g. "一、怎么用这份文档") would be silently
+	// dropped. Prepend a placeholder H1 so defuddle strips the placeholder
+	// instead of our real content. Course path also benefits (its content has
+	// no H1 today due to heading rewrite, but the placeholder is harmless).
+	return SCYS_TITLE_PLACEHOLDER_HTML + html;
 }
+
+const SCYS_TITLE_PLACEHOLDER_HTML = '<h1>__cn_scys_title_placeholder__</h1>';
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
 	// Avoid FileReader so this works in both browser content scripts and the

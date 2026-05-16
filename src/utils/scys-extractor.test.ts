@@ -158,6 +158,47 @@ describe('renderScysChapterContent (real fixture)', () => {
 		expect(html).toContain('class="feishu-callout"');
 	});
 
+	// Regression: callouts must emit Obsidian-native `[!type]` title line so
+	// reading-view renders them as colored boxes (not gray quotes). Otherwise
+	// callouts visually mismatch feishu's tinted callout rendering.
+	it('renders callout with [!type] prefix mapped from emoji_id (bulb→tip)', () => {
+		const html = renderScysChapterContent(blocks);
+		// Course fixture's first callout has no emoji_id (course doesn't expose
+		// it) → falls back to [!note]. At minimum some `[!note]` or `[!*]` line
+		// must appear inside a feishu-callout blockquote.
+		expect(html).toMatch(/<blockquote class="feishu-callout"><p>\[!\w+\]/);
+	});
+
+	it('promotes first heading child into callout title when callout.elements is empty', () => {
+		const calloutWithHeadingChild = [{
+			block_id: 'callout1',
+			block_type: 19,
+			callout: { elements: null, emoji_id: 'bulb' },
+			children_blocks: [
+				{ block_id: 'h3', block_type: 5,
+					heading3: { elements: [{ text_run: { content: '查看顺序', text_element_style: {} } }] } },
+				{ block_id: 'p1', block_type: 2,
+					text: { elements: [{ text_run: { content: '1. body', text_element_style: {} } }] } },
+			],
+		}] as any;
+		const html = renderScysChapterContent(calloutWithHeadingChild);
+		// Title line should contain the heading text, NOT a separate <h3> inside body.
+		expect(html).toContain('[!tip] 💡 查看顺序');
+		expect(html).not.toContain('<h3>查看顺序</h3>');
+		expect(html).toContain('1. body');
+	});
+
+	it('falls back to [!note] when callout has no emoji_id', () => {
+		const callout = [{
+			block_id: 'c1',
+			block_type: 19,
+			callout: { elements: [{ text_run: { content: 'plain title', text_element_style: {} } }] },
+			children_blocks: [],
+		}] as any;
+		const html = renderScysChapterContent(callout);
+		expect(html).toContain('[!note] plain title');
+	});
+
 	it('renders code block as <pre><code>', () => {
 		const html = renderScysChapterContent(blocks);
 		expect(html).toMatch(/<pre><code>/);
@@ -653,5 +694,97 @@ describe('extractScysDocxStandalone (via router)', () => {
 		const doc = { URL: 'https://scys.com/view/docx/X', title: 'Pure Title' } as any;
 		const result = await extractScysStructuredContent(doc);
 		expect(result?.title).toBe('Pure Title');
+	});
+});
+
+import fixtureChapter11407 from './fixtures/scys-chapter-11407.json';
+import fixtureComments11407 from './fixtures/scys-comments-11407.json';
+
+// 11407 covers data shapes 11408 lacks: divider blocks, deeper heading
+// hierarchy (h2+h3+h4 all populated), and a comment thread that spans
+// multiple pages (120 items).
+describe('scys 11407 fixture (divider + extended hierarchy)', () => {
+	const blocks = (fixtureChapter11407 as any).data.chapter.content;
+
+	it('renders DIVIDER (block_type=22) as <hr>', () => {
+		const html = renderScysChapterContent(blocks);
+		// 11407 has 2 divider blocks; 11408 has none.
+		expect((html.match(/<hr>/g) || []).length).toBeGreaterThanOrEqual(2);
+	});
+
+	it('produces full h2/h3/h4 hierarchy from heading4/5/6 blocks', () => {
+		const html = renderScysChapterContent(blocks);
+		expect(html).toContain('<h2>0. 本章概要</h2>');
+		expect(html).toMatch(/<h3>(?:<strong>)?1\.1\s*什么是思考能力/);
+		expect(html).toContain('<h4>路径一：提前沉淀你的个人背景文档</h4>');
+	});
+
+	it('emits exactly 31 image placeholders matching API count', () => {
+		const html = renderScysChapterContent(blocks);
+		const matches = html.match(/feishu-image:\/\/scys:/g) || [];
+		expect(matches.length).toBe(31);
+	});
+});
+
+describe('scys 11407 comments fixture (multi-page accumulation)', () => {
+	// Fixture stores the raw page array (6 pages × 20 items = 120 total) so
+	// the test also documents the consumer-side merge shape.
+	const pages = fixtureComments11407 as any[];
+	const allItems = pages.flatMap(p => p?.data?.items || []);
+	const users = new Map<number, ScysUser>();
+	for (const p of pages) {
+		for (const u of (p?.data?.extra?.users || [])) {
+			users.set(u.id, u);
+		}
+	}
+	const result: ScysCommentsResult = {
+		total: pages[0]?.data?.total || 0,
+		items: allItems,
+		users,
+	};
+
+	it('accumulates 120 top-level comments across 6 pages', () => {
+		expect(allItems.length).toBe(120);
+		expect(result.total).toBe(120);
+	});
+
+	it('renders header with 120 total comments', () => {
+		expect(renderScysComments(result)).toContain('<h2>💬 章节评论（120 条）</h2>');
+	});
+
+	it('emits at least 120 top-level blockquotes (plus nested reply ones)', () => {
+		const html = renderScysComments(result);
+		expect((html.match(/<blockquote>/g) || []).length).toBeGreaterThanOrEqual(120);
+	});
+});
+
+import fixtureDocxQSn2dD from './fixtures/scys-docx-QSn2dD.json';
+
+describe('scys docx fixture — callout visual-parity regression (commit 43a7ed8)', () => {
+	// Real fixture: 542 blocks, 7 callouts (1 bulb + 6 mag_right).
+	// Each callout has callout.elements=null + first child HEADING3 as visual title.
+	const docxBlocks = fixtureDocxQSn2dD as any[];
+	const html = renderScysChapterContent(docxBlocks);
+
+	it('renders 7 callouts as Obsidian-native [!type] colored boxes', () => {
+		// Expect exactly 7 callout title lines with [!tip] or [!info] prefix.
+		const calloutTitleLines = html.match(/<blockquote class="feishu-callout"><p>\[!\w+\]/g) || [];
+		expect(calloutTitleLines.length).toBe(7);
+	});
+
+	it('maps emoji_id="bulb" → [!tip] with 💡 in title', () => {
+		expect(html).toContain('[!tip] 💡');
+	});
+
+	it('maps emoji_id="mag_right" → [!info] with 🔍 in title', () => {
+		const infoCount = (html.match(/\[!info\] 🔍/g) || []).length;
+		expect(infoCount).toBe(6);
+	});
+
+	it('promotes "查看顺序" H3 child into the [!tip] callout title (not as inner heading)', () => {
+		expect(html).toContain('[!tip] 💡 查看顺序');
+		// The H3 should NOT also appear standalone inside the callout body.
+		// Match: <blockquote ...>...<h3>查看顺序</h3>... (would indicate non-promotion)
+		expect(html).not.toMatch(/<blockquote class="feishu-callout">[^<]*<p>\[!tip\][^<]*<\/p><h3>查看顺序<\/h3>/);
 	});
 });

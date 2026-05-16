@@ -671,20 +671,43 @@ declare global {
 			const popupMarkdown = simulatedVars['{{content}}'] || '';
 			const popupMatchesBridge = popupMarkdown === markdown;
 
+			// --- Obsidian-note simulation ---
+			// Reproduce the final .md file that user's default template would
+			// emit to Obsidian's Clippings/ folder (assembled via cn's default
+			// 7-property frontmatter + {{content}} body). The result is what
+			// Obsidian receives via obsidian://new?file=...&content=... —
+			// equivalent to user-triggered clip output, sans Obsidian's own
+			// file write. Lets e2e validation read this without any UI step.
+			const fmEscape = (v: string) => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+			const today = new Date().toISOString().slice(0, 10);
+			const fmTitle = fmEscape(simulatedVars['{{title}}'] || '');
+			const fmDescription = fmEscape(simulatedVars['{{description}}'] || '');
+			const fmAuthor = fmEscape(simulatedVars['{{author}}'] || '');
+			const obsidianNote = [
+				'---',
+				`title: "${fmTitle}"`,
+				`source: "${document.URL}"`,
+				`author:${fmAuthor ? ` "${fmAuthor}"` : ''}`,
+				`published:`,
+				`created: ${today}`,
+				`description: ${fmDescription ? `"${fmDescription}"` : ''}`,
+				`tags:`,
+				`  - "clippings"`,
+				'---',
+				popupMarkdown,
+			].join('\n');
+
 			// Security: only upload to localhost / 127.0.0.1 (BACKLOG §5.2 option B).
-			// Upload BOTH bridge markdown (current behaviour) AND popup-simulated
-			// markdown so end-to-end tests can diff them. Use multipart-style query
-			// param `which` to pick which body is being POSTed; receiver writes
-			// each to a distinct file when both arrive.
+			// Upload the full simulated Obsidian note (frontmatter + popup-path
+			// markdown). The result file equals what user would see in
+			// Clippings/, enabling fully automated e2e validation without
+			// requiring the user to click the extension icon.
 			let uploadedTo: string | null = null;
 			if (data.uploadUrl && typeof data.uploadUrl === 'string') {
 				try {
 					const u = new URL(data.uploadUrl);
 					if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
-						// Single POST of the popup-simulated markdown — this is what
-						// the real clip puts in {{content}}. If popupMatchesBridge is
-						// false, that's the bug signal.
-						await fetch(data.uploadUrl, { method: 'POST', body: popupMarkdown });
+						await fetch(data.uploadUrl, { method: 'POST', body: obsidianNote });
 						uploadedTo = data.uploadUrl;
 					}
 				} catch { /* best-effort */ }

@@ -89,6 +89,41 @@ export interface FeishuBlock {
 	undefined_block?: object;
 }
 
+// Feishu emoji shortcode → unicode emoji mapping for CALLOUT block icons.
+// Common ones observed in scys + feishu docs. Unknown shortcodes return ''
+// (silently dropped rather than rendering ":bulb:" raw text in markdown).
+const FEISHU_EMOJI_MAP: Record<string, string> = {
+	bulb: '💡',
+	mag_right: '🔍',
+	mag: '🔎',
+	warning: '⚠️',
+	bell: '🔔',
+	info: 'ℹ️',
+	information_source: 'ℹ️',
+	pushpin: '📌',
+	bookmark: '🔖',
+	pencil: '✏️',
+	memo: '📝',
+	fire: '🔥',
+	heavy_check_mark: '✅',
+	white_check_mark: '✅',
+	x: '❌',
+	thumbsup: '👍',
+	thinking_face: '🤔',
+	star: '⭐',
+	rocket: '🚀',
+	books: '📚',
+	clipboard: '📋',
+	question: '❓',
+	exclamation: '❗',
+	heart: '❤️',
+	speech_balloon: '💬',
+};
+
+function feishuEmojiToUnicode(emojiId: string): string {
+	return FEISHU_EMOJI_MAP[emojiId] || '';
+}
+
 const FEISHU_BLOCK_TYPE = {
 	PAGE: 1,
 	TEXT: 2,
@@ -747,7 +782,15 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		case FEISHU_BLOCK_TYPE.CALLOUT: {
 			const inner = renderTextElements(block.callout?.elements);
 			const children = renderBlockChildren(block, blockMap);
-			return `<blockquote class="feishu-callout">${inner ? `<p>${inner}</p>` : ''}${children}</blockquote>`;
+			// Feishu callout carries an emoji_id (shortcode) that scys browser
+			// renders as a leading icon (e.g. "💡 查看顺序"). Two shapes seen:
+			// - scys docx: block.callout.emoji_id (direct)
+			// - feishu standard: block.callout.style.emoji_id (nested)
+			const callout = block.callout as any;
+			const emojiId = callout?.emoji_id || callout?.style?.emoji_id || '';
+			const emoji = emojiId ? feishuEmojiToUnicode(emojiId) : '';
+			const emojiHtml = emoji ? `<p>${emoji}</p>` : '';
+			return `<blockquote class="feishu-callout">${emojiHtml}${inner ? `<p>${inner}</p>` : ''}${children}</blockquote>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.DIVIDER:

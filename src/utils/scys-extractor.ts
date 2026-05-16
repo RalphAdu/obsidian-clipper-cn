@@ -66,11 +66,22 @@ export interface ScysBlock extends Omit<FeishuBlock, 'children'> {
 
 // Heading promotion: scys course/docx serves H4/5/6 (6/7/8) as section titles
 // that should map to Obsidian H2/H3/H4 in markdown (so the standard outline
-// pane shows the real document structure).
-const HEADING_REWRITE: Record<number, { newType: number; newField: string }> = {
+// pane shows the real document structure). DEFAULT mapping used by course/docx.
+const HEADING_REWRITE_DEFAULT: Record<number, { newType: number; newField: string }> = {
 	6: { newType: 4, newField: 'heading2' },
 	7: { newType: 5, newField: 'heading3' },
 	8: { newType: 6, newField: 'heading4' },
+};
+
+// Article (xq_topic) mapping: scys article uses one heading level higher than
+// course/docx. The browser renders block_type=5 (HEADING3) as 18px/600
+// (chapter level), block_type=6 as 16px/600 (subsection), etc. — so demote
+// each level by one in markdown to match Obsidian's visual hierarchy.
+const HEADING_REWRITE_ARTICLE: Record<number, { newType: number; newField: string }> = {
+	5: { newType: 4, newField: 'heading2' },
+	6: { newType: 5, newField: 'heading3' },
+	7: { newType: 6, newField: 'heading4' },
+	8: { newType: 7, newField: 'heading5' },
 };
 
 // Map of feishu HEADING block types to their body field name.
@@ -80,15 +91,12 @@ const HEADING_FIELDS: Record<number, string> = {
 	9: 'heading7', 10: 'heading8', 11: 'heading9',
 };
 
-// scys article (xq_topic) authors abuse the "heading" button as a bold-
-// paragraph styler — long prose lands in block_type 7/8/9 with 30+ char
-// content. Per-type cutoffs balance "keep real chapter titles as H2/H3"
-// against "demote prose paragraphs masquerading as headings":
-//   HEADING4 (block_type=6) — top-level article section (max real = 32 chars).
-//   HEADING5/6/7 (block_type=7/8/9) — frequently abused; course/docx real
-//     subsection titles max at 23 chars. Cutoff 30 demotes the prose abuse.
-// HEADING1/2/3 (block_type=3/4/5) are never abused this way — no demotion.
-const HEADING_PARAGRAPH_LEN_THRESHOLD: Record<number, number> = {
+// scys article authors abuse the "heading" button as a bold-paragraph styler.
+// Per-type cutoffs balance "keep real chapter titles as headings" against
+// "demote prose paragraphs masquerading as headings". DEFAULT (course/docx):
+//   HEADING4 (block_type=6) — top-level article section.
+//   HEADING5/6/7 (block_type=7/8/9) — frequently abused; cutoff 30 demotes.
+const HEADING_PARAGRAPH_LEN_THRESHOLD_DEFAULT: Record<number, number> = {
 	6: 50,
 	7: 30,
 	8: 30,
@@ -96,6 +104,29 @@ const HEADING_PARAGRAPH_LEN_THRESHOLD: Record<number, number> = {
 	10: 30,
 	11: 30,
 };
+
+// Article: browser renders doc-heading-7 (block_type=9) at 12px/400 — i.e.
+// visually a plain paragraph regardless of length. Cutoff 0 → always demote.
+// block_type 10/11 (HEADING8/9) follow the same browser pattern in article.
+const HEADING_PARAGRAPH_LEN_THRESHOLD_ARTICLE: Record<number, number> = {
+	6: 50,
+	7: 30,
+	8: 30,
+	9: 0,
+	10: 0,
+	11: 0,
+};
+
+export interface FlattenOptions {
+	headingRewrite?: Record<number, { newType: number; newField: string }>;
+	headingParagraphCutoff?: Record<number, number>;
+	// When a heading block is demoted to TEXT (because content exceeds the
+	// cutoff for that type), force every text_run inside to bold=true. This
+	// mirrors how scys article CSS makes the whole heading container bold
+	// (font-weight: 600 on .block5/.block6) — without this override the
+	// demoted prose loses its visual weight in markdown.
+	forceBoldOnDemote?: boolean;
+}
 
 function headingContentLength(block: any, field: string): number {
 	const body = block[field];
@@ -113,7 +144,9 @@ function headingContentLength(block: any, field: string): number {
 	return n;
 }
 
-export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
+export function flattenScysBlocks(blocks: ScysBlock[], options: FlattenOptions = {}): FeishuBlock[] {
+	const rewriteMap = options.headingRewrite ?? HEADING_REWRITE_DEFAULT;
+	const cutoffMap = options.headingParagraphCutoff ?? HEADING_PARAGRAPH_LEN_THRESHOLD_DEFAULT;
 	const out: FeishuBlock[] = [];
 
 	function walk(block: ScysBlock, parentId?: string): void {
@@ -140,14 +173,21 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 		//      titles in course/docx — map to markdown H2/H3/H4 so they slot into
 		//      Obsidian's outline at sensible levels.
 		const oldField = HEADING_FIELDS[flat.block_type];
-		const cutoff = HEADING_PARAGRAPH_LEN_THRESHOLD[flat.block_type];
+		const cutoff = cutoffMap[flat.block_type];
 		if (oldField && cutoff !== undefined && headingContentLength(flat, oldField) >= cutoff) {
 			// Demote → plain TEXT paragraph
 			flat.text = flat[oldField];
 			delete flat[oldField];
 			flat.block_type = 2;
+			if (options.forceBoldOnDemote && flat.text && Array.isArray(flat.text.elements)) {
+				flat.text = { ...flat.text, elements: flat.text.elements.map((el: any) => {
+					if (!el.text_run) return el;
+					const style = { ...(el.text_run.text_element_style || {}), bold: true };
+					return { ...el, text_run: { ...el.text_run, text_element_style: style } };
+				}) };
+			}
 		} else {
-			const rewrite = HEADING_REWRITE[flat.block_type];
+			const rewrite = rewriteMap[flat.block_type];
 			if (rewrite && oldField) {
 				const body = flat[oldField];
 				if (body === undefined) {
@@ -173,8 +213,8 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 	return out;
 }
 
-export function renderScysChapterContent(scysBlocks: ScysBlock[]): string {
-	const flat = flattenScysBlocks(scysBlocks);
+export function renderScysChapterContent(scysBlocks: ScysBlock[], options: FlattenOptions = {}): string {
+	const flat = flattenScysBlocks(scysBlocks, options);
 	// scys API doesn't include a PAGE block, so synthesise one so convertBlocksToHtml
 	// uses the renderChildren(pageBlock.children, blockMap) path. Otherwise it falls
 	// back to iterating the entire flat array, which re-renders content nested inside
@@ -752,7 +792,25 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 		return null;
 	}
 
-	let html = renderScysChapterContent(detail.docBlocks);
+	// Article-specific HEADING mapping: scys article (xq_topic) renders one
+	// level deeper than course/docx (browser block5-class is 18px H3, block6-
+	// class is 16px H4, etc.). Map block_type=5/6/7/8 down one notch so
+	// Obsidian's outline matches the visual chapter hierarchy.
+	const articleOptions: FlattenOptions = {
+		headingRewrite: HEADING_REWRITE_ARTICLE,
+		headingParagraphCutoff: HEADING_PARAGRAPH_LEN_THRESHOLD_ARTICLE,
+		forceBoldOnDemote: true,
+	};
+	let html = renderScysChapterContent(detail.docBlocks, articleOptions);
+	// Resolve FILE block placeholders: feishu-extractor emits an <a> with the
+	// internal `feishu-file-block://<id>` href, expecting feishu-side resolveFeishuFiles
+	// to rewrite it. scys's FILE blocks are video attachments without a public URL,
+	// so just point the link at the article page with a block-id anchor — at least
+	// the filename survives in the clipped markdown.
+	html = html.replace(
+		/<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">[^<]*<\/a>/g,
+		(_m, blockId, filename) => `<p>📎 <a href="${doc.URL}#${blockId}">${filename}</a></p>`
+	);
 
 	const commentsResult = await fetchScysArticleComments(parsed.entityId, parsed.entityType);
 	let commentsHtml = '';
@@ -763,7 +821,7 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 	// Resolve scys: image tokens (both body and comment images) in one pass.
 	html = await resolveScysImages(html + commentsHtml);
 
-	const flatBlocks = flattenScysBlocks(detail.docBlocks);
+	const flatBlocks = flattenScysBlocks(detail.docBlocks, articleOptions);
 	const wordCount = countWordsFromBlocks(flatBlocks);
 
 	return {

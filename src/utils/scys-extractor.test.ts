@@ -275,6 +275,40 @@ describe('flattenScysBlocks', () => {
 		const flat = flattenScysBlocks(blocks);
 		expect(flat[0].block_type).toBe(2);
 	});
+
+	// Browser article CSS makes the entire heading container bold (font-weight:
+	// 600 on .block5/.block6) regardless of per-run bold metadata. When demoting
+	// long article headings to TEXT, we must apply the same: force bold=true on
+	// every text_run so the markdown shows the whole prose in **…**, matching the
+	// visual exactly.
+	it('forceBoldOnDemote=true: every text_run gets bold=true after demotion', () => {
+		const blocks: ScysBlock[] = [{
+			block_id: 'h', block_type: 7,
+			heading5: { elements: [
+				{ text_run: { content: '加入个人IP，形成个人专属提示词：', text_element_style: { bold: true } } },
+				{ text_run: { content: '得到了一篇爆文提示词，这个时候我们要丰富人设，植入个人IP故事和经历' } },
+			] },
+		}];
+		const flat = flattenScysBlocks(blocks, { forceBoldOnDemote: true });
+		expect(flat[0].block_type).toBe(2);
+		const els = (flat[0] as any).text.elements;
+		expect(els[0].text_run.text_element_style.bold).toBe(true);
+		expect(els[1].text_run.text_element_style.bold).toBe(true);
+	});
+
+	it('forceBoldOnDemote=false (default): bold flags untouched after demotion', () => {
+		const blocks: ScysBlock[] = [{
+			block_id: 'h', block_type: 7,
+			heading5: { elements: [
+				{ text_run: { content: '加入个人IP，形成个人专属提示词：', text_element_style: { bold: true } } },
+				{ text_run: { content: '得到了一篇爆文提示词，这个时候我们要丰富人设，植入个人IP故事和经历' } },
+			] },
+		}];
+		const flat = flattenScysBlocks(blocks);
+		const els = (flat[0] as any).text.elements;
+		expect(els[0].text_run.text_element_style.bold).toBe(true);
+		expect(els[1].text_run.text_element_style).toBeUndefined();
+	});
 });
 
 import fixtureChapter from './fixtures/scys-chapter-11408.json';
@@ -1330,6 +1364,36 @@ describe('extractScysStructuredContent — article route', () => {
 		expect(r?.author).toBe('Tester');
 		expect(r?.content).toContain('body text');
 		expect(r?.content).not.toContain('💬 评论');
+	});
+
+	it('resolves FILE block links to article URL anchors (video/.mp4 attachments)', async () => {
+		// scys article has 3 FILE blocks (video attachments). The default feishu
+		// FILE rendering emits an internal feishu-file-block:// URL that defuddle
+		// drops during markdown conversion, losing the filename. Scys path must
+		// rewrite to a real anchor so the filename survives in the clipped note.
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			if (String(url).includes('topicDetail')) {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({
+					data: {
+						topicDTO: {
+							entityId: '999', entityType: 'xq_topic', showTitle: 'X',
+							docBlocks: [
+								{ block_id: 'file1', block_type: 23, file: { name: '内容王国操作流程(简洁版1).mp4', token: 'TOK' } } as any,
+							],
+							gmtCreate: 0, commentsCount: 0, likeCount: 0, readingCount: 0,
+						},
+						topicUserDTO: { name: 'A' },
+					},
+				}) } as any);
+			}
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: { total: 0, items: [] } }) } as any);
+		});
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/999' } as Document;
+		const r = await extractScysStructuredContent(doc);
+		expect(r?.content).toContain('内容王国操作流程(简洁版1).mp4');
+		expect(r?.content).not.toContain('feishu-file-block://');
+		// Anchor href must contain the article URL + block id
+		expect(r?.content).toMatch(/href="[^"]*\/articleDetail\/xq_topic\/999#file1"/);
 	});
 
 	it('appends comments section when present, using topicDTO.commentsCount as the displayed total', async () => {

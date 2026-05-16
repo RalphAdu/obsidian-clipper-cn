@@ -1166,7 +1166,9 @@ describe('fetchScysArticleDetail', () => {
 				success: true, data: {
 					topicDTO: {
 						entityId: '55188248452852824', entityType: 'xq_topic',
-						showTitle: 'T', docBlocks: [], gmtCreate: 1762503084,
+						showTitle: 'T',
+						docBlocks: [{ block_id: 'x', block_type: 2, text: { elements: [] } }],
+						gmtCreate: 1762503084,
 						commentsCount: 262, likeCount: 1078, readingCount: 19880,
 					},
 					topicUserDTO: { name: '刘智行' },
@@ -1431,6 +1433,86 @@ describe('extractScysStructuredContent — article route', () => {
 		expect(r?.content).toMatch(/href="[^"]*\/articleDetail\/xq_topic\/999#file1"/);
 	});
 
+	// Legacy article body: pre-2024 posts (e.g. 418444442181248) deliver
+	// `topicDTO.articleContent` as a Quill ql-editor HTML string instead of a
+	// docBlocks array. The extractor must fall back to that.
+	it('fixture 418444442181248: legacy ql-editor article renders all key sections', async () => {
+		// Real pre-2024 post (2021-06-23). 23K char articleContent HTML with 247
+		// <p>/<ol> children, 6 imgs (article-images.zsxq.com + docimg3.docs.qq.com),
+		// 27 <li>, 20 <strong>. Wire it through the real article-route so the
+		// legacy fallback path is exercised end-to-end.
+		const detail = await import('./fixtures/scys-article-418444442181248-detail.json');
+		const comments = await import('./fixtures/scys-article-418444442181248-comments.json');
+		const pageIter = [...(comments.default as any[])];
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			const u = String(url);
+			if (u.includes('topicDetail')) return Promise.resolve({ ok: true, json: () => Promise.resolve(detail.default) } as any);
+			if (u.includes('pageTopicComment')) {
+				const next = pageIter.shift();
+				return Promise.resolve({ ok: true, json: () => Promise.resolve(next || { data: { total: 0, items: [] } }) } as any);
+			}
+			return Promise.resolve({ ok: false } as any);
+		});
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/418444442181248' } as Document;
+		const r = await extractScysStructuredContent(doc);
+		expect(r?.title).toBe('高考志愿填报这门生意分析');
+		// First / last paragraph
+		expect(r?.content).toContain('每年会有大量的高考同学需要填报志愿');
+		expect(r?.content).toContain('看完的你也很厉害哦');
+		// Ordered list items survived
+		expect(r?.content).toContain('<li>');
+		// Bold (Quill <strong>) survived
+		expect(r?.content).toContain('<strong>');
+		// Image src rewritten to scys: token form (resolver will inline base64)
+		const imgTokens = r?.content.match(/feishu-image:\/\/scys:/g) || [];
+		expect(imgTokens.length).toBeGreaterThanOrEqual(5);
+		// Wrapper stripped
+		expect(r?.content).not.toContain('ql-editor');
+		// Word count is non-trivial
+		expect(r?.wordCount).toBeGreaterThan(1000);
+	});
+
+	it('falls back to articleContent (Quill HTML) when docBlocks is empty', async () => {
+		const articleHtml = '<div class="content ql-editor"><p>每年会有大量的高考同学需要填报志愿。</p>' +
+			'<p><img src="https://article-images.zsxq.com/xxx" width="342"></p>' +
+			'<ol><li>第一</li><li>第二</li></ol></div>';
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			if (String(url).includes('topicDetail')) {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({
+					data: {
+						topicDTO: {
+							entityId: '418444442181248', entityType: 'xq_topic',
+							showTitle: '高考志愿填报这门生意分析',
+							// NOTE: no docBlocks (legacy post)
+							articleContent: articleHtml,
+							gmtCreate: 1624406702, commentsCount: 1, likeCount: 0, readingCount: 0,
+						},
+						topicUserDTO: { name: 'Tester' },
+					},
+				}) } as any);
+			}
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: { total: 0, items: [] } }) } as any);
+		});
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/418444442181248' } as Document;
+		const r = await extractScysStructuredContent(doc);
+		expect(r?.title).toBe('高考志愿填报这门生意分析');
+		expect(r?.content).toContain('每年会有大量的高考同学需要填报志愿');
+		expect(r?.content).toContain('<li>第一</li>');
+		expect(r?.content).toContain('<li>第二</li>');
+		// img src rewritten to feishu-image://scys:… token form for resolver
+		expect(r?.content).toMatch(/feishu-image:\/\/scys:https%3A%2F%2Farticle-images\.zsxq\.com/);
+		// Outer .ql-editor wrapper stripped
+		expect(r?.content).not.toContain('ql-editor');
+	});
+
+	it('fetchScysArticleDetail returns null when neither docBlocks nor articleContent populated', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({
+			data: { topicDTO: { entityId: '1', entityType: 'xq_topic', showTitle: 'X' }, topicUserDTO: { name: 'A' } },
+		}) } as any);
+		const r = await fetchScysArticleDetail('1', 'xq_topic');
+		expect(r).toBeNull();
+	});
+
 	it('appends comments section when present, using topicDTO.commentsCount as the displayed total', async () => {
 		global.fetch = vi.fn().mockImplementation((url: any) => {
 			if (String(url).includes('topicDetail')) {
@@ -1438,7 +1520,7 @@ describe('extractScysStructuredContent — article route', () => {
 					data: {
 						topicDTO: {
 							entityId: '1', entityType: 'xq_topic', showTitle: 'X',
-							docBlocks: [],
+							docBlocks: [{ block_id: 'x', block_type: 2, text: { elements: [] } }],
 							gmtCreate: 1762503084, commentsCount: 5, likeCount: 0, readingCount: 0,
 						},
 						topicUserDTO: { name: 'A' },

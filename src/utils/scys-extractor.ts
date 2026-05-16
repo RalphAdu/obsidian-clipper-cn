@@ -651,11 +651,17 @@ export interface ScysArticleComment {
 	replies?: ScysArticleComment[] | null;
 }
 
+// scys article has TWO body encodings depending on when the post was written:
+//   docBlocks   — modern feishu block array (2024+ posts; e.g. 55188248)
+//   articleContent — legacy Quill ql-editor HTML string (pre-2024 posts; e.g. 418444442181248)
+// Exactly one of the two will be populated. ScysArticleDetail surfaces both;
+// extractScysArticleStandalone branches on which side is present.
 export interface ScysArticleDetail {
 	entityId: string;
 	entityType: string;
 	showTitle: string;
-	docBlocks: ScysBlock[];
+	docBlocks?: ScysBlock[];     // modern path
+	articleHtml?: string;         // legacy Quill ql-editor HTML
 	gmtCreate: number;
 	commentsCount: number;
 	likeCount: number;
@@ -678,15 +684,22 @@ export async function fetchScysArticleDetail(entityId: string, entityType: strin
 		const json = await res.json();
 		const d = json?.data;
 		const topic = d?.topicDTO;
-		if (!topic || !Array.isArray(topic.docBlocks)) {
+		if (!topic) {
 			logger.warn(`[article] unexpected response shape (entityId=${entityId})`);
+			return null;
+		}
+		const hasBlocks = Array.isArray(topic.docBlocks) && topic.docBlocks.length > 0;
+		const hasHtml = typeof topic.articleContent === 'string' && topic.articleContent.length > 0;
+		if (!hasBlocks && !hasHtml) {
+			logger.warn(`[article] neither docBlocks nor articleContent populated (entityId=${entityId})`);
 			return null;
 		}
 		return {
 			entityId: topic.entityId ?? entityId,
 			entityType: topic.entityType ?? entityType,
 			showTitle: topic.showTitle ?? '',
-			docBlocks: topic.docBlocks as ScysBlock[],
+			docBlocks: hasBlocks ? (topic.docBlocks as ScysBlock[]) : undefined,
+			articleHtml: hasHtml ? (topic.articleContent as string) : undefined,
 			gmtCreate: topic.gmtCreate ?? 0,
 			commentsCount: topic.commentsCount ?? 0,
 			likeCount: topic.likeCount ?? 0,
@@ -792,25 +805,43 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 		return null;
 	}
 
-	// Article-specific HEADING mapping: scys article (xq_topic) renders one
-	// level deeper than course/docx (browser block5-class is 18px H3, block6-
-	// class is 16px H4, etc.). Map block_type=5/6/7/8 down one notch so
-	// Obsidian's outline matches the visual chapter hierarchy.
-	const articleOptions: FlattenOptions = {
-		headingRewrite: HEADING_REWRITE_ARTICLE,
-		headingParagraphCutoff: HEADING_PARAGRAPH_LEN_THRESHOLD_ARTICLE,
-		forceBoldOnDemote: true,
-	};
-	let html = renderScysChapterContent(detail.docBlocks, articleOptions);
-	// Resolve FILE block placeholders: feishu-extractor emits an <a> with the
-	// internal `feishu-file-block://<id>` href, expecting feishu-side resolveFeishuFiles
-	// to rewrite it. scys's FILE blocks are video attachments without a public URL,
-	// so just point the link at the article page with a block-id anchor — at least
-	// the filename survives in the clipped markdown.
-	html = html.replace(
-		/<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">[^<]*<\/a>/g,
-		(_m, blockId, filename) => `<p>📎 <a href="${doc.URL}#${blockId}">${filename}</a></p>`
-	);
+	let html: string;
+	let wordCount: number;
+
+	if (detail.docBlocks && detail.docBlocks.length > 0) {
+		// Modern path: feishu block tree (2024+ posts).
+		// Article-specific HEADING mapping: scys article renders one level deeper
+		// than course/docx (browser block5-class is 18px H3, block6 is 16px H4).
+		const articleOptions: FlattenOptions = {
+			headingRewrite: HEADING_REWRITE_ARTICLE,
+			headingParagraphCutoff: HEADING_PARAGRAPH_LEN_THRESHOLD_ARTICLE,
+			forceBoldOnDemote: true,
+		};
+		html = renderScysChapterContent(detail.docBlocks, articleOptions);
+		// Resolve FILE block placeholders (videos) → article URL anchor link.
+		html = html.replace(
+			/<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">[^<]*<\/a>/g,
+			(_m, blockId, filename) => `<p>📎 <a href="${doc.URL}#${blockId}">${filename}</a></p>`
+		);
+		wordCount = countWordsFromBlocks(flattenScysBlocks(detail.docBlocks, articleOptions));
+	} else {
+		// Legacy path: Quill ql-editor HTML string (pre-2024 posts).
+		// articleContent is already rendered HTML; just feed it through the
+		// pipeline. Rewrite img src to the scys: token form so resolveScysImages
+		// inlines base64 (same as docBlocks path). Comment images and body
+		// images get the same treatment in one pass below.
+		html = (detail.articleHtml || '').replace(
+			/<img([^>]*?)src="(https?:\/\/[^"]+)"/g,
+			(_m, attrs, src) => `<img${attrs}src="feishu-image://scys:${encodeURIComponent(src)}"`
+		);
+		// Strip the <div class="content ql-editor"> wrapper (defuddle would keep
+		// the div noise otherwise).
+		html = html.replace(/^<div class="content ql-editor">/, '').replace(/<\/div>$/, '');
+		// Autolink bare URLs in plain text segments (same as renderTextElements does).
+		html = autolinkBareUrls(html);
+		// Word count: rough char-count of stripped text.
+		wordCount = html.replace(/<[^>]+>/g, '').length;
+	}
 
 	const commentsResult = await fetchScysArticleComments(parsed.entityId, parsed.entityType);
 	let commentsHtml = '';
@@ -818,11 +849,8 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 		commentsHtml = renderScysArticleComments(commentsResult.items, detail.commentsCount || commentsResult.total);
 	}
 
-	// Resolve scys: image tokens (both body and comment images) in one pass.
+	// Resolve scys: image tokens (body + comment images) in one pass.
 	html = await resolveScysImages(html + commentsHtml);
-
-	const flatBlocks = flattenScysBlocks(detail.docBlocks, articleOptions);
-	const wordCount = countWordsFromBlocks(flatBlocks);
 
 	return {
 		title: detail.showTitle,

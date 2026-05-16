@@ -5,7 +5,7 @@ from pathlib import Path
 from collections import Counter
 
 DOM_DUMP = Path('/tmp/scys-article-dom-dump.json')
-VAULT_MD = Path('/Users/adu/Documents/Obsidian /Life/_cn-test/scys-article-55188248.md')
+VAULT_MD = Path('/Users/adu/Documents/Obsidian /Life/_cn-test/scys-article-418444442181248.md')
 
 def expected_md_type(n):
     if n['hasImg'] and n['textLen'] < 5: return 'image'

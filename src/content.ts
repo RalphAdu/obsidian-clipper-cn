@@ -640,13 +640,51 @@ declare global {
 			const defuddleMod = await import('defuddle/full');
 			const markdown = defuddleMod.createMarkdownContent(content, document.URL);
 
+			// --- Popup-path simulation (regression guard for 2026-05-16 HTML-leak bug) ---
+			// The real clip flow goes through popup → initializePageContent →
+			// buildVariables, where extractedContent dict overrides {{content}}.
+			// Bridge previously stopped at createMarkdownContent and missed bugs in
+			// the dict-overlay step. Simulate that step locally and POST what the
+			// template engine would actually see.
+			const sharedMod = await import('./utils/shared');
+			const simulatedExtractedContent: Record<string, string> = {};
+			// Mirror exactly what content.ts builds for the main path (no scys
+			// content/title override — bug 2026-05-16). Comments here would be a
+			// good place to add other extractor-specific dict entries if any branch
+			// re-introduces the pattern.
+			const simulatedVars = sharedMod.buildVariables({
+				title: result?.title || '',
+				author: (result as any)?.author || '',
+				content: markdown,
+				contentHtml: content,
+				url: document.URL,
+				fullHtml: '',
+				description: '',
+				favicon: '',
+				image: '',
+				published: '',
+				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : '',
+				language: '',
+				wordCount: (result as any)?.wordCount || 0,
+				extractedContent: simulatedExtractedContent,
+			});
+			const popupMarkdown = simulatedVars['{{content}}'] || '';
+			const popupMatchesBridge = popupMarkdown === markdown;
+
 			// Security: only upload to localhost / 127.0.0.1 (BACKLOG §5.2 option B).
+			// Upload BOTH bridge markdown (current behaviour) AND popup-simulated
+			// markdown so end-to-end tests can diff them. Use multipart-style query
+			// param `which` to pick which body is being POSTed; receiver writes
+			// each to a distinct file when both arrive.
 			let uploadedTo: string | null = null;
 			if (data.uploadUrl && typeof data.uploadUrl === 'string') {
 				try {
 					const u = new URL(data.uploadUrl);
 					if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
-						await fetch(data.uploadUrl, { method: 'POST', body: markdown });
+						// Single POST of the popup-simulated markdown — this is what
+						// the real clip puts in {{content}}. If popupMatchesBridge is
+						// false, that's the bug signal.
+						await fetch(data.uploadUrl, { method: 'POST', body: popupMarkdown });
 						uploadedTo = data.uploadUrl;
 					}
 				} catch { /* best-effort */ }
@@ -661,6 +699,9 @@ declare global {
 				markdownLength: markdown.length,
 				markdownHead: markdown.slice(0, 500),
 				markdownTail: markdown.slice(-1000),
+				popupMarkdownLength: popupMarkdown.length,
+				popupMatchesBridge,
+				popupMarkdownHead: popupMarkdown.slice(0, 500),
 				uploadedTo,
 			}));
 		} catch (err) {

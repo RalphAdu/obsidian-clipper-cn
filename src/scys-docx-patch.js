@@ -29,17 +29,40 @@
 		return true;
 	}
 
+	function findFeishuBlockArray(value, depth) {
+		if (depth > 4) return null;
+		if (isFeishuBlockArray(value)) return value;
+		if (!value || typeof value !== 'object') return null;
+		if (Array.isArray(value)) {
+			// Non-block array — walk first few entries
+			var arrMax = Math.min(value.length, 5);
+			for (var i = 0; i < arrMax; i++) {
+				var found = findFeishuBlockArray(value[i], depth + 1);
+				if (found) return found;
+			}
+			return null;
+		}
+		// Object — walk own properties
+		var keys = Object.keys(value);
+		for (var k = 0; k < keys.length; k++) {
+			var found2 = findFeishuBlockArray(value[keys[k]], depth + 1);
+			if (found2) return found2;
+		}
+		return null;
+	}
+
 	function tryCapture(parsed) {
 		try {
-			if (!isFeishuBlockArray(parsed)) return;
+			var blocks = findFeishuBlockArray(parsed, 0);
+			if (!blocks) return;
 			var prev = localStorage.getItem('__cnScysDocxBlocks');
 			var prevLen = 0;
 			if (prev) {
 				try { prevLen = originalParse(prev).length; } catch (e) {}
 			}
-			if (parsed.length > prevLen) {
-				localStorage.setItem('__cnScysDocxBlocks', JSON.stringify(parsed));
-				document.documentElement.setAttribute('data-cn-scys-docx-blocks', String(parsed.length));
+			if (blocks.length > prevLen) {
+				localStorage.setItem('__cnScysDocxBlocks', JSON.stringify(blocks));
+				document.documentElement.setAttribute('data-cn-scys-docx-blocks', String(blocks.length));
 			}
 		} catch (e) { /* never throw from a hook */ }
 	}

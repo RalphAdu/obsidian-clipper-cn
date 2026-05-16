@@ -511,8 +511,212 @@ async function extractScysDocxStandalone(doc: Document): Promise<ScysStructuredC
 	return { title, author: '', content: html, wordCount };
 }
 
+// ─── /articleDetail/{entityType}/{entityId} (zsxq topic mirror) ───────────────
+// scys mirrors knowledge-planet (zsxq) topics under /articleDetail/xq_topic/{id}.
+// Backed by POST /shengcai-web/client/homePage/topicDetail and pageTopicComment.
+// Reuses the existing block→HTML pipeline since topicDTO.docBlocks is the same
+// feishu-flavoured block shape as docx/course.
+
+export function isScysArticleUrl(url: string): boolean {
+	try {
+		const u = new URL(url);
+		if (u.hostname !== 'scys.com') return false;
+		// /articleDetail/{type}/{id} — type is a slug (e.g. xq_topic), id is numeric.
+		return /^\/articleDetail\/[A-Za-z0-9_]+\/\d+\/?$/.test(u.pathname);
+	} catch {
+		return false;
+	}
+}
+
+export function parseScysArticleUrl(url: string): { entityType: string; entityId: string } | null {
+	try {
+		const u = new URL(url);
+		const m = u.pathname.match(/^\/articleDetail\/([A-Za-z0-9_]+)\/(\d+)\/?$/);
+		return m ? { entityType: m[1], entityId: m[2] } : null;
+	} catch {
+		return null;
+	}
+}
+
+export interface ScysArticleComment {
+	commentId: string;
+	pCommentId?: string;
+	gmtCreate: number; // unix seconds
+	content: string; // server-rendered HTML (e.g. "<p>…</p>")
+	images?: string; // single URL, or comma-separated; empty string when absent
+	userName: string;
+	userAvatar?: string;
+	likeCount: number;
+	isAuthor: boolean;
+	replyUserName?: string | null;
+	repliesCount?: number;
+	replies?: ScysArticleComment[] | null;
+}
+
+export interface ScysArticleDetail {
+	entityId: string;
+	entityType: string;
+	showTitle: string;
+	docBlocks: ScysBlock[];
+	gmtCreate: number;
+	commentsCount: number;
+	likeCount: number;
+	readingCount: number;
+	authorName: string;
+}
+
+export async function fetchScysArticleDetail(entityId: string, entityType: string): Promise<ScysArticleDetail | null> {
+	try {
+		const res = await fetch('/shengcai-web/client/homePage/topicDetail', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ entityId, entityType }),
+			credentials: 'include',
+		});
+		if (!res.ok) {
+			logger.warn(`[article] HTTP ${res.status}`);
+			return null;
+		}
+		const json = await res.json();
+		const d = json?.data;
+		const topic = d?.topicDTO;
+		if (!topic || !Array.isArray(topic.docBlocks)) {
+			logger.warn(`[article] unexpected response shape (entityId=${entityId})`);
+			return null;
+		}
+		return {
+			entityId: topic.entityId ?? entityId,
+			entityType: topic.entityType ?? entityType,
+			showTitle: topic.showTitle ?? '',
+			docBlocks: topic.docBlocks as ScysBlock[],
+			gmtCreate: topic.gmtCreate ?? 0,
+			commentsCount: topic.commentsCount ?? 0,
+			likeCount: topic.likeCount ?? 0,
+			readingCount: topic.readingCount ?? 0,
+			authorName: d?.topicUserDTO?.name ?? '',
+		};
+	} catch (err) {
+		logger.warn(`[article] fetch error: ${String(err)}`);
+		return null;
+	}
+}
+
+export async function fetchScysArticleComments(
+	entityId: string,
+	entityType: string,
+): Promise<{ items: ScysArticleComment[]; total: number } | null> {
+	const items: ScysArticleComment[] = [];
+	let total = 0;
+	let pageIndex = 1;
+	const PAGE_CAP = 50;
+
+	while (true) {
+		if (pageIndex > PAGE_CAP) {
+			logger.warn(`[article-comments] page cap (${PAGE_CAP}) reached at page ${pageIndex}`);
+			break;
+		}
+		let json: any;
+		try {
+			const res = await fetch('/shengcai-web/client/homePage/pageTopicComment', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				// sortType=1 = 智能排序 (default); matches what the page sends on initial load.
+				body: JSON.stringify({ entityId, entityType, sortType: 1, pageIndex }),
+				credentials: 'include',
+			});
+			if (!res.ok) {
+				if (pageIndex === 1) return null;
+				break;
+			}
+			json = await res.json();
+		} catch (err) {
+			logger.warn(`[article-comments page=${pageIndex}] fetch error: ${String(err)}`);
+			if (pageIndex === 1) return null;
+			break;
+		}
+		const data = json?.data;
+		if (!data) {
+			if (pageIndex === 1) return null;
+			break;
+		}
+		total = data.total ?? total;
+		const pageItems: ScysArticleComment[] = Array.isArray(data.items) ? data.items : [];
+		items.push(...pageItems);
+		if (pageItems.length === 0) break;
+		if (items.length >= total) break;
+		pageIndex++;
+	}
+	return { items, total };
+}
+
+// Convert images field (single URL or comma-separated) into a placeholder
+// <img> using the same feishu-image://scys: protocol resolveScysImages handles.
+function renderCommentImages(images: string | undefined): string {
+	if (!images || !images.trim()) return '';
+	return images.split(',').map(u => u.trim()).filter(Boolean).map(u =>
+		`<p><img src="feishu-image://scys:${encodeURIComponent(u)}" alt=""></p>`
+	).join('');
+}
+
+// Header line for an article comment. Mirrors formatScysCommentHeader visual
+// pattern but uses ScysArticleComment fields directly.
+export function formatScysArticleCommentHeader(comment: ScysArticleComment): string {
+	const name = comment.userName || `匿名#${comment.commentId}`;
+	const author = comment.isAuthor ? ' · 作者' : '';
+	const likes = (comment.likeCount ?? 0) > 0 ? ` · ${comment.likeCount} ❤️` : '';
+	const date = formatScysDate(comment.gmtCreate);
+	const reply = comment.replyUserName ? ` · 回复 @${comment.replyUserName}` : '';
+	return `<p><strong>${name}</strong>${author}${likes} · ${date}${reply}</p>`;
+}
+
+function renderOneArticleCommentHtml(c: ScysArticleComment): string {
+	const header = formatScysArticleCommentHeader(c);
+	const body = (c.content ?? '') + renderCommentImages(c.images);
+	const replies = Array.isArray(c.replies) ? c.replies : [];
+	const repliesHtml = replies.map(renderOneArticleCommentHtml).join('');
+	return `<blockquote>${header}${body}${repliesHtml}</blockquote>`;
+}
+
+export function renderScysArticleComments(items: ScysArticleComment[], total: number): string {
+	if (!items.length) return '';
+	const bodies = items.map(renderOneArticleCommentHtml).join('');
+	return `<hr><h2>💬 评论（${total} 条）</h2>${bodies}`;
+}
+
+async function extractScysArticleStandalone(doc: Document): Promise<ScysStructuredContent | null> {
+	const parsed = parseScysArticleUrl(doc.URL);
+	if (!parsed) return null;
+	const detail = await fetchScysArticleDetail(parsed.entityId, parsed.entityType);
+	if (!detail) {
+		logger.warn(`Article fetch failed for ${parsed.entityType}/${parsed.entityId}`);
+		return null;
+	}
+
+	let html = renderScysChapterContent(detail.docBlocks);
+
+	const commentsResult = await fetchScysArticleComments(parsed.entityId, parsed.entityType);
+	let commentsHtml = '';
+	if (commentsResult && commentsResult.items.length) {
+		commentsHtml = renderScysArticleComments(commentsResult.items, detail.commentsCount || commentsResult.total);
+	}
+
+	// Resolve scys: image tokens (both body and comment images) in one pass.
+	html = await resolveScysImages(html + commentsHtml);
+
+	const flatBlocks = flattenScysBlocks(detail.docBlocks);
+	const wordCount = countWordsFromBlocks(flatBlocks);
+
+	return {
+		title: detail.showTitle,
+		author: detail.authorName,
+		content: html,
+		wordCount,
+	};
+}
+
 export async function extractScysStructuredContent(doc: Document): Promise<ScysStructuredContent | null> {
 	if (isScysCourseUrl(doc.URL)) return extractScysCourseChapter(doc);
 	if (isScysDocxUrl(doc.URL)) return extractScysDocxStandalone(doc);
+	if (isScysArticleUrl(doc.URL)) return extractScysArticleStandalone(doc);
 	return null;
 }

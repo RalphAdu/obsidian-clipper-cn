@@ -788,3 +788,376 @@ describe('scys docx fixture — callout visual-parity regression (commit 43a7ed8
 		expect(html).not.toMatch(/<blockquote class="feishu-callout">[^<]*<p>\[!tip\][^<]*<\/p><h3>查看顺序<\/h3>/);
 	});
 });
+
+// ─── /articleDetail/xq_topic/{id} (zsxq topic mirror) ──────────────────────
+import {
+	isScysArticleUrl,
+	parseScysArticleUrl,
+	formatScysArticleCommentHeader,
+	renderScysArticleComments,
+	fetchScysArticleDetail,
+	fetchScysArticleComments,
+	ScysArticleComment,
+} from './scys-extractor';
+
+describe('isScysArticleUrl', () => {
+	it('matches /articleDetail/{type}/{id}', () => {
+		expect(isScysArticleUrl('https://scys.com/articleDetail/xq_topic/55188248452852824')).toBe(true);
+		expect(isScysArticleUrl('https://scys.com/articleDetail/xq_topic/55188248452852824/')).toBe(true);
+	});
+	it('rejects course / docx URLs', () => {
+		expect(isScysArticleUrl('https://scys.com/course/detail/172?chapterId=11408')).toBe(false);
+		expect(isScysArticleUrl('https://scys.com/view/docx/ABC')).toBe(false);
+	});
+	it('rejects non-numeric id', () => {
+		expect(isScysArticleUrl('https://scys.com/articleDetail/xq_topic/abc')).toBe(false);
+	});
+	it('rejects non-scys host', () => {
+		expect(isScysArticleUrl('https://example.com/articleDetail/xq_topic/123')).toBe(false);
+	});
+	it('rejects malformed URL', () => {
+		expect(isScysArticleUrl('not a url')).toBe(false);
+	});
+});
+
+describe('parseScysArticleUrl', () => {
+	it('extracts entityType and entityId', () => {
+		expect(parseScysArticleUrl('https://scys.com/articleDetail/xq_topic/55188248452852824'))
+			.toEqual({ entityType: 'xq_topic', entityId: '55188248452852824' });
+	});
+	it('preserves entityType slug for non-xq_topic types (future-proofing)', () => {
+		expect(parseScysArticleUrl('https://scys.com/articleDetail/sc_post/123'))
+			.toEqual({ entityType: 'sc_post', entityId: '123' });
+	});
+	it('returns null for invalid path', () => {
+		expect(parseScysArticleUrl('https://scys.com/articleDetail/onlytype')).toBeNull();
+	});
+});
+
+describe('formatScysArticleCommentHeader', () => {
+	const base: ScysArticleComment = {
+		commentId: '17778942586844', pCommentId: '0',
+		gmtCreate: 1762503084, // 2025-11-07
+		content: '<p>hi</p>', userName: 'SUXI',
+		likeCount: 0, isAuthor: false,
+	} as ScysArticleComment;
+
+	it('renders bare name + date when no likes / not author', () => {
+		expect(formatScysArticleCommentHeader(base))
+			.toMatch(/^<p><strong>SUXI<\/strong> · 2025-11-0[7-8]<\/p>$/);
+	});
+	it('adds 作者 marker when isAuthor=true', () => {
+		const c = { ...base, isAuthor: true };
+		expect(formatScysArticleCommentHeader(c))
+			.toMatch(/^<p><strong>SUXI<\/strong> · 作者 · 2025-11-0[7-8]<\/p>$/);
+	});
+	it('adds likes when likeCount > 0', () => {
+		const c = { ...base, likeCount: 9 };
+		expect(formatScysArticleCommentHeader(c))
+			.toMatch(/^<p><strong>SUXI<\/strong> · 9 ❤️ · 2025-11-0[7-8]<\/p>$/);
+	});
+	it('shows reply target when replyUserName present', () => {
+		const c = { ...base, replyUserName: '刘智行' };
+		expect(formatScysArticleCommentHeader(c))
+			.toMatch(/^<p><strong>SUXI<\/strong> · 2025-11-0[7-8] · 回复 @刘智行<\/p>$/);
+	});
+	it('falls back to anonymous-id placeholder when userName missing', () => {
+		const c = { ...base, userName: '' };
+		expect(formatScysArticleCommentHeader(c))
+			.toMatch(/^<p><strong>匿名#17778942586844<\/strong>/);
+	});
+});
+
+describe('renderScysArticleComments', () => {
+	const mk = (id: string, name: string, content: string, opts: Partial<ScysArticleComment> = {}): ScysArticleComment => ({
+		commentId: id, pCommentId: opts.pCommentId ?? '0',
+		gmtCreate: 1762503084, content, userName: name,
+		likeCount: 0, isAuthor: false, ...opts,
+	} as ScysArticleComment);
+
+	it('returns empty string for no items', () => {
+		expect(renderScysArticleComments([], 0)).toBe('');
+	});
+
+	it('renders H2 with total count and one comment as <blockquote>', () => {
+		const html = renderScysArticleComments([mk('1', 'A', '<p>hello</p>')], 1);
+		expect(html).toContain('<h2>💬 评论（1 条）</h2>');
+		expect(html).toContain('<blockquote>');
+		expect(html).toContain('hello');
+		expect(html).toMatch(/<strong>A<\/strong>/);
+	});
+
+	it('renders nested replies as nested blockquotes (1 level deep)', () => {
+		const reply = mk('2', 'B', '<p>reply</p>', { pCommentId: '1' });
+		const main = mk('1', 'A', '<p>main</p>', { replies: [reply], repliesCount: 1 });
+		const html = renderScysArticleComments([main], 1);
+		expect((html.match(/<blockquote>/g) || []).length).toBe(2);
+		expect(html).toContain('main');
+		expect(html).toContain('reply');
+	});
+
+	it('uses passed-in total (which may include replies) in H2', () => {
+		// Real-world case: API data.total = 101 (top-level), but UI shows 262
+		// (top + replies). We pass through the explicit total argument.
+		const html = renderScysArticleComments([mk('1', 'A', '<p>x</p>')], 262);
+		expect(html).toContain('<h2>💬 评论（262 条）</h2>');
+	});
+
+	it('emits placeholder <img> with feishu-image://scys: protocol for non-empty images field', () => {
+		const c = mk('1', 'A', '<p>see below</p>', { images: 'https://search01.shengcaiyoushu.com/foo/bar.png' });
+		const html = renderScysArticleComments([c], 1);
+		expect(html).toMatch(/<img src="feishu-image:\/\/scys:https%3A%2F%2F[^"]+"/);
+	});
+
+	it('handles comma-separated images string (defense against multi-image future shape)', () => {
+		const c = mk('1', 'A', '<p>x</p>', { images: 'https://a/1.png, https://b/2.png' });
+		const html = renderScysArticleComments([c], 1);
+		expect((html.match(/feishu-image:\/\/scys:/g) || []).length).toBe(2);
+	});
+
+	it('skips image rendering when images is empty string or undefined', () => {
+		const c1 = mk('1', 'A', '<p>x</p>', { images: '' });
+		const c2 = mk('2', 'B', '<p>y</p>');
+		const html = renderScysArticleComments([c1, c2], 2);
+		expect(html).not.toContain('feishu-image://');
+	});
+});
+
+describe('fetchScysArticleDetail', () => {
+	const originalFetch = global.fetch;
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('POSTs to topicDetail with entityId/entityType and unwraps topicDTO + topicUserDTO', async () => {
+		const sent: any = {};
+		global.fetch = vi.fn().mockImplementation((url: any, init: any) => {
+			sent.url = url; sent.init = init;
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({
+				success: true, data: {
+					topicDTO: {
+						entityId: '55188248452852824', entityType: 'xq_topic',
+						showTitle: 'T', docBlocks: [], gmtCreate: 1762503084,
+						commentsCount: 262, likeCount: 1078, readingCount: 19880,
+					},
+					topicUserDTO: { name: '刘智行' },
+				},
+			}) } as any);
+		});
+		const r = await fetchScysArticleDetail('55188248452852824', 'xq_topic');
+		expect(sent.url).toBe('/shengcai-web/client/homePage/topicDetail');
+		expect(sent.init.method).toBe('POST');
+		expect(JSON.parse(sent.init.body)).toEqual({ entityId: '55188248452852824', entityType: 'xq_topic' });
+		expect(r?.showTitle).toBe('T');
+		expect(r?.authorName).toBe('刘智行');
+		expect(r?.commentsCount).toBe(262);
+	});
+
+	it('returns null on HTTP error', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 } as any);
+		expect(await fetchScysArticleDetail('1', 'xq_topic')).toBeNull();
+	});
+
+	it('returns null when topicDTO missing or docBlocks not array', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: {} }) } as any);
+		expect(await fetchScysArticleDetail('1', 'xq_topic')).toBeNull();
+	});
+});
+
+describe('fetchScysArticleComments', () => {
+	const originalFetch = global.fetch;
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('paginates by pageIndex until accumulated items >= total', async () => {
+		const pages = [
+			{ data: { total: 25, items: Array(20).fill(null).map((_, i) => ({ commentId: String(i) })) } },
+			{ data: { total: 25, items: Array(5).fill(null).map((_, i) => ({ commentId: String(20 + i) })) } },
+		];
+		let n = 0;
+		global.fetch = vi.fn().mockImplementation(() =>
+			Promise.resolve({ ok: true, json: () => Promise.resolve(pages[n++]) } as any)
+		);
+		const r = await fetchScysArticleComments('1', 'xq_topic');
+		expect(r?.items.length).toBe(25);
+		expect(r?.total).toBe(25);
+		expect(global.fetch).toHaveBeenCalledTimes(2);
+	});
+
+	it('sends pageIndex starting at 1 with sortType=1 (default 智能排序)', async () => {
+		const captured: any[] = [];
+		global.fetch = vi.fn().mockImplementation((url: any, init: any) => {
+			captured.push(JSON.parse(init.body));
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: { total: 1, items: [{}] } }) } as any);
+		});
+		await fetchScysArticleComments('1', 'xq_topic');
+		expect(captured[0]).toEqual({ entityId: '1', entityType: 'xq_topic', sortType: 1, pageIndex: 1 });
+	});
+
+	it('returns null on first-page HTTP error', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: false } as any);
+		expect(await fetchScysArticleComments('1', 'xq_topic')).toBeNull();
+	});
+
+	it('stops on empty items page (safety) even before total reached', async () => {
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve({ data: { total: 100, items: [] } }),
+		} as any);
+		const r = await fetchScysArticleComments('1', 'xq_topic');
+		expect(r?.items.length).toBe(0);
+	});
+});
+
+import fixtureArticleDetail from './fixtures/scys-article-55188248-detail.json';
+import fixtureArticleComments from './fixtures/scys-article-55188248-comments.json';
+
+describe('scys article fixture — real 55188248 (zsxq topic mirror)', () => {
+	const topic = (fixtureArticleDetail as any).data.topicDTO;
+	const html = renderScysChapterContent(topic.docBlocks);
+
+	it('fixture has expected size signals (541 top-level docBlocks, 262 commentsCount)', () => {
+		expect(topic.docBlocks.length).toBe(541);
+		// Top-level block_type=27 (image) is only 40; the full nested tree has 120
+		// because scys inlines images inside block_type=25 wrapper containers nested
+		// in other containers (grid cells, etc.). Live page renders 125 imgs in
+		// .content-container (120 article + 4 comment + 1 decoration) — extractor
+		// matches that.
+		expect(topic.docBlocks.filter((b: any) => b.block_type === 27).length).toBe(40);
+		expect(topic.commentsCount).toBe(262);
+	});
+
+	it('renders the showTitle as the first heading-derived <h1> (post-placeholder)', () => {
+		// renderScysChapterContent prepends a placeholder H1 that defuddle later strips;
+		// the next thing in HTML is the real HEADING1 content from docBlocks.
+		expect(html).toContain('AI+公众号垂直小号');
+	});
+
+	it('renders 120 image placeholders matching nested image-block count (40 top + 80 nested)', () => {
+		// scys docBlocks has 40 top-level block_type=27 plus 80 more nested inside
+		// inline-image containers (block_type=25) within other containers. Each is
+		// a distinct block_id with its own file_url — must all be rendered.
+		expect((html.match(/feishu-image:\/\/scys:/g) || []).length).toBe(120);
+	});
+
+	it('renders sectional H2/H3/H4 from heading4/5/6 blocks (real content)', () => {
+		// Sampling a couple of known sections from the article
+		expect(html).toMatch(/<h2>[^<]*垂直小号[^<]*<\/h2>/);
+	});
+});
+
+describe('scys article comments fixture — real 55188248 (11 pages, 262 incl. replies)', () => {
+	const pages = fixtureArticleComments as any[];
+	const allItems: ScysArticleComment[] = pages.flatMap(p => p?.data?.items || []);
+	const total = pages[0]?.data?.total ?? 0;
+
+	it('captures 11 pages and 101 top-level + 161 replies = 262', () => {
+		expect(pages.length).toBe(11);
+		expect(allItems.length).toBe(101);
+		expect(total).toBe(101);
+		const replies = allItems.flatMap(it => it.replies || []);
+		expect(replies.length).toBe(161);
+	});
+
+	it('renderScysArticleComments emits header with API total (101) and at least 101 top-level blockquotes', () => {
+		const html = renderScysArticleComments(allItems, total);
+		expect(html).toContain('<h2>💬 评论（101 条）</h2>');
+		// each top + each reply contributes a <blockquote> tag → 262 minimum
+		expect((html.match(/<blockquote>/g) || []).length).toBeGreaterThanOrEqual(262);
+	});
+
+	it('renders real comment body text from server-rendered HTML (regression guard)', () => {
+		const html = renderScysArticleComments(allItems, total);
+		// First comment we saw on the page (verified via get_page_text capture)
+		expect(html).toContain('尝试了好多遍，不知道哪里不对');
+		// An author reply
+		expect(html).toContain('联系鱼丸，联系我。不要放弃');
+	});
+
+	it('renders dates as YYYY-MM-DD (no NaN)', () => {
+		const html = renderScysArticleComments(allItems, total);
+		expect(html).toMatch(/· 20\d{2}-\d{2}-\d{2}/);
+		expect(html).not.toContain('NaN');
+	});
+
+	it('emits image placeholders for the 4 comments that have non-empty images', () => {
+		const html = renderScysArticleComments(allItems, total);
+		const allComments = [...allItems, ...allItems.flatMap(it => it.replies || [])];
+		const imgComments = allComments.filter(c => c.images && c.images !== '');
+		expect(imgComments.length).toBe(4);
+		expect((html.match(/feishu-image:\/\/scys:/g) || []).length).toBe(4);
+	});
+
+	it('renders "作者" marker on isAuthor=true comments', () => {
+		const html = renderScysArticleComments(allItems, total);
+		expect(html).toContain(' · 作者 · ');
+	});
+
+	it('renders "回复 @{name}" on replies that target a specific user', () => {
+		const html = renderScysArticleComments(allItems, total);
+		expect(html).toMatch(/· 回复 @[^<]+</);
+	});
+});
+
+describe('extractScysStructuredContent — article route', () => {
+	const originalFetch = global.fetch;
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('returns null when topicDetail fails', async () => {
+		global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 } as any);
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/55188248452852824' } as Document;
+		expect(await extractScysStructuredContent(doc)).toBeNull();
+	});
+
+	it('returns content+title+author when topicDetail succeeds (comments optional)', async () => {
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			if (String(url).includes('topicDetail')) {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({
+					success: true, data: {
+						topicDTO: {
+							entityId: '1', entityType: 'xq_topic', showTitle: 'Test Article',
+							docBlocks: [
+								{ block_id: 'b1', block_type: 2, text: { elements: [{ text_run: { content: 'body text' } }] } } as any,
+							],
+							gmtCreate: 1762503084, commentsCount: 0, likeCount: 0, readingCount: 100,
+						},
+						topicUserDTO: { name: 'Tester' },
+					},
+				}) } as any);
+			}
+			// pageTopicComment → return empty so no comments section
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: { total: 0, items: [] } }) } as any);
+		});
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/55188248452852824' } as Document;
+		const r = await extractScysStructuredContent(doc);
+		expect(r?.title).toBe('Test Article');
+		expect(r?.author).toBe('Tester');
+		expect(r?.content).toContain('body text');
+		expect(r?.content).not.toContain('💬 评论');
+	});
+
+	it('appends comments section when present, using topicDTO.commentsCount as the displayed total', async () => {
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			if (String(url).includes('topicDetail')) {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({
+					data: {
+						topicDTO: {
+							entityId: '1', entityType: 'xq_topic', showTitle: 'X',
+							docBlocks: [],
+							gmtCreate: 1762503084, commentsCount: 5, likeCount: 0, readingCount: 0,
+						},
+						topicUserDTO: { name: 'A' },
+					},
+				}) } as any);
+			}
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({
+				data: { total: 1, items: [{
+					commentId: 'c1', gmtCreate: 1762503084, content: '<p>hi</p>',
+					userName: 'U', likeCount: 0, isAuthor: false,
+				}] },
+			}) } as any);
+		});
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/55188248452852824' } as Document;
+		const r = await extractScysStructuredContent(doc);
+		// 5 should appear (commentsCount fallback), not 1 (API total)
+		expect(r?.content).toContain('<h2>💬 评论（5 条）</h2>');
+		expect(r?.content).toContain('hi');
+	});
+});

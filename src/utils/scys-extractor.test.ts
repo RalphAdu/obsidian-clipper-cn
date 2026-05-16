@@ -296,6 +296,76 @@ describe('flattenScysBlocks', () => {
 		expect(els[1].text_run.text_element_style.bold).toBe(true);
 	});
 
+	it('does NOT emit <strong> inside a HEADING (skipBold) — bold flag on heading text_runs is redundant since H tags are visually bold', () => {
+		// Real fixture: "二、取得的项目成绩" has bold=true on its text_run.
+		// Old behaviour: `## **二、取得的项目成绩**` (markdown-noisy + breaks ** pairs).
+		// New: plain `## 二、取得的项目成绩`.
+		const blocks: ScysBlock[] = [{
+			block_id: 'h', block_type: 5,
+			heading3: { elements: [{ text_run: { content: '二、取得的项目成绩', text_element_style: { bold: true } } }] },
+		}] as any;
+		// course/docx path: 5 → default H3 (no rewrite). Heading inner bold suppressed.
+		const html = renderScysChapterContent(blocks);
+		expect(html).toContain('<h3>二、取得的项目成绩</h3>');
+		expect(html).not.toMatch(/<h3><strong>/);
+	});
+
+	it('wraps heading with [[SCYS-ALIGN-center]] placeholder when block style.align == 2', () => {
+		// Placeholders survive defuddle's HTML→markdown conversion; markdown-
+		// post-process restores them to real <div align="…"> at the markdown stage.
+		const blocks: ScysBlock[] = [{
+			block_id: 'h', block_type: 5,
+			heading3: {
+				elements: [{ text_run: { content: '零、前言' } }],
+				style: { align: 2 },
+			},
+		}] as any;
+		const html = renderScysChapterContent(blocks);
+		expect(html).toContain('[[SCYS-ALIGN-center]]<h3>零、前言</h3>[[/SCYS-ALIGN]]');
+	});
+
+	it('wraps heading with [[SCYS-ALIGN-right]] placeholder when block style.align == 3', () => {
+		const blocks: ScysBlock[] = [{
+			block_id: 'h', block_type: 5,
+			heading3: {
+				elements: [{ text_run: { content: 'X' } }],
+				style: { align: 3 },
+			},
+		}] as any;
+		const html = renderScysChapterContent(blocks);
+		expect(html).toContain('[[SCYS-ALIGN-right]]<h3>X</h3>[[/SCYS-ALIGN]]');
+	});
+
+	it('renders non-default text_color as [[SCYS-COLOR-N]] placeholder (Image #9 red emphasis)', () => {
+		const blocks: ScysBlock[] = [{
+			block_id: 'p', block_type: 2,
+			text: { elements: [
+				{ text_run: { content: '亦仁老大说过，', text_element_style: { bold: false } } },
+				{ text_run: { content: '默认项目都是通的，默认数据都是假的。', text_element_style: { bold: true, text_color: 1 } } },
+			] },
+		}] as any;
+		const html = renderScysChapterContent(blocks);
+		expect(html).toContain('[[SCYS-COLOR-1]]');
+		expect(html).toContain('默认项目都是通的');
+		expect(html).toContain('[[/SCYS-COLOR]]');
+	});
+
+	it('merges adjacent <strong> blocks so markdown does not show literal `****`', () => {
+		// Pre-fix: <strong>aa</strong><strong>bb</strong> → markdown **aa****bb**
+		// (some renderers surface that middle **** as literal characters).
+		const blocks: ScysBlock[] = [{
+			block_id: 'p', block_type: 2,
+			text: { elements: [
+				{ text_run: { content: 'aa', text_element_style: { bold: true } } },
+				{ text_run: { content: 'bb', text_element_style: { bold: true } } },
+			] },
+		}] as any;
+		const html = renderScysChapterContent(blocks);
+		// Merged into a single <strong>aabb</strong> rather than two adjacent ones.
+		expect(html).toContain('<strong>aabb</strong>');
+		expect(html).not.toContain('</strong><strong>');
+	});
+
 	it('forceBoldOnDemote=false (default): bold flags untouched after demotion', () => {
 		const blocks: ScysBlock[] = [{
 			block_id: 'h', block_type: 7,
@@ -334,9 +404,10 @@ describe('renderScysChapterContent (real fixture)', () => {
 
 	it('produces h4 for HEADING6 (e.g. "2.1.1 用途...")', () => {
 		const html = renderScysChapterContent(blocks);
-		// heading6 elements in this fixture have bold:true on text_run →
-		// renderTextElements wraps content in <strong>. Required, not optional.
-		expect(html).toMatch(/<h4><strong>2\.1\.1\s*用途/);
+		// renderTextElements now skips <strong> when invoked from a HEADING
+		// context (the H tag is already visually bold; nested **…** in markdown
+		// causes `## **二、…**` noise and breaks `**` pair counting).
+		expect(html).toMatch(/<h4>2\.1\.1\s*用途/);
 	});
 
 	it('renders bullet list block as <ul>', () => {

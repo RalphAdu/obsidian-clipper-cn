@@ -588,10 +588,45 @@ async function fetchDocumentMeta(documentId: string): Promise<{ title: string; o
 	}
 }
 
-function renderTextElements(elements: FeishuTextBody['elements']): string {
+// Render an HTML heading with two scys-specific concerns handled:
+//   1. skipBold — heading text is already visually bold, so `<strong>` inside
+//      would round-trip as `## **二、…**` (noisy + breaks `**` pair counting).
+//   2. block-level text-align (style.align): scys/feishu encodes alignment as
+//      1=left (default), 2=center, 3=right. We translate to <div align="…">
+//      wrapper so Obsidian Reading view renders the alignment.
+function renderHeading(level: number, elements: any, style: any): string {
+	const inner = renderTextElements(elements, { skipBold: true });
+	const tag = `<h${level}>${inner}</h${level}>`;
+	const align = style?.align;
+	if (align === 2) return `[[SCYS-ALIGN-center]]${tag}[[/SCYS-ALIGN]]`;
+	if (align === 3) return `[[SCYS-ALIGN-right]]${tag}[[/SCYS-ALIGN]]`;
+	return tag;
+}
+
+// scys/feishu text_color enum → CSS color. Matches feishu's standard palette
+// (0=default/black, 1=red, 2=orange, 3=yellow, 4=green, 5=cyan, 6=blue, 7=purple).
+const FEISHU_TEXT_COLOR_MAP: Record<number, string> = {
+	1: '#e83e3a',
+	2: '#ff8800',
+	3: '#f5b400',
+	4: '#2dd24d',
+	5: '#28d4e8',
+	6: '#2da3eb',
+	7: '#8e3eea',
+};
+
+interface RenderTextOptions {
+	// Skip <strong> wrapping when bold=true. Used by HEADING* renderers since
+	// markdown heading lines are already visually bold — emitting **…** inside
+	// `## …` produces noisy `## **二、…**` and breaks `**` pair counting in
+	// adjacent strong runs.
+	skipBold?: boolean;
+}
+
+function renderTextElements(elements: FeishuTextBody['elements'], opts: RenderTextOptions = {}): string {
 	if (!elements || !elements.length) return '';
 
-	return elements.map((el) => {
+	const rendered = elements.map((el) => {
 		if (el.equation?.content) {
 			return `<code>${escapeHtml(el.equation.content)}</code>`;
 		}
@@ -612,7 +647,7 @@ function renderTextElements(elements: FeishuTextBody['elements']): string {
 		if (style?.inline_code) {
 			html = `<code>${html}</code>`;
 		}
-		if (style?.bold) {
+		if (style?.bold && !opts.skipBold) {
 			html = `<strong>${html}</strong>`;
 		}
 		if (style?.italic) {
@@ -623,6 +658,15 @@ function renderTextElements(elements: FeishuTextBody['elements']): string {
 		}
 		if (style?.underline) {
 			html = `<u>${html}</u>`;
+		}
+		// Non-default text_color: wrap with placeholders that survive defuddle's
+		// HTML→markdown conversion (which strips inline style attributes). The
+		// markdown-post-process layer rewrites these to Obsidian-compatible
+		// <span style="color:…"> at the markdown stage. scys author uses red (=1)
+		// for emphasis paragraphs that would otherwise collapse to black.
+		const tc = (style as any)?.text_color;
+		if (typeof tc === 'number' && tc > 0 && FEISHU_TEXT_COLOR_MAP[tc]) {
+			html = `[[SCYS-COLOR-${tc}]]${html}[[/SCYS-COLOR]]`;
 		}
 		if (style?.link?.url) {
 			try {
@@ -642,6 +686,13 @@ function renderTextElements(elements: FeishuTextBody['elements']): string {
 
 		return html;
 	}).join('');
+	// Collapse adjacent identical <strong>/<em> blocks into a single span. Defuddle
+	// converts `<strong>aa</strong><strong>bb</strong>` to `**aa****bb**`, where
+	// the middle `****` is two empty strong markers that some markdown renderers
+	// surface as literal `**` artifacts. Merging avoids that.
+	return rendered
+		.replace(/<\/strong>(\s*)<strong>/g, '$1')
+		.replace(/<\/em>(\s*)<em>/g, '$1');
 }
 
 // Wraps bare http(s) URLs in <a href="…">…</a>. Skips URLs already inside an
@@ -794,22 +845,22 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		}
 
 		case FEISHU_BLOCK_TYPE.HEADING1:
-			return `<h1>${renderTextElements(block.heading1?.elements)}</h1>`;
+			return renderHeading(1, block.heading1?.elements, (block.heading1 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING2:
-			return `<h2>${renderTextElements(block.heading2?.elements)}</h2>`;
+			return renderHeading(2, block.heading2?.elements, (block.heading2 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING3:
-			return `<h3>${renderTextElements(block.heading3?.elements)}</h3>`;
+			return renderHeading(3, block.heading3?.elements, (block.heading3 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING4:
-			return `<h4>${renderTextElements(block.heading4?.elements)}</h4>`;
+			return renderHeading(4, block.heading4?.elements, (block.heading4 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING5:
-			return `<h5>${renderTextElements(block.heading5?.elements)}</h5>`;
+			return renderHeading(5, block.heading5?.elements, (block.heading5 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING6:
-			return `<h6>${renderTextElements(block.heading6?.elements)}</h6>`;
+			return renderHeading(6, block.heading6?.elements, (block.heading6 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING7:
 		case FEISHU_BLOCK_TYPE.HEADING8:
 		case FEISHU_BLOCK_TYPE.HEADING9: {
 			const body = getTextBody(block);
-			return `<h6>${renderTextElements(body?.elements)}</h6>`;
+			return renderHeading(6, body?.elements, (body as any)?.style);
 		}
 
 		case FEISHU_BLOCK_TYPE.BULLET:

@@ -52,38 +52,33 @@ fi
 echo "    OK — Obsidian PID: $(pgrep -f 'Obsidian.app/Contents/MacOS/Obsidian' | head -1)"
 
 echo "==> 3. AppleScript: read front window title"
+# Bring Obsidian to front first so the front window is the note we just opened.
+osascript -e 'tell application "Obsidian" to activate' >/dev/null 2>&1 || true
+sleep 0.5
 WINDOW_TITLE=$(osascript -e 'tell application "System Events" to tell process "Obsidian"
 	if exists window 1 then
 		return name of window 1
-	else
-		return "(no window)"
 	end if
-end tell' 2>/dev/null || echo "(osascript failed)")
-echo "    Front window: $WINDOW_TITLE"
+	return "(no window)"
+end tell' 2>&1)
+OSA_EXIT=$?
+echo "    Front window: $WINDOW_TITLE (osascript exit=$OSA_EXIT)"
 
-# Expected: window title contains file basename (Obsidian shows "<Note Name> - <Vault>")
 BASENAME=$(basename "$FILE_PATH")
 if echo "$WINDOW_TITLE" | grep -qF "$BASENAME"; then
 	echo "    OK — window title contains '$BASENAME'"
 else
-	echo "    [WARN] window title does NOT contain '$BASENAME' (got: $WINDOW_TITLE)"
+	echo "    [WARN] window title does NOT contain '$BASENAME'"
 fi
 
-echo "==> 4. Screenshot Obsidian window (best-effort)"
+echo "==> 4. Screenshot of Obsidian (full screen — Electron apps don't expose AX window id)"
 SHOT_PATH="/tmp/obsidian-verify-$(date +%s).png"
-# Try without permission first — most env will fail silently.
-if screencapture -x -o -l \
-	"$(osascript -e 'tell application "System Events" to tell process "Obsidian"
-		if exists window 1 then
-			return id of window 1
-		else
-			return 0
-		end if
-	end tell' 2>/dev/null)" \
-	"$SHOT_PATH" 2>/dev/null && [ -s "$SHOT_PATH" ]; then
+# Full main-screen capture: Obsidian was just activated so it's the foreground window.
+if screencapture -x -m -o "$SHOT_PATH" 2>&1 && [ -s "$SHOT_PATH" ]; then
 	echo "    OK — screenshot saved: $SHOT_PATH ($(stat -f %z "$SHOT_PATH") bytes)"
+	echo "    OBSIDIAN_SHOT=$SHOT_PATH"
 else
-	echo "    [SKIP] screencapture failed (likely needs Screen Recording permission for Terminal)"
+	echo "    [SKIP] screencapture failed (likely needs Screen Recording permission)"
 	rm -f "$SHOT_PATH"
 fi
 

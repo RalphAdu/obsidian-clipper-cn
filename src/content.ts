@@ -14,6 +14,7 @@ import { createLogger } from './utils/logger';
 import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bilibili-extractor';
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl } from './utils/scys-extractor';
+import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
 const contentLogger = createLogger('Content');
@@ -638,7 +639,7 @@ declare global {
 
 			const content = result?.content || '';
 			const defuddleMod = await import('defuddle/full');
-			const markdown = defuddleMod.createMarkdownContent(content, document.URL);
+			const markdown = postProcessExtractorMarkdown(defuddleMod.createMarkdownContent(content, document.URL));
 
 			// --- Popup-path simulation (regression guard for 2026-05-16 HTML-leak bug) ---
 			// The real clip flow goes through popup → initializePageContent →
@@ -703,14 +704,20 @@ declare global {
 			// Clippings/, enabling fully automated e2e validation without
 			// requiring the user to click the extension icon.
 			let uploadedTo: string | null = null;
+			let uploadError: string | null = null;
 			if (data.uploadUrl && typeof data.uploadUrl === 'string') {
 				try {
 					const u = new URL(data.uploadUrl);
 					if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
-						await fetch(data.uploadUrl, { method: 'POST', body: obsidianNote });
+						const resp = await fetch(data.uploadUrl, { method: 'POST', body: obsidianNote });
 						uploadedTo = data.uploadUrl;
+						if (!resp.ok) uploadError = `HTTP ${resp.status}`;
+					} else {
+						uploadError = `hostname rejected: ${u.hostname}`;
 					}
-				} catch { /* best-effort */ }
+				} catch (e) {
+					uploadError = String(e);
+				}
 			}
 			localStorage.setItem(key, JSON.stringify({
 				status: 'done',
@@ -726,6 +733,7 @@ declare global {
 				popupMatchesBridge,
 				popupMarkdownHead: popupMarkdown.slice(0, 500),
 				uploadedTo,
+				uploadError,
 			}));
 		} catch (err) {
 			localStorage.setItem(key, JSON.stringify({ status: 'error', error: String(err) }));

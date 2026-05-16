@@ -1,5 +1,6 @@
 import { ExtractedContent } from '../types/types';
 import { createMarkdownContent } from 'defuddle/full';
+import { postProcessExtractorMarkdown } from './markdown-post-process';
 import { sanitizeFileName } from './string-utils';
 import { buildVariables, addSchemaOrgDataToVariables } from './shared';
 import browser from './browser-polyfill';
@@ -149,7 +150,7 @@ export async function initializePageContent(
 		let selectedMarkdown = '';
 		if (selectedHtml) {
 			content = selectedHtml;
-			selectedMarkdown = createMarkdownContent(selectedHtml, currentUrl);
+			selectedMarkdown = postProcessExtractorMarkdown(createMarkdownContent(selectedHtml, currentUrl));
 		}
 
 		// Process highlights after getting the base content
@@ -157,9 +158,9 @@ export async function initializePageContent(
 			content = processHighlights(content, highlights);
 		}
 
-		const markdownBody = createMarkdownContent(content, currentUrl);
+		const markdownBody = postProcessExtractorMarkdown(createMarkdownContent(content, currentUrl));
 
-		const highlightsData = collapseGroupsForExport(highlights, c => createMarkdownContent(c, currentUrl));
+		const highlightsData = collapseGroupsForExport(highlights, c => postProcessExtractorMarkdown(createMarkdownContent(c, currentUrl)));
 
 		const noteName = sanitizeFileName(title);
 

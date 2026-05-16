@@ -124,6 +124,25 @@ function feishuEmojiToUnicode(emojiId: string): string {
 	return FEISHU_EMOJI_MAP[emojiId] || '';
 }
 
+// Feishu emoji shortcode → Obsidian native callout type. Used so callout
+// renders as a colored box in Obsidian (not a gray blockquote), while still
+// preserving the original emoji in the title for visual parity with feishu.
+const FEISHU_EMOJI_TO_CALLOUT_TYPE: Record<string, string> = {
+	bulb: 'tip',
+	mag_right: 'info', mag: 'info',
+	info: 'info', information_source: 'info',
+	warning: 'warning', exclamation: 'warning', bell: 'warning',
+	pushpin: 'important', rocket: 'important',
+	bookmark: 'note', pencil: 'note', memo: 'note',
+	fire: 'danger',
+	heavy_check_mark: 'success', white_check_mark: 'success', thumbsup: 'success',
+	x: 'failure',
+	thinking_face: 'question', question: 'question',
+	star: 'example', heart: 'example',
+	books: 'abstract', clipboard: 'abstract',
+	speech_balloon: 'quote',
+};
+
 const FEISHU_BLOCK_TYPE = {
 	PAGE: 1,
 	TEXT: 2,
@@ -780,17 +799,46 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		}
 
 		case FEISHU_BLOCK_TYPE.CALLOUT: {
-			const inner = renderTextElements(block.callout?.elements);
-			const children = renderBlockChildren(block, blockMap);
-			// Feishu callout carries an emoji_id (shortcode) that scys browser
-			// renders as a leading icon (e.g. "💡 查看顺序"). Two shapes seen:
-			// - scys docx: block.callout.emoji_id (direct)
-			// - feishu standard: block.callout.style.emoji_id (nested)
+			// Two emoji_id shapes seen:
+			//   scys docx:       block.callout.emoji_id
+			//   feishu standard: block.callout.style.emoji_id
+			// Emit Obsidian-native callout syntax (`[!type] title`) so reading
+			// view shows a colored box matching feishu's tinted callout, and
+			// keep the original emoji inline in the title so visual parity is
+			// preserved when Obsidian's default icon for that type differs.
 			const callout = block.callout as any;
 			const emojiId = callout?.emoji_id || callout?.style?.emoji_id || '';
 			const emoji = emojiId ? feishuEmojiToUnicode(emojiId) : '';
-			const emojiHtml = emoji ? `<p>${emoji}</p>` : '';
-			return `<blockquote class="feishu-callout">${emojiHtml}${inner ? `<p>${inner}</p>` : ''}${children}</blockquote>`;
+			const calloutType = FEISHU_EMOJI_TO_CALLOUT_TYPE[emojiId] || 'note';
+
+			let titleText = renderTextElements(block.callout?.elements);
+			const allChildIds = block.children || [];
+			let bodyChildIds = allChildIds;
+			// scys docx callouts have callout.elements=null and put the visual
+			// title as a leading heading child. Promote that into the title
+			// line so Obsidian shows it on the callout's coloured header bar.
+			if (!titleText && allChildIds.length > 0) {
+				const firstChild = blockMap.get(allChildIds[0]);
+				const headingKey = firstChild ? ({
+					[FEISHU_BLOCK_TYPE.HEADING1]: 'heading1',
+					[FEISHU_BLOCK_TYPE.HEADING2]: 'heading2',
+					[FEISHU_BLOCK_TYPE.HEADING3]: 'heading3',
+					[FEISHU_BLOCK_TYPE.HEADING4]: 'heading4',
+					[FEISHU_BLOCK_TYPE.HEADING5]: 'heading5',
+					[FEISHU_BLOCK_TYPE.HEADING6]: 'heading6',
+					[FEISHU_BLOCK_TYPE.HEADING7]: 'heading7',
+					[FEISHU_BLOCK_TYPE.HEADING8]: 'heading8',
+					[FEISHU_BLOCK_TYPE.HEADING9]: 'heading9',
+				} as Record<number, string | undefined>)[firstChild.block_type as number] : undefined;
+				if (firstChild && headingKey) {
+					titleText = renderTextElements((firstChild as any)[headingKey]?.elements);
+					bodyChildIds = allChildIds.slice(1);
+				}
+			}
+			const childrenHtml = renderChildren(bodyChildIds, blockMap);
+			const title = [emoji, titleText].filter(Boolean).join(' ');
+			const titleLine = `[!${calloutType}]${title ? ' ' + title : ''}`;
+			return `<blockquote class="feishu-callout"><p>${titleLine}</p>${childrenHtml}</blockquote>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.DIVIDER:

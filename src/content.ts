@@ -293,13 +293,15 @@ declare global {
 				extractedContent.page = String(bilibiliContent.page);
 			}
 
-			if (scysContent) {
-				extractedContent.title = scysContent.title;
-				extractedContent.author = scysContent.author;
-				extractedContent.content = scysContent.content;
-				extractedContent.wordCount = String(scysContent.wordCount);
-				extractedContent.description = '';
-			}
+			// scysContent's title/author/content/wordCount/description are already
+			// surfaced via the ContentResponse cascade (line ~352-367) which feeds
+			// initializePageContent → buildVariables, where {{title}}/{{author}}/
+			// {{content}}/{{words}}/{{description}} are bound from params. Writing
+			// them into extractedContent here would re-overwrite {{content}} with
+			// raw HTML (extractedContent dict is iterated last in buildVariables
+			// shared.ts:70, after content-extractor.ts:160 ran createMarkdownContent).
+			// Bug 2026-05-16: Obsidian users saw raw HTML in clipped notes when
+			// this block was present. See BACKLOG §X.X.
 
 				// Create a new DOMParser
 				const parser = new DOMParser();

@@ -64,11 +64,54 @@ export interface ScysBlock extends Omit<FeishuBlock, 'children'> {
 	sc_html?: { content?: string };
 }
 
-const HEADING_REWRITE: Record<number, { newType: number; oldField: keyof ScysBlock; newField: string }> = {
-	6: { newType: 4, oldField: 'heading4', newField: 'heading2' },
-	7: { newType: 5, oldField: 'heading5', newField: 'heading3' },
-	8: { newType: 6, oldField: 'heading6', newField: 'heading4' },
+// Heading promotion: scys course/docx serves H4/5/6 (6/7/8) as section titles
+// that should map to Obsidian H2/H3/H4 in markdown (so the standard outline
+// pane shows the real document structure).
+const HEADING_REWRITE: Record<number, { newType: number; newField: string }> = {
+	6: { newType: 4, newField: 'heading2' },
+	7: { newType: 5, newField: 'heading3' },
+	8: { newType: 6, newField: 'heading4' },
 };
+
+// Map of feishu HEADING block types to their body field name.
+const HEADING_FIELDS: Record<number, string> = {
+	3: 'heading1', 4: 'heading2', 5: 'heading3',
+	6: 'heading4', 7: 'heading5', 8: 'heading6',
+	9: 'heading7', 10: 'heading8', 11: 'heading9',
+};
+
+// scys article (xq_topic) authors abuse the "heading" button as a bold-
+// paragraph styler — long prose lands in block_type 7/8/9 with 30+ char
+// content. Per-type cutoffs balance "keep real chapter titles as H2/H3"
+// against "demote prose paragraphs masquerading as headings":
+//   HEADING4 (block_type=6) — top-level article section (max real = 32 chars).
+//   HEADING5/6/7 (block_type=7/8/9) — frequently abused; course/docx real
+//     subsection titles max at 23 chars. Cutoff 30 demotes the prose abuse.
+// HEADING1/2/3 (block_type=3/4/5) are never abused this way — no demotion.
+const HEADING_PARAGRAPH_LEN_THRESHOLD: Record<number, number> = {
+	6: 50,
+	7: 30,
+	8: 30,
+	9: 30,
+	10: 30,
+	11: 30,
+};
+
+function headingContentLength(block: any, field: string): number {
+	const body = block[field];
+	if (!body || !Array.isArray(body.elements)) return 0;
+	let n = 0;
+	for (const el of body.elements) {
+		// Count both plain text and mention_doc titles — feishu blocks split
+		// "prefix text + linked doc title" across multiple elements; missing the
+		// mention_doc length would under-count and skip demotion. equation.content
+		// (rendered inline as <code>) also contributes to visible length.
+		n += ((el.text_run && el.text_run.content) || '').length;
+		n += ((el.mention_doc && el.mention_doc.title) || '').length;
+		n += ((el.equation && el.equation.content) || '').length;
+	}
+	return n;
+}
 
 export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 	const out: FeishuBlock[] = [];
@@ -89,16 +132,31 @@ export function flattenScysBlocks(blocks: ScysBlock[]): FeishuBlock[] {
 		const { children_blocks: _dropCB, node: _dropNode, ...rest } = block;
 		const flat: any = { ...rest, parent_id: parentId, children: childIds.length ? childIds : undefined };
 
-		// Heading rewrite (block_type 6/7/8 → 4/5/6, copy body to new field name)
-		const rewrite = HEADING_REWRITE[flat.block_type];
-		if (rewrite) {
-			const body = flat[rewrite.oldField];
-			if (body === undefined) {
-				logger.warn(`heading rewrite: missing ${rewrite.oldField} on block ${block.block_id}`);
+		// HEADING handling has two layers:
+		//   1. Demotion: if scys content is long enough to be prose abuse of a
+		//      heading button (per-type cutoff), convert to a plain TEXT block so
+		//      Obsidian doesn't render it as a huge blue heading.
+		//   2. Promotion: feishu's H4/H5/H6 are conventionally section/subsection
+		//      titles in course/docx — map to markdown H2/H3/H4 so they slot into
+		//      Obsidian's outline at sensible levels.
+		const oldField = HEADING_FIELDS[flat.block_type];
+		const cutoff = HEADING_PARAGRAPH_LEN_THRESHOLD[flat.block_type];
+		if (oldField && cutoff !== undefined && headingContentLength(flat, oldField) >= cutoff) {
+			// Demote → plain TEXT paragraph
+			flat.text = flat[oldField];
+			delete flat[oldField];
+			flat.block_type = 2;
+		} else {
+			const rewrite = HEADING_REWRITE[flat.block_type];
+			if (rewrite && oldField) {
+				const body = flat[oldField];
+				if (body === undefined) {
+					logger.warn(`heading rewrite: missing ${oldField} on block ${block.block_id}`);
+				}
+				flat[rewrite.newField] = body;
+				delete flat[oldField];
+				flat.block_type = rewrite.newType;
 			}
-			flat[rewrite.newField] = body;
-			delete flat[rewrite.oldField];
-			flat.block_type = rewrite.newType;
 		}
 
 		// Image: inject scys: prefixed token from top-level file_url

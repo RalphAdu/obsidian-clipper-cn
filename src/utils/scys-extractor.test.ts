@@ -160,6 +160,121 @@ describe('flattenScysBlocks', () => {
 		const flat = flattenScysBlocks(blocks);
 		expect(flat[0].children).toBeUndefined();
 	});
+
+	// scys article authors abuse HEADING5/6 as a bold-paragraph styler for long
+	// prose — blindly rewriting to H3/H4 makes Obsidian render them as huge blue
+	// headings, totally unlike the browser's plain 12px paragraph rendering.
+	// Per-type cutoffs: HEADING4 → 50, HEADING5/6 → 30 chars.
+	it('downgrades HEADING5 (block_type=7) to TEXT when content ≥ 30 chars', () => {
+		const longText = '以经典书籍 / 权威人物 IP 开篇，格式：《XX》：当你有某类经历，就会发现某些缺点式行为往往才是正面特质';
+		expect(longText.length).toBeGreaterThanOrEqual(30);
+		const blocks: ScysBlock[] = [{
+			block_id: 'h',
+			block_type: 7,
+			heading5: { elements: [{ text_run: { content: longText } }] },
+		}];
+		const flat = flattenScysBlocks(blocks);
+		expect(flat[0].block_type).toBe(2);
+		expect((flat[0] as any).text).toEqual({ elements: [{ text_run: { content: longText } }] });
+		expect((flat[0] as any).heading5).toBeUndefined();
+		expect((flat[0] as any).heading3).toBeUndefined();
+	});
+
+	it('downgrades 34-char HEADING5 abused as paragraph (real article block)', () => {
+		// Real fixture block: "爆文链接丢入：丢入上面的提示词之后，丢入爆文链接，让其对爆文进行分析" (34 chars).
+		// First user visual-diff round showed this slipping through with cutoff=40.
+		const text = '爆文链接丢入：丢入上面的提示词之后，丢入爆文链接，让其对爆文进行分析';
+		expect(text.length).toBe(34);
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 7, heading5: { elements: [{ text_run: { content: text } }] } }]);
+		expect(flat[0].block_type).toBe(2);
+	});
+
+	it('downgrades 38-char HEADING5 abused as paragraph (real article block)', () => {
+		const text = '生成原创爆文+垂直小号：丢入之后就可以生成原创垂直小号了+你的垂直人设和IP';
+		expect(text.length).toBe(38);
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 7, heading5: { elements: [{ text_run: { content: text } }] } }]);
+		expect(flat[0].block_type).toBe(2);
+	});
+
+	it('downgrades HEADING6 (block_type=8) to TEXT when content ≥ 30 chars', () => {
+		const longText = '10个豆包软件：顾名思义开通10个豆包软件或者网页物理批量生成最高';
+		expect(longText.length).toBeGreaterThanOrEqual(30);
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 8, heading6: { elements: [{ text_run: { content: longText } }] } }]);
+		expect(flat[0].block_type).toBe(2);
+	});
+
+	it('keeps short HEADING5 as <h3> (course/docx-style real chapter heading)', () => {
+		const blocks: ScysBlock[] = [{
+			block_id: 'h',
+			block_type: 7,
+			heading5: { elements: [{ text_run: { content: '2.1 需求判断：想清楚这个知识库是干嘛的' } }] },
+		}];
+		const flat = flattenScysBlocks(blocks);
+		expect(flat[0].block_type).toBe(5);
+		expect((flat[0] as any).heading3).toBeDefined();
+	});
+
+	it('keeps HEADING5 "爆文模板提示词（可直接套用创作）" (16 chars) as H3 — real subsection', () => {
+		// Boundary on the keep side: short article H5 used as a real subsection title.
+		const text = '爆文模板提示词（可直接套用创作）';
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 7, heading5: { elements: [{ text_run: { content: text } }] } }]);
+		expect(flat[0].block_type).toBe(5);
+	});
+
+	it('keeps short HEADING4 as <h2> (e.g. "0. 本章概要")', () => {
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 6, heading4: { elements: [{ text_run: { content: '0. 本章概要' } }] } }]);
+		expect(flat[0].block_type).toBe(4);
+	});
+
+	it('downgrades long HEADING7 (block_type=9) to TEXT (real article block)', () => {
+		// "模板提示词植入个人IP形成专属个人IP模板提示词（仅供参考，每个领域提示词不一样，需要以实拆爆文的模板提示词为主）："
+		const text = '模板提示词植入个人IP形成专属个人IP模板提示词（仅供参考，每个领域提示词不一样，需要以实拆爆文的模板提示词为主）：';
+		expect(text.length).toBeGreaterThanOrEqual(30);
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 9, heading7: { elements: [{ text_run: { content: text } }] } } as any]);
+		expect(flat[0].block_type).toBe(2);
+	});
+
+	it('keeps short HEADING7 as <h6> (default feishu fallback rendering)', () => {
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 9, heading7: { elements: [{ text_run: { content: '拆解爆文形成模板提示词：' } }] } } as any]);
+		// short HEADING7 stays block_type=9 (no rewrite mapping); feishu-extractor renders it as <h6>
+		expect(flat[0].block_type).toBe(9);
+	});
+
+	it('counts mention_doc.title toward heading length (multi-element prose with link)', () => {
+		// Real article block: text_run + mention_doc, combined visible text >= 30 chars
+		// but text_run alone is 27 — without summing mention_doc we'd miss the demotion.
+		const flat = flattenScysBlocks([{
+			block_id: 'h', block_type: 9,
+			heading7: { elements: [
+				{ text_run: { content: '提示词和批量下载器已经打包到链接当中，请点击飞书链接：' } },
+				{ mention_doc: { title: '提示词和批量下载软件', url: 'https://example.com' } },
+			] },
+		} as any]);
+		expect(flat[0].block_type).toBe(2);
+	});
+
+	it('keeps 32-char HEADING4 as H2 (real article chapter "垂直小号原创ip爆文操作步骤（其它领域逻辑互通，以读书领域为例）")', () => {
+		// HEADING4 cutoff is higher (50) than H5/6 (30) — article block_type=6 is
+		// reliably used for real chapter titles; longest real one is 32 chars.
+		const text = '垂直小号原创ip爆文操作步骤（其它领域逻辑互通，以读书领域为例）';
+		expect(text.length).toBe(32);
+		const flat = flattenScysBlocks([{ block_id: 'h', block_type: 6, heading4: { elements: [{ text_run: { content: text } }] } }]);
+		expect(flat[0].block_type).toBe(4);
+	});
+
+	it('downgrades long HEADING built from multiple text_run elements (length is summed)', () => {
+		// Real scys blocks often split bold/non-bold runs into separate elements.
+		const blocks: ScysBlock[] = [{
+			block_id: 'h',
+			block_type: 7,
+			heading5: { elements: [
+				{ text_run: { content: '加入个人IP，形成个人专属提示词：', text_element_style: { bold: true } } },
+				{ text_run: { content: '得到了一篇爆文提示词，这个时候我们要丰富人设，植入个人IP故事和经历' } },
+			] },
+		}];
+		const flat = flattenScysBlocks(blocks);
+		expect(flat[0].block_type).toBe(2);
+	});
 });
 
 import fixtureChapter from './fixtures/scys-chapter-11408.json';

@@ -586,3 +586,70 @@ export function parseZsxqUrl(url: string): ZsxqUrlInfo | null {
 		return null;
 	}
 }
+
+// ─── Top-level entry ────────────────────────────────────────────────────────
+
+export interface ZsxqStructuredContent {
+	title: string;
+	author: string;
+	content: string;
+	wordCount: number;
+}
+
+function buildZsxqTitle(topic: ZsxqTopic): string {
+	// Prefer talk.article.title (full article title) over the truncated
+	// talk.text teaser.
+	const articleTitle = topic.talk?.article?.title;
+	if (articleTitle) return articleTitle;
+	if (topic.title) return topic.title;
+	const body = topic.talk ?? topic.question ?? topic.task ?? topic.solution;
+	const plain = parseZsxqInlineText(body?.text ?? '').replace(/\n/g, ' ').trim();
+	if (!plain) return 'zsxq 帖子';
+	return plain.length > 40 ? plain.slice(0, 40) + '…' : plain;
+}
+
+function buildZsxqAuthor(topic: ZsxqTopic): string {
+	const body = topic.talk ?? topic.question ?? topic.task ?? topic.solution;
+	return body?.owner?.name ?? '';
+}
+
+function countZsxqWords(topic: ZsxqTopic, comments: ZsxqComment[], articleHtml: string | null): number {
+	let total = 0;
+	if (articleHtml) total += articleHtml.replace(/<[^>]+>/g, '').length;
+	const body = topic.talk ?? topic.question ?? topic.task ?? topic.solution;
+	if (body?.text) total += parseZsxqInlineText(body.text).length;
+	for (const c of comments) {
+		if (c.text) total += parseZsxqInlineText(c.text).length;
+		for (const r of c.replied_comments ?? []) {
+			if (r.text) total += parseZsxqInlineText(r.text).length;
+		}
+	}
+	return total;
+}
+
+export async function extractZsxqStructuredContent(doc: Document): Promise<ZsxqStructuredContent | null> {
+	const parsed = parseZsxqUrl(doc.URL);
+	if (!parsed || parsed.kind !== 'topic') return null;
+
+	const topic = await fetchZsxqTopic(parsed.topicId);
+	if (!topic) return null;
+
+	// Concurrently fetch comments + article body HTML.
+	const [comments, articleHtml] = await Promise.all([
+		fetchZsxqAllComments(parsed.topicId).catch(() => [] as ZsxqComment[]),
+		topic.talk?.article?.article_id
+			? fetchZsxqArticleHtml(topic.talk.article.article_id).catch(() => null)
+			: Promise.resolve<string | null>(null),
+	]);
+
+	const bodyHtml = renderZsxqTopicBodyHtml(topic, articleHtml);
+	const commentsHtml = renderZsxqCommentsHtml(comments, topic.comments_count ?? comments.length);
+	const content = await resolveZsxqImages(bodyHtml + commentsHtml);
+
+	return {
+		title: buildZsxqTitle(topic),
+		author: buildZsxqAuthor(topic),
+		content,
+		wordCount: countZsxqWords(topic, comments, articleHtml),
+	};
+}

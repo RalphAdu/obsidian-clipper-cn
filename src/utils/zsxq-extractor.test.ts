@@ -12,6 +12,7 @@ import {
 	fetchZsxqAllComments,
 	fetchZsxqArticleHtml,
 	resolveZsxqImages,
+	extractZsxqStructuredContent,
 	type ZsxqTopic,
 	type ZsxqComment,
 } from './zsxq-extractor';
@@ -572,5 +573,75 @@ describe('resolveZsxqImages', () => {
 		const out = await resolveZsxqImages(html);
 		expect(out).not.toContain('feishu-image://zsxq:');
 		expect(out).toContain(`src="${url}"`);
+	});
+});
+
+describe('extractZsxqStructuredContent', () => {
+	const originalFetch = globalThis.fetch;
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+		vi.restoreAllMocks();
+	});
+
+	function makeDoc(url: string): Document {
+		return { URL: url } as unknown as Document;
+	}
+
+	it('returns null for non-topic URLs (article kind is deferred)', async () => {
+		const out = await extractZsxqStructuredContent(makeDoc('https://wx.zsxq.com/group/1/article/abc'));
+		expect(out).toBeNull();
+	});
+
+	it('returns null for unrelated URLs', async () => {
+		const out = await extractZsxqStructuredContent(makeDoc('https://example.com'));
+		expect(out).toBeNull();
+	});
+
+	it('returns null when topic fetch fails', async () => {
+		globalThis.fetch = vi.fn(async () => new Response('nope', { status: 500 })) as any;
+		const out = await extractZsxqStructuredContent(makeDoc('https://wx.zsxq.com/group/1/topic/2'));
+		expect(out).toBeNull();
+	});
+
+	it('assembles title + author + content from a real fixture', async () => {
+		// Mock fetch to return:
+		// - /info → topicFixture
+		// - /comments → commentsFixture (page-1, then empty)
+		// - articles.zsxq.com/...html → articleHtmlFixture wrapped in a doc
+		// - image fetches → 403 (so L3 raw URL degradation kicks in; we just
+		//   verify the assembled content references the article body).
+		const commentsPage1 = commentsFixture.resp_data.comments;
+		let commentsCallCount = 0;
+		globalThis.fetch = vi.fn(async (target: any) => {
+			const url = String(target);
+			if (url.includes('/topics/') && url.endsWith('/info')) {
+				return new Response(JSON.stringify(topicFixture), { status: 200 });
+			}
+			if (url.includes('/comments')) {
+				commentsCallCount++;
+				const body = commentsCallCount === 1
+					? { succeeded: true, resp_data: { comments: commentsPage1 } }
+					: { succeeded: true, resp_data: { comments: [] } };
+				return new Response(JSON.stringify(body), { status: 200 });
+			}
+			if (url.includes('articles.zsxq.com')) {
+				return new Response(`<html><body>${articleHtmlFixture}</body></html>`, { status: 200 });
+			}
+			// images / anything else
+			return new Response('', { status: 403 });
+		}) as any;
+
+		const out = await extractZsxqStructuredContent(makeDoc('https://wx.zsxq.com/group/1824528822/topic/185414442218552'));
+		expect(out).toBeTruthy();
+		// Title prefers talk.article.title.
+		expect(out!.title).toContain('人均GMV50W');
+		// Author is talk.owner.name = 鹏哥.
+		expect(out!.author).toBe('鹏哥');
+		// Content embeds the article body.
+		expect(out!.content).toContain('我是鹏哥');
+		// Content includes the comments section.
+		expect(out!.content).toContain('💬 全部评论');
+		// Word count > 0 and at least the article body length.
+		expect(out!.wordCount).toBeGreaterThan(1000);
 	});
 });

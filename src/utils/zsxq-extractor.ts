@@ -187,6 +187,16 @@ function renderImages(images?: ZsxqImage[]): string {
 	return images.map(img => `<p>${renderImage(img)}</p>`).join('');
 }
 
+// The article HTML scraped from articles.zsxq.com contains raw <img src> tags
+// pointing at images.zsxq.com / article-images.zsxq.com. Rewrite each src to
+// the feishu-image://zsxq:{encoded-url} token so resolveZsxqImages handles
+// them uniformly (L1 same-origin → L2 background fetch → L3 raw-url fallback).
+function rewriteArticleImageSrcsToTokens(html: string): string {
+	return html.replace(/<img\b([^>]*?)\bsrc="(https?:\/\/[^"]+)"([^>]*)>/gi, (_m, pre, src, post) => {
+		return `<img${pre}src="feishu-image://zsxq:${encodeURIComponent(src)}"${post}>`;
+	});
+}
+
 function renderFiles(files?: ZsxqFile[]): string {
 	if (!files || files.length === 0) return '';
 	const items = files.map(f => {
@@ -248,15 +258,14 @@ export function renderZsxqTopicBodyHtml(topic: ZsxqTopic, articleBodyHtml: strin
 	const parts: string[] = [];
 	const talkBody = body as ZsxqTalkBody;
 
-	// If a real article body is supplied, use it as the primary content and
-	// quote the truncated talk.text teaser above. Otherwise paragraph-ize the
-	// (full or partial) talk.text directly.
+	// If a real article body is supplied, use it as the primary content. The
+	// article body already contains the full text (talk.text is a truncated
+	// teaser — including it would just duplicate the first 205 chars).
+	// Rewrite raw <img src="https://...zsxq.com/..."/> in the article HTML to
+	// the feishu-image://zsxq: token form so resolveZsxqImages can convert
+	// them to base64 / fall back to raw URL uniformly.
 	if (talkBody.article && articleBodyHtml) {
-		const teaser = parseZsxqInlineText(talkBody.text || '').trim();
-		if (teaser) {
-			parts.push(`<blockquote><p>${escapeHtml(teaser).replace(/\n/g, '<br/>')}</p></blockquote>`);
-		}
-		parts.push(articleBodyHtml);
+		parts.push(rewriteArticleImageSrcsToTokens(articleBodyHtml));
 	} else {
 		parts.push(renderTextAsParagraphs(body.text || ''));
 	}

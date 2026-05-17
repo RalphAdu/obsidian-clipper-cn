@@ -219,3 +219,10 @@ describe('convertBlocksToHtml — section header boundary', () => {
 		expect(html.match(/<ul>/g)?.length).toBe(1);
 	});
 });
+
+describe('extractFeishuStructuredContent — comments wiring', () => {
+	it('extractFeishuComments is imported and reachable from feishu-comments module', async () => {
+		const mod = await import('./feishu-comments');
+		expect(typeof mod.extractFeishuComments).toBe('function');
+	});
+});

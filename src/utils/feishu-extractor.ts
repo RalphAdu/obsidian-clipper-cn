@@ -1,5 +1,6 @@
 import browser from './browser-polyfill';
 import { createLogger } from './logger';
+import { extractFeishuComments } from './feishu-comments';
 
 const logger = createLogger('Feishu');
 
@@ -1176,6 +1177,15 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	const imagesResolved = await resolveFeishuImages(rawContent);
 	const sheetsResolved = await resolveFeishuSheets(imagesResolved);
 	const content = resolveFeishuFiles(sheetsResolved, doc.URL);
+
+	let commentsMarkdown = '';
+	try {
+		commentsMarkdown = await extractFeishuComments(resolved.documentId);
+	} catch (e) {
+		logger.warn(`Comments extraction threw: ${String(e)}`);
+	}
+	const fullContent = commentsMarkdown ? `${content}\n\n${commentsMarkdown}` : content;
+
 	const title = meta?.title || doc.title || '';
 
 	const textContent = blocks
@@ -1194,7 +1204,7 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	return {
 		title,
 		author: meta?.owner || '',
-		content,
+		content: fullContent,
 		wordCount,
 	};
 }

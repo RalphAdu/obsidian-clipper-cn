@@ -33,6 +33,70 @@ export type ZsxqUrlInfo =
 	| { kind: 'topic'; groupId: string; topicId: string }
 	| { kind: 'article'; groupId: string; articleId: string };
 
+// ─── Inline text parsing ──────────────────────────────────────────────────────
+// zsxq text fields embed self-closing <e> tags for hashtags, mentions, emoji
+// and inline web links, plus the usual <br> and HTML entities. Convert all of
+// that into plain markdown text without DOM dependencies (vitest runs in pure
+// node — no jsdom). The <e> tag attributes are always URL-encoded.
+
+function safeDecode(s: string): string {
+	try { return decodeURIComponent(s); } catch { return s; }
+}
+
+function decodeBasicEntities(s: string): string {
+	return s
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, '\'')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&amp;/g, '&');
+}
+
+export function parseZsxqInlineText(text: string): string {
+	if (!text) return '';
+	let out = text;
+
+	// 1. <e type="..." ... /> tags (self-closing, no nesting).
+	out = out.replace(/<e\s+([^>]*?)\/?>/g, (_m, attrsRaw: string) => {
+		// Parse attributes loosely: key="value" pairs.
+		const attrs: Record<string, string> = {};
+		const attrRe = /(\w+)="([^"]*)"/g;
+		let m: RegExpExecArray | null;
+		while ((m = attrRe.exec(attrsRaw)) !== null) {
+			attrs[m[1]] = m[2];
+		}
+		const type = attrs.type ?? '';
+		const title = attrs.title ? safeDecode(attrs.title) : '';
+		const href = attrs.href ? safeDecode(attrs.href) : '';
+		switch (type) {
+			case 'hashtag':
+				// title usually already wraps the term in #…#
+				return title || '';
+			case 'mention':
+				// title usually already starts with @
+				return title || '';
+			case 'emoji':
+				return title || '[表情]';
+			case 'web':
+				if (href) {
+					return `[${title || href}](${href})`;
+				}
+				return title;
+			default:
+				return '';
+		}
+	});
+
+	// 2. <br> / <br/> → newline.
+	out = out.replace(/<br\s*\/?>/gi, '\n');
+
+	// 3. HTML entities.
+	out = decodeBasicEntities(out);
+
+	return out;
+}
+
 export function parseZsxqUrl(url: string): ZsxqUrlInfo | null {
 	try {
 		const u = new URL(url);

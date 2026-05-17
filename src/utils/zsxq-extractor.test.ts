@@ -3,6 +3,7 @@ import {
 	isZsxqTopicUrl,
 	isZsxqArticleUrl,
 	parseZsxqUrl,
+	parseZsxqInlineText,
 } from './zsxq-extractor';
 
 describe('isZsxqTopicUrl', () => {
@@ -84,5 +85,54 @@ describe('parseZsxqUrl', () => {
 
 	it('returns null for unknown shapes', () => {
 		expect(parseZsxqUrl('https://wx.zsxq.com/')).toBeNull();
+	});
+});
+
+describe('parseZsxqInlineText', () => {
+	it('returns empty string for empty input', () => {
+		expect(parseZsxqInlineText('')).toBe('');
+	});
+
+	it('passes through plain text unchanged', () => {
+		expect(parseZsxqInlineText('大家好')).toBe('大家好');
+	});
+
+	it('expands hashtag <e> tag (URL-decoded title already contains #…#)', () => {
+		expect(parseZsxqInlineText('<e type="hashtag" title="%23AI%23" />')).toBe('#AI#');
+	});
+
+	it('expands mention <e> tag (URL-decoded title already starts with @)', () => {
+		expect(parseZsxqInlineText('<e type="mention" title="%40%E9%99%88%E5%A4%A7" />')).toBe('@陈大');
+	});
+
+	it('expands emoji <e> tag via URL-decoded title', () => {
+		expect(parseZsxqInlineText('<e type="emoji" title="%F0%9F%98%80" />')).toBe('😀');
+	});
+
+	it('emoji without title falls back to [表情]', () => {
+		expect(parseZsxqInlineText('<e type="emoji" />')).toBe('[表情]');
+	});
+
+	it('expands web <e> tag into a markdown link', () => {
+		const out = parseZsxqInlineText('<e type="web" href="https://x.com" title="%E5%B7%A5%E5%85%B7" />');
+		expect(out).toBe('[工具](https://x.com)');
+	});
+
+	it('drops unknown <e> types silently', () => {
+		expect(parseZsxqInlineText('a<e type="mystery" title="x" />b')).toBe('ab');
+	});
+
+	it('converts <br> and <br/> to newline', () => {
+		expect(parseZsxqInlineText('a<br>b<br/>c')).toBe('a\nb\nc');
+	});
+
+	it('decodes common HTML entities', () => {
+		expect(parseZsxqInlineText('a &amp; b &lt;tag&gt; &quot;x&quot; &#39;y&#39;&nbsp;z'))
+			.toBe('a & b <tag> "x" \'y\' z');
+	});
+
+	it('handles mixed-order tags and entities', () => {
+		const out = parseZsxqInlineText('Hi <e type="mention" title="%40bob" />! see <e type="web" href="https://a.com" title="here" /><br>END');
+		expect(out).toBe('Hi @bob! see [here](https://a.com)\nEND');
 	});
 });

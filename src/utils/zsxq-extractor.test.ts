@@ -11,6 +11,7 @@ import {
 	fetchZsxqTopic,
 	fetchZsxqAllComments,
 	fetchZsxqArticleHtml,
+	resolveZsxqImages,
 	type ZsxqTopic,
 	type ZsxqComment,
 } from './zsxq-extractor';
@@ -526,5 +527,50 @@ describe('fetchZsxqArticleHtml', () => {
 	it('returns null on network error', async () => {
 		globalThis.fetch = vi.fn(async () => { throw new Error('cors'); }) as any;
 		expect(await fetchZsxqArticleHtml('xxx')).toBeNull();
+	});
+});
+
+describe('resolveZsxqImages', () => {
+	const originalFetch = globalThis.fetch;
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+		vi.restoreAllMocks();
+	});
+
+	it('returns input unchanged when no tokens present', async () => {
+		const html = '<p>plain html, no tokens</p>';
+		expect(await resolveZsxqImages(html)).toBe(html);
+	});
+
+	it('replaces token with base64 data URL on L1 success', async () => {
+		const url = 'https://images.zsxq.com/foo.jpg';
+		const token = `zsxq:${encodeURIComponent(url)}`;
+		const html = `<img alt="1" src="feishu-image://${token}"/>`;
+
+		// Mock fetch to return a tiny blob with image/jpeg.
+		globalThis.fetch = vi.fn(async (target: any) => {
+			expect(String(target)).toBe(url);
+			const data = new Uint8Array([0xff, 0xd8, 0xff]); // jpeg magic
+			const blob = new Blob([data], { type: 'image/jpeg' });
+			return new Response(blob, { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
+		}) as any;
+
+		const out = await resolveZsxqImages(html);
+		expect(out).toContain('data:image/jpeg;base64,');
+		expect(out).not.toContain('feishu-image://zsxq:');
+	});
+
+	it('degrades to raw URL when both L1 and L2 fail', async () => {
+		const url = 'https://images.zsxq.com/bar.jpg';
+		const token = `zsxq:${encodeURIComponent(url)}`;
+		const html = `<img alt="2" src="feishu-image://${token}"/>`;
+
+		// L1 returns ok:false; L2 (browser.runtime.sendMessage in mock) resolves to {}
+		// — so no replacement; fall through to L3 raw-URL degradation.
+		globalThis.fetch = vi.fn(async () => new Response('nope', { status: 403 })) as any;
+
+		const out = await resolveZsxqImages(html);
+		expect(out).not.toContain('feishu-image://zsxq:');
+		expect(out).toContain(`src="${url}"`);
 	});
 });

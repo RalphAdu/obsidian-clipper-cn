@@ -478,6 +478,97 @@ export async function fetchZsxqArticleHtml(articleId: string): Promise<string | 
 	return extractQlEditorBlock(fullHtml);
 }
 
+// ─── Image resolution (L1 same-origin → L2 background → L3 raw URL) ─────────
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+	// Avoid FileReader so this works in both browser content scripts and the
+	// node test runner (vitest is not configured with jsdom).
+	const buf = await blob.arrayBuffer();
+	const bytes = new Uint8Array(buf);
+	let bin = '';
+	for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+	const base64 = btoa(bin);
+	const mime = blob.type || 'image/png';
+	return `data:${mime};base64,${base64}`;
+}
+
+async function fetchZsxqImageL1(zsxqToken: string): Promise<string | null> {
+	const fileUrl = decodeURIComponent(zsxqToken.replace(/^zsxq:/, ''));
+	try {
+		const res = await fetch(fileUrl, { credentials: 'include' });
+		if (!res.ok) {
+			const display = fileUrl.length > 80 ? fileUrl.slice(0, 80) + '...' : fileUrl;
+			logger.warn(`[zsxq-img L1] HTTP ${res.status} for ${display}`);
+			return null;
+		}
+		const blob = await res.blob();
+		return await blobToDataUrl(blob);
+	} catch (err) {
+		logger.warn(`[zsxq-img L1] fetch error: ${String(err)}`);
+		return null;
+	}
+}
+
+export async function resolveZsxqImages(html: string): Promise<string> {
+	const tokenPattern = /feishu-image:\/\/(zsxq:[^"'\s>]+)/g;
+	const tokens = new Set<string>();
+	let match: RegExpExecArray | null;
+	while ((match = tokenPattern.exec(html)) !== null) {
+		tokens.add(match[1]);
+	}
+	if (tokens.size === 0) return html;
+
+	const replacements = new Map<string, string>();
+
+	// L1: same-origin fetch in content-script (works for images.zsxq.com when
+	// the content script is on the same eTLD+1 and CORS is permissive).
+	await Promise.all(
+		Array.from(tokens).map(async (token) => {
+			const dataUrl = await fetchZsxqImageL1(token);
+			if (dataUrl) replacements.set(token, dataUrl);
+		})
+	);
+
+	// L2: background main-world dispatch for unresolved tokens.
+	const unresolvedAfterL1 = Array.from(tokens).filter(t => !replacements.has(t));
+	if (unresolvedAfterL1.length > 0 && typeof browser !== 'undefined' && browser?.runtime?.sendMessage) {
+		const urlsToTokens = new Map<string, string>();
+		for (const t of unresolvedAfterL1) {
+			urlsToTokens.set(decodeURIComponent(t.replace(/^zsxq:/, '')), t);
+		}
+		const urls = Array.from(urlsToTokens.keys());
+		try {
+			const resp = await browser.runtime.sendMessage({
+				action: 'fetchZsxqImagesAsBase64',
+				urls,
+			}) as { success?: boolean; results?: Record<string, string> };
+			if (resp?.success && resp.results) {
+				for (const [url, dataUrl] of Object.entries(resp.results)) {
+					const token = urlsToTokens.get(url);
+					if (token && dataUrl) replacements.set(token, dataUrl);
+				}
+			}
+		} catch (err) {
+			logger.warn(`[zsxq-img L2] error: ${String(err)}`);
+		}
+	}
+
+	let resolved = html;
+	// First substitute all resolved tokens with their data URLs.
+	for (const [token, dataUrl] of replacements) {
+		resolved = resolved.split(`feishu-image://${token}`).join(dataUrl);
+	}
+	// L3: any remaining `feishu-image://zsxq:…` tokens degrade to raw URL so
+	// the rendered markdown at least shows the image while the user's zsxq
+	// session is still valid (CDN URLs are signed with short expiry).
+	const stillUnresolved = Array.from(tokens).filter(t => !replacements.has(t));
+	for (const token of stillUnresolved) {
+		const rawUrl = decodeURIComponent(token.replace(/^zsxq:/, ''));
+		resolved = resolved.split(`feishu-image://${token}`).join(rawUrl);
+	}
+	return resolved;
+}
+
 export function parseZsxqUrl(url: string): ZsxqUrlInfo | null {
 	try {
 		const u = new URL(url);

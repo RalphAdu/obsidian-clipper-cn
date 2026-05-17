@@ -1,5 +1,6 @@
 import browser from './browser-polyfill';
 import { createLogger } from './logger';
+import { fetchFeishuApi } from './feishu-extractor';
 
 const logger = createLogger('FeishuComments');
 
@@ -146,18 +147,16 @@ export async function fetchFeishuComments(documentId: string): Promise<FeishuCom
 		const params = new URLSearchParams({ file_type: 'docx', page_size: '100' });
 		if (pageToken) params.set('page_token', pageToken);
 		const url = `https://open.feishu.cn/open-apis/drive/v1/files/${documentId}/comments?${params}`;
-		const resp = await browser.runtime.sendMessage({ action: 'fetchFeishuApi', url }) as {
-			success?: boolean;
-			data?: { items?: FeishuComment[]; page_token?: string; has_more?: boolean };
-			error?: string;
-		};
-		if (!resp?.success || !resp.data) {
-			logger.warn(`Comments fetch failed: ${resp?.error || 'unknown'}`);
+		try {
+			const result = await fetchFeishuApi(url);
+			const items = result?.data?.items as FeishuComment[] | undefined;
+			if (Array.isArray(items)) all.push(...items);
+			if (!result?.data?.has_more || !result?.data?.page_token) break;
+			pageToken = result.data.page_token;
+		} catch (e) {
+			logger.warn(`Comments fetch failed: ${String(e)}`);
 			break;
 		}
-		all.push(...(resp.data.items || []));
-		if (!resp.data.has_more || !resp.data.page_token) break;
-		pageToken = resp.data.page_token;
 	}
 	return all;
 }

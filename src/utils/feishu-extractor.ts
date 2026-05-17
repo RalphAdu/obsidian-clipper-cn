@@ -207,7 +207,7 @@ export function parseFeishuUrl(url: string): FeishuParsedUrl {
 	}
 }
 
-async function fetchFeishuApi(url: string, options?: { method?: string; body?: string; headers?: Record<string, string> }): Promise<any> {
+export async function fetchFeishuApi(url: string, options?: { method?: string; body?: string; headers?: Record<string, string> }): Promise<any> {
 	const response = await browser.runtime.sendMessage({
 		action: 'fetchFeishuApi',
 		url,

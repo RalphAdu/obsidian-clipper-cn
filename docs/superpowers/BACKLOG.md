@@ -5,7 +5,7 @@
 > 每条 feature 都标了"为什么这么做 / 已知什么不行 / 推荐怎么做"。
 
 **最后更新**：2026-05-17
-**最新 commit 基线**：`c5efe22`（articles.zsxq.com SSR article extractor）/ `3c37532`（zsxq published frontmatter）/ `23010c1`（zsxq 5-part fix for second test URL）
+**最新 commit 基线**：`0949660`（zsxq q&a author = 答主而非提问者）/ `c5efe22`（articles.zsxq.com SSR article extractor）/ `3c37532`（zsxq published frontmatter）
 
 ---
 
@@ -1589,4 +1589,78 @@ zsxq 是 cn fork 独有 feature，**不计划上游化**（知识星球是中文
 - **触发的核心反思**：**spec URL scope 要列全所有"该站点可能产生的内容页 URL"**，不仅是用户首次截图给的那个。这条规则后续 extractor 实施时主动应用：抓样本时同时 grep 站点所有 link/share 出口，列入 spec URL allowlist。
 
 **最大的认知更新**：附录 G 是"两个真实样本最低门槛"，附录 H 是"**两个不同 URL host 的最低门槛**"。同一站点用户实际访问内容的入口 URL 可能跨 host，spec 阶段一并列举，避免后期补丁。
+
+---
+
+## 附录 I：q&a topic author 错位（2026-05-17）
+
+紧接附录 H。用户裁剪 `topic/55188411525252124`（type='q&a'）→ frontmatter `author` 写成 "投资致富"（提问者），而页面顶部显示 "释老毛"（被问的星主）。1 commit、~15 分钟修复（`0949660`），但**为什么没在前两轮发现**值得专门反思。
+
+### 为什么没发现：测试样本的 type 单一性
+
+`zsxq-extractor` 的 `topic.type` 字段在 spec 里列了 4 种：`talk / q&a / task / solution`，代码 switch 都写了——但 **fixture 只有 talk 一种**。
+
+| 阶段 | 检查覆盖 | 用了什么样本 |
+|---|---|---|
+| spec | 类型枚举 4 种全列 | 假设值，无 fixture |
+| Task 0 fixture | 1 个 talk topic（185414442218552）| 缺 q&a/task/solution |
+| 第二轮（topic 14588214414288282）| 又是 talk | 同上 |
+| 单测 `renderZsxqTopicBodyHtml q&a` | **合成 mock**：`question.owner.name='Q', answer.owner.name='A'` | 测了 render 路径，**没测 author 选择路径** |
+| 端到端 5 + 4 轮稳定 | 都是 talk URL | 同上 |
+
+合成单测**只验证渲染出 提问/回答 section 的存在**，没断言 `buildZsxqAuthor(qaTopic)` 该返回谁。所以 4 个 case 的 author 决策逻辑里只有 `talk` 真实跑过；`q&a` 的 `body = talk ?? question ?? ...` 短路到 question——返回提问者——但单测无 author 断言无法触发。
+
+**根因**：附录 G 的"2 个样本"规则停在了"2 个真实 URL"层面，**没下沉到"覆盖所有 type 枚举值"**。
+
+### 修复
+
+`buildZsxqAuthor` 改为 type-aware：
+
+| topic.type | author 字段来源 |
+|---|---|
+| `talk` / `task` | `body.owner.name` |
+| `q&a` | `answer.owner` → `question.owner`（answerer = 星主 优先） |
+| `solution` | `solution.owner` → `task.owner` |
+
+加 fixture `zsxq-topic-qa-55188411525252124.json` + 2 个断言测试，**显式验证 `qaTopic.question?.owner.name === '投资致富' && qaTopic.answer?.owner.name === '释老毛'`**——这两个断言才是真正的回归保护，渲染 section 断言不算。
+
+### 为什么 spec 阶段没暴露
+
+我在 spec 里写了"talk / q&a / task / solution 都支持"，**但只有 talk 有详细字段表**（`talk.owner / talk.text / talk.images / talk.files / talk.article`）。q&a 的字段表是模糊的"question + answer"——**没有明确"哪个 owner 是用户期望的 author"**。
+
+回头看，spec 阶段应该问的问题：
+> 对每个 type，**哪个子结构的 owner 字段对应页面顶部头像/署名**？
+
+这个问题用合成数据答不出，必须**抓一个真实样本看 zsxq 自己怎么显示**。我没做，因为找不到自然的 q&a URL 入口（用户给的 URL 都是 talk）。
+
+### 可借鉴的新规则
+
+**spec 阶段的"type 枚举验收"清单**——当 API 返回的 type 字段有 N 个可能值，**fixture 必须覆盖至少 (N - rare 长尾)**，否则任何"按 type 分支的字段选择逻辑"都是 untested。
+
+具体三条：
+1. **如果 type 字段决定了下游字段选择**（title / author / published / content 哪里来），fixture 必须**每个 type 至少一个真实样本**
+2. **合成 mock 单测只能验证渲染管线连通**，不能替代真实 fixture 上的"业务字段断言"（"这个字段值应当 = X"）
+3. **当无法获得某 type 的真实 URL 时，在 spec 里显式标注"untested-in-real-data"**，并把该 type 的字段映射作为推测保留，等用户给样本后再验证
+
+### 把附录 G+H+I 合并成新基线 checklist
+
+**Spec 阶段抓 fixture 的最低门槛**（每个 extractor 立项前必填）：
+
+| 维度 | 最低样本数 | 验收 |
+|---|---|---|
+| **真实样本数**（G）| ≥ 2 | 不同作者 / 时间 / 内容形态 |
+| **URL host 覆盖**（H）| 站点所有可能内容页 host | grep 站点 "复制链接 / 分享" 出口 |
+| **type 枚举覆盖**（I）| 每个 type 字段值至少 1 个 | 端到端跑通 + 业务字段断言 |
+| 内嵌 tag 子集 audit | `grep -oE '<e type="[^"]+"'` 全集 | 覆盖每种 type |
+
+如果某维度无法满足（如 q&a 真实 URL 难找），spec 显式标注 "untested-in-real-data"，**不允许默默用合成数据冒充覆盖**。
+
+### 总结性观察
+
+- **commits 数**：1（fix + fixture + 2 tests）
+- **从用户报问题 → 端到端验证**：约 15 分钟
+- **新沉淀进 BACKLOG**：本附录 + 头部 commit 基线更新 + 新 type 枚举覆盖规则
+- **本次教训属于 spec 上游层级**：不是代码 bug 修不完，是**spec 的"枚举值覆盖"假设**没明确写出来。代码 switch 写齐 ≠ 测试覆盖齐，下次 spec checklist 加上"每 type 至少 1 真实 fixture"。
+
+**最大的认知更新**：附录 G→H→I 形成一个递进——**真实样本数 → URL host 数 → 字段枚举值数**。3 个维度都是"接口形态多样性"的不同切面，3 个都满足才算 spec 抓到真实需求。下次专项 extractor 立项前，用这个 3-维 checklist 走一遍。
 

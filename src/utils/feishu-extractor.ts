@@ -750,6 +750,103 @@ export function convertBlocksToHtml(blocks: FeishuBlock[]): string {
 	return renderChildren(pageBlock.children, blockMap);
 }
 
+const LIST_KINDS = [
+	FEISHU_BLOCK_TYPE.BULLET,
+	FEISHU_BLOCK_TYPE.ORDERED,
+	FEISHU_BLOCK_TYPE.TODO,
+] as const;
+type ListKind = typeof LIST_KINDS[number];
+
+// Structural blocks that close any open list when encountered as a sibling.
+// Anything not in this set and not a list kind is treated as a "follower"
+// (continuation content) that gets appended to the preceding <li>.
+const LIST_BOUNDARIES = new Set<number>([
+	FEISHU_BLOCK_TYPE.PAGE,
+	FEISHU_BLOCK_TYPE.HEADING1, FEISHU_BLOCK_TYPE.HEADING2, FEISHU_BLOCK_TYPE.HEADING3,
+	FEISHU_BLOCK_TYPE.HEADING4, FEISHU_BLOCK_TYPE.HEADING5, FEISHU_BLOCK_TYPE.HEADING6,
+	FEISHU_BLOCK_TYPE.HEADING7, FEISHU_BLOCK_TYPE.HEADING8, FEISHU_BLOCK_TYPE.HEADING9,
+	FEISHU_BLOCK_TYPE.CALLOUT,
+	FEISHU_BLOCK_TYPE.QUOTE_CONTAINER,
+	FEISHU_BLOCK_TYPE.GRID,
+	FEISHU_BLOCK_TYPE.TABLE,
+	FEISHU_BLOCK_TYPE.DIVIDER,
+	FEISHU_BLOCK_TYPE.IFRAME,
+]);
+
+function isListKind(t: number): t is ListKind {
+	return (LIST_KINDS as readonly number[]).includes(t);
+}
+
+function renderTodoItem(
+	block: FeishuBlock,
+	blockMap: Map<string, FeishuBlock>,
+	appendHtml = '',
+): string {
+	const done = (block.todo as any)?.style?.done === true;
+	const inner = renderTextElements(block.todo?.elements);
+	const children = renderBlockChildren(block, blockMap);
+	const checkbox = done ? '[x] ' : '[ ] ';
+	return `<li>${escapeHtml(checkbox)}${inner}${children}${appendHtml}</li>`;
+}
+
+// Accumulates a single logical list starting at childIds[startIdx].
+// - blocks of `kind` → new <li>, and any buffered followers flush to the
+//   PREVIOUS <li> (the one this block does NOT belong to)
+// - LIST_BOUNDARIES or a different list kind → close the list
+// - other blocks → buffered as followers (TEXT, IFRAME, IMAGE, FILE, QUOTE, …)
+// - on close, remaining followers flush to the LAST <li>
+function collectListGroup(
+	kind: ListKind,
+	childIds: string[],
+	startIdx: number,
+	blockMap: Map<string, FeishuBlock>,
+): { html: string; nextIdx: number } {
+	type Entry = { block: FeishuBlock; followerBlocks: FeishuBlock[] };
+	const entries: Entry[] = [];
+	let pendingFollowers: FeishuBlock[] = [];
+	let i = startIdx;
+
+	while (i < childIds.length) {
+		const b = blockMap.get(childIds[i]);
+		if (!b) { i++; continue; }
+
+		if (b.block_type === kind) {
+			if (entries.length > 0 && pendingFollowers.length > 0) {
+				entries[entries.length - 1].followerBlocks.push(...pendingFollowers);
+				pendingFollowers = [];
+			}
+			entries.push({ block: b, followerBlocks: [] });
+			i++;
+			continue;
+		}
+
+		if (isListKind(b.block_type) || LIST_BOUNDARIES.has(b.block_type)) {
+			break;
+		}
+
+		pendingFollowers.push(b);
+		i++;
+	}
+
+	if (entries.length > 0 && pendingFollowers.length > 0) {
+		entries[entries.length - 1].followerBlocks.push(...pendingFollowers);
+	}
+
+	const renderItem = kind === FEISHU_BLOCK_TYPE.TODO ? renderTodoItem : renderListItem;
+	const liHtml = entries.map(({ block, followerBlocks }) => {
+		const appendHtml = followerBlocks.map((fb) => renderBlock(fb, blockMap)).join('');
+		return renderItem(block, blockMap, appendHtml);
+	}).join('');
+
+	const openTag =
+		kind === FEISHU_BLOCK_TYPE.ORDERED ? '<ol>' :
+		kind === FEISHU_BLOCK_TYPE.TODO ? '<ul class="feishu-todo">' :
+		'<ul>';
+	const closeTag = kind === FEISHU_BLOCK_TYPE.ORDERED ? '</ol>' : '</ul>';
+
+	return { html: `${openTag}${liHtml}${closeTag}`, nextIdx: i };
+}
+
 function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>): string {
 	const parts: string[] = [];
 	let i = 0;
@@ -758,42 +855,15 @@ function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>):
 		const block = blockMap.get(childIds[i]);
 		if (!block) { i++; continue; }
 
-		if (block.block_type === FEISHU_BLOCK_TYPE.BULLET) {
-			const listItems: string[] = [];
-			while (i < childIds.length) {
-				const b = blockMap.get(childIds[i]);
-				if (!b || b.block_type !== FEISHU_BLOCK_TYPE.BULLET) break;
-				listItems.push(renderListItem(b, blockMap));
-				i++;
-			}
-			parts.push(`<ul>${listItems.join('')}</ul>`);
-			continue;
-		}
-
-		if (block.block_type === FEISHU_BLOCK_TYPE.ORDERED) {
-			const listItems: string[] = [];
-			while (i < childIds.length) {
-				const b = blockMap.get(childIds[i]);
-				if (!b || b.block_type !== FEISHU_BLOCK_TYPE.ORDERED) break;
-				listItems.push(renderListItem(b, blockMap));
-				i++;
-			}
-			parts.push(`<ol>${listItems.join('')}</ol>`);
-			continue;
-		}
-
-		if (block.block_type === FEISHU_BLOCK_TYPE.TODO) {
-			const listItems: string[] = [];
-			while (i < childIds.length) {
-				const b = blockMap.get(childIds[i]);
-				if (!b || b.block_type !== FEISHU_BLOCK_TYPE.TODO) break;
-				const done = (b.todo as any)?.style?.done === true;
-				const inner = renderTextElements(b.todo?.elements);
-				const checkbox = done ? '[x] ' : '[ ] ';
-				listItems.push(`<li>${escapeHtml(checkbox)}${inner}${renderBlockChildren(b, blockMap)}</li>`);
-				i++;
-			}
-			parts.push(`<ul class="feishu-todo">${listItems.join('')}</ul>`);
+		if (isListKind(block.block_type)) {
+			const { html, nextIdx } = collectListGroup(
+				block.block_type as ListKind,
+				childIds,
+				i,
+				blockMap,
+			);
+			parts.push(html);
+			i = nextIdx;
 			continue;
 		}
 
@@ -804,11 +874,15 @@ function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>):
 	return parts.join('');
 }
 
-function renderListItem(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderListItem(
+	block: FeishuBlock,
+	blockMap: Map<string, FeishuBlock>,
+	appendHtml = '',
+): string {
 	const body = getTextBody(block);
 	const inner = renderTextElements(body?.elements);
 	const children = renderBlockChildren(block, blockMap);
-	return `<li>${inner}${children}</li>`;
+	return `<li>${inner}${children}${appendHtml}</li>`;
 }
 
 function renderBlockChildren(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {

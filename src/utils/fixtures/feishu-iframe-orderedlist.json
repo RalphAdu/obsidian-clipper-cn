@@ -1,0 +1,118 @@
+[
+  {
+    "block_id": "page",
+    "block_type": 1,
+    "page": { "elements": [], "style": { "align": 1 } },
+    "children": ["intro", "ol1", "exp1", "ol2", "exp2", "ol3", "exp3", "ol4", "exp4", "iframe1"]
+  },
+  {
+    "block_id": "intro",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "跨学科思维模型对我帮助良多：", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  },
+  {
+    "block_id": "ol1",
+    "block_type": 13,
+    "parent_id": "page",
+    "ordered": {
+      "elements": [
+        { "text_run": { "content": "哲学的辩证：以退为进的破局", "text_element_style": { "bold": true, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1, "folded": false, "sequence": "1" }
+    }
+  },
+  {
+    "block_id": "exp1",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "停播七个月去打磨产品。", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  },
+  {
+    "block_id": "ol2",
+    "block_type": 13,
+    "parent_id": "page",
+    "ordered": {
+      "elements": [
+        { "text_run": { "content": "文学的觉察：看见数据背后的人", "text_element_style": { "bold": true, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1, "folded": false, "sequence": "auto" }
+    }
+  },
+  {
+    "block_id": "exp2",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "家长不是来学习复杂系统的，是来找答案的。", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  },
+  {
+    "block_id": "ol3",
+    "block_type": 13,
+    "parent_id": "page",
+    "ordered": {
+      "elements": [
+        { "text_run": { "content": "心理学：降低决策成本", "text_element_style": { "bold": true, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1, "folded": false, "sequence": "auto" }
+    }
+  },
+  {
+    "block_id": "exp3",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "成交的核心是更低的决策成本。", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  },
+  {
+    "block_id": "ol4",
+    "block_type": 13,
+    "parent_id": "page",
+    "ordered": {
+      "elements": [
+        { "text_run": { "content": "经济学：衡量隐性代价", "text_element_style": { "bold": true, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1, "folded": false, "sequence": "auto" }
+    }
+  },
+  {
+    "block_id": "exp4",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "机会成本的博弈。", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  },
+  {
+    "block_id": "iframe1",
+    "block_type": 26,
+    "parent_id": "page",
+    "iframe": {
+      "component": {
+        "iframe_type": 99,
+        "url": "https%3A%2F%2Fwww.join-tsinghua.edu.cn%2Febook%2Findex.html"
+      }
+    }
+  }
+]

@@ -644,8 +644,23 @@ export async function extractZsxqStructuredContent(doc: Document): Promise<ZsxqS
 	if (!topic) return null;
 
 	// Concurrently fetch comments + article body HTML.
+	// Comments retry: zsxq API intermittently returns an empty array (HTTP 200)
+	// when content-script fetch races SPA session warmup. Retry up to 3× with
+	// short backoff when the topic claims comments but we got none.
+	const expectedCount = topic.comments_count ?? 0;
+	const fetchCommentsWithRetry = async (): Promise<ZsxqComment[]> => {
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const got = await fetchZsxqAllComments(parsed.topicId).catch(() => [] as ZsxqComment[]);
+			if (got.length > 0 || expectedCount === 0) return got;
+			if (attempt < 2) {
+				logger.warn(`[comments] empty but expected ${expectedCount} — retry ${attempt + 1}/3`);
+				await sleep(800 * (attempt + 1));
+			}
+		}
+		return [];
+	};
 	const [comments, articleHtml] = await Promise.all([
-		fetchZsxqAllComments(parsed.topicId).catch(() => [] as ZsxqComment[]),
+		fetchCommentsWithRetry(),
 		topic.talk?.article?.article_id
 			? fetchZsxqArticleHtml(topic.talk.article.article_id).catch(() => null)
 			: Promise.resolve<string | null>(null),

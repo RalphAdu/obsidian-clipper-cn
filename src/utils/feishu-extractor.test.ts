@@ -107,3 +107,41 @@ describe('convertBlocksToHtml — list merging', () => {
 		expect(html).toContain('<h2>Next section</h2>');
 	});
 });
+
+describe('convertBlocksToHtml — mention_doc', () => {
+	it('renders mention_doc as <a href> using OpenAPI-provided url', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['t'] },
+			{
+				block_id: 't',
+				block_type: 2,
+				parent_id: 'p',
+				text: {
+					elements: [
+						{ text_run: { content: '书接上回：' } },
+						{ mention_doc: { title: '@包子', token: 'X0E', url: 'https://my.feishu.cn/docx/X0E', obj_type: 22 } },
+					],
+				},
+			} as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<a href="https://my.feishu.cn/docx/X0E">@包子</a>');
+	});
+
+	it('falls back to plain title when mention_doc.url is missing', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['t'] },
+			{
+				block_id: 't',
+				block_type: 2,
+				parent_id: 'p',
+				text: {
+					elements: [{ mention_doc: { title: '@旧引用', token: 'old', obj_type: 22 } }],
+				},
+			} as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('@旧引用');
+		expect(html).not.toContain('<a href');
+	});
+});

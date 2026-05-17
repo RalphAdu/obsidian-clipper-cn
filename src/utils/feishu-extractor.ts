@@ -41,7 +41,7 @@ interface FeishuTextBody {
 	elements?: Array<{
 		text_run?: FeishuTextRun;
 		mention_user?: FeishuMentionUser;
-		mention_doc?: { token?: string; title?: string; obj_type?: number; text_element_style?: FeishuTextElement['text_element_style'] };
+		mention_doc?: { token?: string; title?: string; obj_type?: number; url?: string; text_element_style?: FeishuTextElement['text_element_style'] };
 		equation?: { content?: string };
 	}>;
 	style?: {
@@ -621,7 +621,12 @@ function renderTextElements(elements: FeishuTextBody['elements'], opts: RenderTe
 		}
 
 		if (el.mention_doc?.title) {
-			return escapeHtml(el.mention_doc.title);
+			const title = escapeHtml(el.mention_doc.title);
+			const url = el.mention_doc.url;
+			if (url) {
+				return `<a href="${escapeAttr(url)}">${title}</a>`;
+			}
+			return title;
 		}
 
 		const run = el.text_run || el.mention_user;

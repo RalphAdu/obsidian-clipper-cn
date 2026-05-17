@@ -85,6 +85,7 @@ export interface FeishuBlock {
 	grid?: { column_size?: number };
 	grid_column?: object;
 	file?: { name?: string; token?: string; size?: number };
+	iframe?: { component?: { iframe_type?: number; url?: string } };
 	view?: object;
 	undefined_block?: object;
 }
@@ -967,7 +968,14 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 			return `<table data-feishu-sheet="${token}"></table>`;
 		}
 
-		case FEISHU_BLOCK_TYPE.IFRAME:
+		case FEISHU_BLOCK_TYPE.IFRAME: {
+			const rawUrl = block.iframe?.component?.url;
+			if (!rawUrl) return `<p>[Embedded content: type 26]</p>`;
+			const decoded = safeDecode(rawUrl);
+			const label = extractDomainLabel(decoded) || decoded;
+			return `<p>🌐 <a href="${escapeAttr(decoded)}">${escapeHtml(label)}</a></p>`;
+		}
+
 		case FEISHU_BLOCK_TYPE.WIDGET:
 		case FEISHU_BLOCK_TYPE.MINDNOTE:
 		case FEISHU_BLOCK_TYPE.DIAGRAM:
@@ -1082,4 +1090,19 @@ function escapeAttr(value: string): string {
 		.replace(/'/g, '&#39;')
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;');
+}
+
+function safeDecode(s: string): string {
+	try { return decodeURIComponent(s); } catch { return s; }
+}
+
+function extractDomainLabel(url: string): string {
+	try {
+		const u = new URL(url);
+		const hostname = u.hostname.replace(/^www\./, '');
+		const path = u.pathname && u.pathname !== '/' ? u.pathname : '';
+		return hostname + path;
+	} catch {
+		return '';
+	}
 }

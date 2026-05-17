@@ -961,6 +961,65 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
+		if (typedRequest.action === 'fetchZsxqImagesAsBase64') {
+			const urls = (typedRequest as any).urls as string[];
+			if (!Array.isArray(urls) || urls.length === 0) {
+				sendResponse({ success: false, error: 'Missing urls' });
+				return true;
+			}
+			(async () => {
+				const results: Record<string, string> = {};
+				await Promise.all(urls.map(async (url) => {
+					try {
+						const res = await fetch(url);
+						if (!res.ok) return;
+						const buf = await res.arrayBuffer();
+						const bytes = new Uint8Array(buf);
+						// Detect actual format from magic bytes; default to image/jpeg if absent.
+						let mime: string;
+						if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) mime = 'image/jpeg';
+						else if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) mime = 'image/png';
+						else if (bytes.length >= 3 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) mime = 'image/gif';
+						else if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) mime = 'image/webp';
+						else mime = (res.headers.get('Content-Type') || 'image/jpeg').split(';')[0].trim();
+						let bin = '';
+						for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+						results[url] = `data:${mime};base64,${btoa(bin)}`;
+					} catch (err) {
+						// best-effort; leave unresolved
+					}
+				}));
+				sendResponse({ success: true, results });
+			})();
+			return true;
+		}
+
+		if (typedRequest.action === 'fetchZsxqArticleHtml') {
+			const articleId = (typedRequest as any).articleId as string;
+			if (!articleId) {
+				sendResponse({ success: false, error: 'Missing articleId' });
+				return true;
+			}
+			(async () => {
+				try {
+					const res = await fetch(`https://articles.zsxq.com/id_${articleId}.html`);
+					if (!res.ok) {
+						sendResponse({ success: false, error: `HTTP ${res.status}`, html: null });
+						return;
+					}
+					const html = await res.text();
+					sendResponse({ success: true, html });
+				} catch (error) {
+					sendResponse({
+						success: false,
+						error: error instanceof Error ? error.message : String(error),
+						html: null,
+					});
+				}
+			})();
+			return true;
+		}
+
 		if (typedRequest.action === "sidePanelOpened") {
 			if (sender.tab && sender.tab.windowId) {
 				sidePanelOpenWindows.add(sender.tab.windowId);
@@ -1289,7 +1348,9 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			typedRequest.action === 'fetchBilibiliJson' ||
 			typedRequest.action === 'fetchFeishuApi' ||
 			typedRequest.action === 'fetchFeishuImage' ||
-			typedRequest.action === 'fetchScysImagesViaMainWorld') {
+			typedRequest.action === 'fetchScysImagesViaMainWorld' ||
+			typedRequest.action === 'fetchZsxqImagesAsBase64' ||
+			typedRequest.action === 'fetchZsxqArticleHtml') {
 			return true;
 		}
 	}

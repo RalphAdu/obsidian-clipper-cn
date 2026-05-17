@@ -39,23 +39,41 @@
 
 ---
 
-## 关键不确定点（Task 0 实测前的假设）
+## Task 0 实测结果（已完成）
 
-| 假设 | 验证方式 | 如错的应对 |
-|---|---|---|
-| API host = `api.zsxq.com` | Task 0 浏览器 DevTools 看 Network | 改用实测 host |
-| Topic API = `GET /v2/topics/{topicId}` | Task 0 | 改用实测 path |
-| Comment API = `GET /v2/topics/{topicId}/comments?count=30&end_time={iso}` | Task 0 | 改用实测 path + 参数 |
-| Article API（专栏）= 同 topic 或 `/v2/articles/{id}` | Task 0 | 改用实测 path |
-| 评论返回扁平数组 + `parent_comment_id` 字段 | Task 0 + Task 4 | 启发式：按 time + repliee.user_id 配对 |
-| 不需要自定义签名头（仅 cookie） | Task 0 | 降级 background fetch + executeScript MAIN-world |
-| 图床域名（zsxq images CDN） | Task 0 | 加实测域名到 host_permissions |
+| 项目 | 实测确认 |
+|---|---|
+| Topic API | `GET https://api.zsxq.com/v2/topics/{id}/info`（注意 `/info` 后缀）→ `{ succeeded, resp_data: { topic, type } }` |
+| Comments API | `GET https://api.zsxq.com/v2/topics/{id}/comments?count=30[&end_time=ISO]`，**默认按 desc 排序**；`sort=asc` 实测返回空数组 |
+| 评论结构 | 嵌套：top-level `comments[]`，每条带 `replied_comments[]`（即子回复）。**深度恒为 2**（reply 无子 reply）。回复节点含 `parent_comment_id` + `repliee` |
+| Topic 正文 | `topic.talk.text` 是 **205 字摘要**，不是全文；正文全文在 `https://articles.zsxq.com/id_{article_id}.html` 的 `<div class="content ql-editor">` 节点 |
+| Article body API | `GET /v2/articles/{id}` 返回 `权限不足`（code 1030），**不能用**；改抓 articles.zsxq.com 的 HTML，解析 `.ql-editor` 节点 |
+| 签名头 | 不需要自定义头，content-script `credentials: 'include'` 同源 fetch 即可 |
+| 图床域名 | 两个：`https://images.zsxq.com/*`（头像/普通图）+ `https://article-images.zsxq.com/*`（文章正文图） |
+| Article HTML 抓取 | 来自 articles.zsxq.com 跨 origin；从 wx.zsxq.com 直接 fetch 会触发 CORS（实测 "Failed to fetch"），**必须走 background fetch + host_permissions** |
 
-Task 0 完成后**回填到本 plan 与 spec**，再开 Task 1 后续。
+**Fixture 文件（已落地）**：
+- `src/utils/fixtures/zsxq-topic-185414442218552.json` — topic /info 响应
+- `src/utils/fixtures/zsxq-comments-185414442218552.json` — comments 全部页拼合（54 条总数：27 top + 27 nested）
+- `src/utils/fixtures/zsxq-article-qleditor-0rpvzt86eie6.html` — 文章 `.ql-editor` 节点 outerHTML（10162 字符 HTML / 6560 字符纯文本）
+
+**关键字段名实测**：
+
+Topic：`succeeded, resp_data.topic.{type, topic_id, talk: {owner: {user_id, name, avatar_url}, text, images?, files?, article?: {title, article_id, article_url, inline_article_url}}, likes_count, comments_count}`
+
+Comment（top-level）：`{comment_id, create_time(ISO8601), text, owner: {user_id, name, avatar_url, location?, alias?}, likes_count, group_owner_liked, topic_owner_liked, rewards_count, sticky, images?, replies_count, replied_comments?: ZsxqReply[]}`
+
+Reply：`{comment_id, parent_comment_id, create_time, text, owner: {...}, repliee: {user_id, name, avatar_url}, likes_count, ...}`
 
 ---
 
-## Task 0: 准备真实 API fixture（全自动）
+## Task 0: 准备真实 API fixture（全自动） — ✅ 已完成（见上方实测结果）
+
+跳过 Task 0 步骤；fixture 已 commit `1ec9161`。
+
+---
+
+## Task 0 原始流程（仅供回归参考，不再执行）
 
 **前提**：claude-in-chrome MCP 已连接、`wx.zsxq.com` 在某 tab 已登录会话有效
 

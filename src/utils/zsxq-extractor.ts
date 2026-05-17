@@ -335,6 +335,149 @@ export function renderZsxqCommentsHtml(comments: ZsxqComment[], totalCount: numb
 	return `<hr/><h2>💬 全部评论（${totalCount} 条）</h2>${bodies}`;
 }
 
+// ─── API fetching ───────────────────────────────────────────────────────────
+// Topic detail:  GET https://api.zsxq.com/v2/topics/{id}/info
+//                Returns { succeeded, resp_data: { type:'topic', topic } }.
+// Comments:      GET https://api.zsxq.com/v2/topics/{id}/comments?count=30[&end_time=ISO]
+//                Default sort=desc. Paginate using the last comment's
+//                create_time as end_time. Stop on short page or PAGE_CAP.
+// Article body:  GET https://articles.zsxq.com/id_{article_id}.html
+//                Full SSR HTML; extract .ql-editor block. CORS-blocked from
+//                wx.zsxq.com when called from content script — fall through to
+//                background handler (Task 8) which uses host_permissions.
+
+const ZSXQ_API_BASE = 'https://api.zsxq.com/v2';
+const ZSXQ_ARTICLES_BASE = 'https://articles.zsxq.com';
+const COMMENTS_PAGE_SIZE = 30;
+const COMMENTS_PAGE_CAP = 50;
+const COMMENTS_PAGE_DELAY_MS = 200;
+
+export async function fetchZsxqTopic(topicId: string): Promise<ZsxqTopic | null> {
+	try {
+		const res = await fetch(`${ZSXQ_API_BASE}/topics/${topicId}/info`, { credentials: 'include' });
+		if (!res.ok) {
+			logger.warn(`[topic] HTTP ${res.status}`);
+			return null;
+		}
+		const json = await res.json();
+		if (!json?.succeeded) {
+			logger.warn(`[topic] succeeded=false (topicId=${topicId})`);
+			return null;
+		}
+		const topic = json?.resp_data?.topic;
+		if (!topic) {
+			logger.warn(`[topic] unexpected response shape (topicId=${topicId})`);
+			return null;
+		}
+		return topic as ZsxqTopic;
+	} catch (err) {
+		logger.warn(`[topic] fetch error: ${String(err)}`);
+		return null;
+	}
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function fetchZsxqAllComments(topicId: string): Promise<ZsxqComment[]> {
+	const all: ZsxqComment[] = [];
+	let endTime: string | undefined;
+	let page = 1;
+	while (true) {
+		if (page > COMMENTS_PAGE_CAP) {
+			logger.warn(`[comments] page cap (${COMMENTS_PAGE_CAP}) reached for topic=${topicId}`);
+			break;
+		}
+		const params = new URLSearchParams({ count: String(COMMENTS_PAGE_SIZE) });
+		if (endTime) params.set('end_time', endTime);
+		const url = `${ZSXQ_API_BASE}/topics/${topicId}/comments?${params.toString()}`;
+		let json: any;
+		try {
+			const res = await fetch(url, { credentials: 'include' });
+			if (!res.ok) {
+				logger.warn(`[comments page=${page}] HTTP ${res.status}`);
+				break;
+			}
+			json = await res.json();
+		} catch (err) {
+			logger.warn(`[comments page=${page}] fetch error: ${String(err)}`);
+			break;
+		}
+		const pageItems: ZsxqComment[] = Array.isArray(json?.resp_data?.comments) ? json.resp_data.comments : [];
+		all.push(...pageItems);
+		if (pageItems.length < COMMENTS_PAGE_SIZE) break;
+		endTime = pageItems[pageItems.length - 1].create_time;
+		page++;
+		await sleep(COMMENTS_PAGE_DELAY_MS);
+	}
+	return all;
+}
+
+// Extract just the ql-editor block (outerHTML) from a full SSR HTML doc.
+// Articles always have exactly one `<div class="content ql-editor">…</div>`
+// container holding the entire body; everything else is layout chrome.
+function extractQlEditorBlock(fullHtml: string): string | null {
+	// Find the opening tag.
+	const openRe = /<div\s+class="[^"]*\bql-editor\b[^"]*"[^>]*>/i;
+	const openMatch = openRe.exec(fullHtml);
+	if (!openMatch) return null;
+	const openIdx = openMatch.index;
+	// Walk forward counting balanced <div>/</div> tags to find the matching close.
+	const tagRe = /<\/?div\b[^>]*>/gi;
+	tagRe.lastIndex = openIdx;
+	let depth = 0;
+	let m: RegExpExecArray | null;
+	while ((m = tagRe.exec(fullHtml)) !== null) {
+		if (m[0].startsWith('</')) {
+			depth--;
+			if (depth === 0) {
+				const end = m.index + m[0].length;
+				return fullHtml.slice(openIdx, end);
+			}
+		} else {
+			depth++;
+		}
+	}
+	return null;
+}
+
+export async function fetchZsxqArticleHtml(articleId: string): Promise<string | null> {
+	const articleUrl = `${ZSXQ_ARTICLES_BASE}/id_${articleId}.html`;
+
+	// L1: same-origin fetch (works only if the content script happens to be on
+	// articles.zsxq.com; from wx.zsxq.com this fails with CORS).
+	let fullHtml: string | null = null;
+	try {
+		const res = await fetch(articleUrl, { credentials: 'include' });
+		if (res.ok) {
+			fullHtml = await res.text();
+		} else {
+			logger.warn(`[article-html L1] HTTP ${res.status}`);
+		}
+	} catch (err) {
+		logger.warn(`[article-html L1] fetch error: ${String(err)}`);
+	}
+
+	// L2: dispatch to background — uses host_permissions to bypass CORS.
+	if (!fullHtml && typeof browser !== 'undefined' && browser?.runtime?.sendMessage) {
+		try {
+			const resp = await browser.runtime.sendMessage({
+				action: 'fetchZsxqArticleHtml',
+				articleId,
+			}) as { success?: boolean; html?: string };
+			if (resp?.success && typeof resp.html === 'string') {
+				fullHtml = resp.html;
+			}
+		} catch (err) {
+			logger.warn(`[article-html L2] error: ${String(err)}`);
+		}
+	}
+
+	if (!fullHtml) return null;
+	return extractQlEditorBlock(fullHtml);
+}
+
 export function parseZsxqUrl(url: string): ZsxqUrlInfo | null {
 	try {
 		const u = new URL(url);

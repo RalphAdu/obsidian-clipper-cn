@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
@@ -8,6 +8,9 @@ import {
 	parseZsxqInlineText,
 	renderZsxqTopicBodyHtml,
 	renderZsxqCommentsHtml,
+	fetchZsxqTopic,
+	fetchZsxqAllComments,
+	fetchZsxqArticleHtml,
 	type ZsxqTopic,
 	type ZsxqComment,
 } from './zsxq-extractor';
@@ -404,5 +407,124 @@ describe('renderZsxqCommentsHtml', () => {
 		const out = renderZsxqCommentsHtml([c], 1);
 		expect(out).toContain('feishu-image://zsxq:');
 		expect(out).toContain(encodeURIComponent('https://x/a.jpg'));
+	});
+});
+
+describe('fetchZsxqTopic', () => {
+	const originalFetch = globalThis.fetch;
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+		vi.restoreAllMocks();
+	});
+
+	it('hits the /info endpoint and returns resp_data.topic on success', async () => {
+		const fetchMock = vi.fn(async (url: any) => {
+			expect(String(url)).toBe('https://api.zsxq.com/v2/topics/12345/info');
+			return new Response(JSON.stringify({
+				succeeded: true,
+				resp_data: { type: 'topic', topic: { topic_id: 12345, type: 'talk', create_time: '', likes_count: 0, comments_count: 0 } },
+			}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+		});
+		globalThis.fetch = fetchMock as any;
+		const t = await fetchZsxqTopic('12345');
+		expect(t).toBeTruthy();
+		expect(t!.topic_id).toBe(12345);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('returns null on non-2xx', async () => {
+		globalThis.fetch = vi.fn(async () => new Response('nope', { status: 401 })) as any;
+		expect(await fetchZsxqTopic('1')).toBeNull();
+	});
+
+	it('returns null when succeeded=false', async () => {
+		globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ succeeded: false }), { status: 200 })) as any;
+		expect(await fetchZsxqTopic('1')).toBeNull();
+	});
+
+	it('returns null on network error', async () => {
+		globalThis.fetch = vi.fn(async () => { throw new Error('boom'); }) as any;
+		expect(await fetchZsxqTopic('1')).toBeNull();
+	});
+});
+
+describe('fetchZsxqAllComments', () => {
+	const originalFetch = globalThis.fetch;
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+		vi.restoreAllMocks();
+	});
+
+	function makeComment(id: number, time: string): any {
+		return {
+			comment_id: id, create_time: time, text: `c${id}`,
+			owner: { user_id: 1, name: 'a', avatar_url: '' },
+			likes_count: 0, group_owner_liked: false, topic_owner_liked: false,
+			rewards_count: 0, sticky: false,
+		};
+	}
+
+	it('stops when a page returns fewer than 30 comments', async () => {
+		const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+			succeeded: true,
+			resp_data: { comments: [makeComment(1, '2024-01-01T00:00:00+0800')] },
+		}), { status: 200 }));
+		globalThis.fetch = fetchMock as any;
+		const out = await fetchZsxqAllComments('99');
+		expect(out).toHaveLength(1);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('paginates with end_time of last comment until a short page', async () => {
+		const page1 = Array.from({ length: 30 }, (_, i) => makeComment(i + 1, `2024-01-${String(i + 1).padStart(2, '0')}T00:00:00+0800`));
+		const page2 = [makeComment(31, '2024-02-01T00:00:00+0800')];
+		const calls: string[] = [];
+		globalThis.fetch = vi.fn(async (url: any) => {
+			calls.push(String(url));
+			const body = calls.length === 1
+				? { succeeded: true, resp_data: { comments: page1 } }
+				: { succeeded: true, resp_data: { comments: page2 } };
+			return new Response(JSON.stringify(body), { status: 200 });
+		}) as any;
+		const out = await fetchZsxqAllComments('99');
+		expect(out).toHaveLength(31);
+		expect(calls).toHaveLength(2);
+		// 2nd call must carry end_time matching the last comment's create_time.
+		expect(calls[1]).toContain('end_time=');
+		expect(calls[1]).toContain(encodeURIComponent(page1[page1.length - 1].create_time));
+	});
+
+	it('returns [] when first page errors', async () => {
+		globalThis.fetch = vi.fn(async () => new Response('boom', { status: 500 })) as any;
+		expect(await fetchZsxqAllComments('1')).toEqual([]);
+	});
+});
+
+describe('fetchZsxqArticleHtml', () => {
+	const originalFetch = globalThis.fetch;
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+		vi.restoreAllMocks();
+	});
+
+	it('extracts the .ql-editor outerHTML from a full SSR page', async () => {
+		const wrapped = `<!doctype html><html><body>${articleHtmlFixture}</body></html>`;
+		globalThis.fetch = vi.fn(async () => new Response(wrapped, { status: 200 })) as any;
+		const out = await fetchZsxqArticleHtml('0rpvzt86eie6');
+		expect(out).toBeTruthy();
+		expect(out!.startsWith('<div class="content ql-editor">')).toBe(true);
+		expect(out!.endsWith('</div>')).toBe(true);
+	});
+
+	it('returns null when no ql-editor block is present and background path is unavailable', async () => {
+		globalThis.fetch = vi.fn(async () => new Response('<html><body>nope</body></html>', { status: 200 })) as any;
+		// browser.runtime.sendMessage will resolve to {} per mock — no html means null.
+		const out = await fetchZsxqArticleHtml('xxx');
+		expect(out).toBeNull();
+	});
+
+	it('returns null on network error', async () => {
+		globalThis.fetch = vi.fn(async () => { throw new Error('cors'); }) as any;
+		expect(await fetchZsxqArticleHtml('xxx')).toBeNull();
 	});
 });

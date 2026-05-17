@@ -53,4 +53,57 @@ describe('convertBlocksToHtml — list merging', () => {
 		expect(html).not.toMatch(/<\/ol>\s*<p>停播七个月/);
 		expect(html).not.toMatch(/<\/ol>\s*<p>家长/);
 	});
+
+	it('closes the current <ol> when a HEADING block appears between OL items', () => {
+		const b: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['o1', 'h', 'o2'] },
+			{ block_id: 'o1', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'first' } }], style: { sequence: '1' } } } as any,
+			{ block_id: 'h', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: 'Section' } }] } } as any,
+			{ block_id: 'o2', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'second' } }], style: { sequence: '1' } } } as any,
+		];
+		const html = convertBlocksToHtml(b);
+		const olMatches = html.match(/<ol>/g);
+		expect(olMatches?.length).toBe(2);
+		expect(html).toContain('<h2>Section</h2>');
+	});
+
+	it('closes the current <ol> when a BULLET block appears (different list kind acts as boundary)', () => {
+		const b: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['o1', 'u1', 'o2'] },
+			{ block_id: 'o1', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'ord' } }] } } as any,
+			{ block_id: 'u1', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'bul' } }] } } as any,
+			{ block_id: 'o2', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'ord2' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(b);
+		expect(html.match(/<ol>/g)?.length).toBe(2);
+		expect(html.match(/<ul>/g)?.length).toBe(1);
+		expect(html.indexOf('<ul>')).toBeGreaterThan(html.indexOf('<ol>'));
+		expect(html.lastIndexOf('<ol>')).toBeGreaterThan(html.indexOf('<ul>'));
+	});
+
+	it('preserves TODO checkboxes and merges interleaved TEXT into preceding <li>', () => {
+		const b: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['td1', 'tx', 'td2'] },
+			{ block_id: 'td1', block_type: 17, parent_id: 'p', todo: { elements: [{ text_run: { content: 'task one' } }], style: { done: false } } } as any,
+			{ block_id: 'tx', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: 'note for task one' } }] } } as any,
+			{ block_id: 'td2', block_type: 17, parent_id: 'p', todo: { elements: [{ text_run: { content: 'task two' } }], style: { done: true } } } as any,
+		];
+		const html = convertBlocksToHtml(b);
+		expect(html.match(/<ul class="feishu-todo">/g)?.length).toBe(1);
+		expect(html).toContain('[ ] task one<p>note for task one</p>');
+		expect(html).toContain('[x] task two');
+	});
+
+	it('flushes trailing followers (TEXT after the last OL) into the last <li>', () => {
+		const b: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['o1', 'tx', 'h'] },
+			{ block_id: 'o1', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'item' } }] } } as any,
+			{ block_id: 'tx', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: 'tail note' } }] } } as any,
+			{ block_id: 'h', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: 'Next section' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(b);
+		expect(html).toContain('<li>item<p>tail note</p></li>');
+		expect(html).not.toMatch(/<\/ol>\s*<p>tail note/);
+		expect(html).toContain('<h2>Next section</h2>');
+	});
 });

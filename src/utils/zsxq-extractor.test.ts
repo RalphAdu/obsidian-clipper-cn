@@ -163,6 +163,31 @@ describe('parseZsxqInlineText', () => {
 	});
 });
 
+// Real q&a fixture: questioner (投资致富) asks 星主 (释老毛) about index funds.
+// Page UI shows 释老毛 (answerer) as topic owner; 投资致富 only appears as
+// "投资致富 提问：…" inside the question body.
+const qaFixture = JSON.parse(
+	readFileSync(join(FIXTURE_DIR, 'zsxq-topic-qa-55188411525252124.json'), 'utf8'),
+);
+
+describe('q&a topic — author resolves to the answerer, not the questioner', () => {
+	const qaTopic: ZsxqTopic = qaFixture.resp_data.topic;
+
+	it('fixture is shaped as a q&a topic with both question and answer', () => {
+		expect(qaTopic.type).toBe('q&a');
+		expect(qaTopic.question?.owner.name).toBe('投资致富');
+		expect(qaTopic.answer?.owner.name).toBe('释老毛');
+	});
+
+	it('renderZsxqTopicBodyHtml emits both 🙋 提问 and 💡 回答 sections', () => {
+		const html = renderZsxqTopicBodyHtml(qaTopic, null);
+		expect(html).toContain('🙋 提问');
+		expect(html).toContain('💡 回答');
+		expect(html).toContain('巨师好'); // start of question text
+		expect(html).toContain('凡是名字叫红利的都大同小异'); // start of answer text
+	});
+});
+
 describe('renderZsxqTopicBodyHtml', () => {
 	const topic: ZsxqTopic = topicFixture.resp_data.topic;
 

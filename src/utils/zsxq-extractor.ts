@@ -729,7 +729,19 @@ function buildZsxqTitle(topic: ZsxqTopic): string {
 }
 
 function buildZsxqAuthor(topic: ZsxqTopic): string {
-	const body = topic.talk ?? topic.question ?? topic.task ?? topic.solution;
+	// For q&a topics, the topic "owner" displayed on the page is the answerer
+	// (the 星主 being asked), not the questioner. zsxq's web UI shows the
+	// answerer's avatar + name at the top of the post; the questioner appears
+	// inside the question body. Prefer answer.owner.name when available.
+	if (topic.type === 'q&a') {
+		return topic.answer?.owner?.name ?? topic.question?.owner?.name ?? '';
+	}
+	// For solution topics, the solver is the "owner" of the topic (the task
+	// itself was posted by someone else); prefer solution.owner.
+	if (topic.type === 'solution') {
+		return topic.solution?.owner?.name ?? topic.task?.owner?.name ?? '';
+	}
+	const body = topic.talk ?? topic.task;
 	return body?.owner?.name ?? '';
 }
 

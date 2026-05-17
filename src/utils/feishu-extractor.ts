@@ -769,6 +769,25 @@ export function convertBlocksToHtml(blocks: FeishuBlock[]): string {
 	return renderChildren(pageBlock.children, blockMap, headingNumbers);
 }
 
+/**
+ * Returns true if `block` is a TEXT block whose every non-empty `text_run`
+ * element is bold — the feishu-web convention for an inline section header
+ * placed between two list groups (e.g. "家长的痛点：" above a bullet list).
+ *
+ * Empty TEXTs (spacers) → false. Plain TEXTs (explanation paragraphs) → false.
+ */
+export function isSectionHeaderText(block: FeishuBlock): boolean {
+	if (block.block_type !== FEISHU_BLOCK_TYPE.TEXT) return false;
+	const elements = block.text?.elements || [];
+	const nonEmpty = elements.filter(
+		(e) => (e.text_run?.content || '').trim().length > 0,
+	);
+	if (nonEmpty.length === 0) return false;
+	return nonEmpty.every(
+		(e) => e.text_run?.text_element_style?.bold === true,
+	);
+}
+
 const LIST_KINDS = [
 	FEISHU_BLOCK_TYPE.BULLET,
 	FEISHU_BLOCK_TYPE.ORDERED,
@@ -842,6 +861,13 @@ function collectListGroup(
 		}
 
 		if (isListKind(b.block_type) || LIST_BOUNDARIES.has(b.block_type)) {
+			break;
+		}
+
+		// A bold-only TEXT block is the feishu convention for a section header
+		// (e.g., "家长的痛点：" above a bullet list). Close the current list so
+		// the header renders as its own <p><strong>…</strong></p> paragraph.
+		if (isSectionHeaderText(b)) {
 			break;
 		}
 

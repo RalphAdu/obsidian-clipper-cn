@@ -174,3 +174,48 @@ describe('convertBlocksToHtml — H1 auto-numbering', () => {
 		expect(html).not.toMatch(/<h\d>\d+\./);
 	});
 });
+
+describe('convertBlocksToHtml — section header boundary', () => {
+	it('an all-bold non-empty TEXT block between BULLET lists closes the first <ul>', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['u1', 'sh', 'u2'] },
+			{ block_id: 'u1', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'first item' } }] } } as any,
+			{
+				block_id: 'sh',
+				block_type: 2,
+				parent_id: 'p',
+				text: {
+					elements: [{ text_run: { content: '家长的痛点：', text_element_style: { bold: true } } }],
+				},
+			} as any,
+			{ block_id: 'u2', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'second item' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html.match(/<ul>/g)?.length).toBe(2);
+		expect(html).toContain('<p><strong>家长的痛点：</strong></p>');
+		expect(html).not.toMatch(/<li>[^<]*家长的痛点：/);
+	});
+
+	it('a non-bold TEXT block between OL lists still gets absorbed (no regression)', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['o1', 'tx', 'o2'] },
+			{ block_id: 'o1', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'one' } }] } } as any,
+			{ block_id: 'tx', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: 'plain explanation', text_element_style: { bold: false } } }] } } as any,
+			{ block_id: 'o2', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'two' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html.match(/<ol>/g)?.length).toBe(1);
+		expect(html).toContain('<li>one<p>plain explanation</p></li>');
+	});
+
+	it('a spacer-style empty bold TEXT is not a boundary (gets absorbed silently)', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['u1', 'sp', 'u2'] },
+			{ block_id: 'u1', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'first' } }] } } as any,
+			{ block_id: 'sp', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: '', text_element_style: { bold: true } } }] } } as any,
+			{ block_id: 'u2', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'second' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html.match(/<ul>/g)?.length).toBe(1);
+	});
+});

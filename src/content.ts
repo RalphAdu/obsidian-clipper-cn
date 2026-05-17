@@ -14,6 +14,7 @@ import { createLogger } from './utils/logger';
 import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bilibili-extractor';
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
+import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl } from './utils/zsxq-extractor';
 import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
@@ -280,6 +281,12 @@ declare global {
 					return null;
 				})
 				: null;
+			const zsxqContent = (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL))
+				? await extractZsxqStructuredContent(document).catch((error) => {
+					contentLogger.warn('Failed to extract zsxq structured content', { error: String(error) });
+					return null;
+				})
+				: null;
 			const extractedContent: { [key: string]: string } = {
 				...defuddled.variables,
 			};
@@ -351,8 +358,8 @@ declare global {
 					: null;
 
 				const response: ContentResponse = {
-					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || defuddled.author,
-					content: bilibiliContent?.structuredHtml || feishuContent?.content || scysContent?.content || weChatArticleContent || defuddled.content,
+					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || defuddled.author,
+					content: bilibiliContent?.structuredHtml || feishuContent?.content || scysContent?.content || zsxqContent?.content || weChatArticleContent || defuddled.content,
 					description: bilibiliContent?.description || defuddled.description,
 					domain: getDomain(document.URL),
 					extractedContent: extractedContent,
@@ -365,9 +372,9 @@ declare global {
 					published: bilibiliContent?.published || defuddled.published,
 					schemaOrgData: defuddled.schemaOrgData,
 					selectedHtml: selectedHtml,
-					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : defuddled.site,
-					title: bilibiliContent?.title || feishuContent?.title || scysContent?.title || defuddled.title,
-					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || defuddled.wordCount,
+					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : defuddled.site,
+					title: bilibiliContent?.title || feishuContent?.title || scysContent?.title || zsxqContent?.title || defuddled.title,
+					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || zsxqContent?.wordCount || defuddled.wordCount,
 					metaTags: defuddled.metaTags || []
 				};
 				if (response.title) {
@@ -617,21 +624,25 @@ declare global {
 		const data = event.data;
 		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
 		const origin = location.hostname;
-		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$/.test(origin)) return;
+		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$/.test(origin)) return;
 		const testId = data.testId;
 		const key = '__obsidianClipperTestResult__:' + testId;
 		try {
 			localStorage.setItem(key, JSON.stringify({ status: 'running' }));
 
-			// Route by URL: scys.com → scys-extractor; feishu/lark → feishu-extractor.
+			// Route by URL: scys.com → scys-extractor; feishu/lark → feishu-extractor;
+			// wx.zsxq.com → zsxq-extractor.
 			let result: { title?: string; content?: string } | null = null;
-			let source: 'scys' | 'feishu' | null = null;
+			let source: 'scys' | 'feishu' | 'zsxq' | null = null;
 			if (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL) || isScysArticleUrl(document.URL)) {
 				result = await extractScysStructuredContent(document);
 				source = 'scys';
 			} else if (isFeishuDocUrl(document.URL)) {
 				result = await extractFeishuStructuredContent(document);
 				source = 'feishu';
+			} else if (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL)) {
+				result = await extractZsxqStructuredContent(document);
+				source = 'zsxq';
 			} else {
 				localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'unsupported url for bridge' }));
 				return;
@@ -664,7 +675,7 @@ declare global {
 				favicon: '',
 				image: '',
 				published: '',
-				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : '',
+				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : '',
 				language: '',
 				wordCount: (result as any)?.wordCount || 0,
 				extractedContent: simulatedExtractedContent,

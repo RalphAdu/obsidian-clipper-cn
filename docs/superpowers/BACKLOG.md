@@ -1664,3 +1664,26 @@ zsxq 是 cn fork 独有 feature，**不计划上游化**（知识星球是中文
 
 **最大的认知更新**：附录 G→H→I 形成一个递进——**真实样本数 → URL host 数 → 字段枚举值数**。3 个维度都是"接口形态多样性"的不同切面，3 个都满足才算 spec 抓到真实需求。下次专项 extractor 立项前，用这个 3-维 checklist 走一遍。
 
+
+
+---
+
+## 2026-05-17 反思：audit 漏掉「评论裁剪丢失」
+
+**症状**：feishu-audit-tool 报 `PASS — 0 misses across 10 buckets`，但用户实际裁剪到 Obsidian 后 .md 完全没有评论区。
+
+**根因（两个独立 bug，audit 都漏）**：
+
+1. **IPC unwrap 错位**：`fetchFeishuComments` 通过 `browser.runtime.sendMessage` 调 `fetchFeishuApi` action，background 返回 `{success, data: <OpenAPI 完整响应>}`，OpenAPI 响应又是 `{code, data: <payload>, msg}` ——客户端代码当成 `resp.data = payload` 用，少 unwrap 一层 `data`，永远返 0 条评论。audit-tool 用原生 Node `fetch` 绕过了这条链路，所以一直绿。
+
+2. **Markdown 接缝错位**：评论 markdown 之前被 tail-append 到 HTML `content` 末尾，下游 `createMarkdownContent` 整体过 turndown——markdown 符号被转义/吞掉，Obsidian 看不到任何评论。audit-tool 是「先 turndown 再拼 markdown」，接缝在 turndown 之后，也绕过了这个 bug。
+
+**audit 的盲区性质**：audit-tool 走了一条**与生产不同的 pipeline**——既不经过 IPC，也不在同一个位置拼接。它验证了"OpenAPI 数据→期望 markdown"，但没验证"生产代码能否产出那个 markdown"。
+
+**修复**：commit `6c8d8d9` 修 Bug 1（统一走 `fetchFeishuApi`），commit `ed5d59c` 修 Bug 2（评论走 `extractedContent.commentsMarkdown` 通道，在 turndown 之后追加）。新增 `src/utils/feishu-comments.integration.test.ts` 用 mock `browser.runtime.sendMessage` 跑生产代码路径，覆盖两类 bug。
+
+**沉淀给未来 audit 的纪律**：
+- audit 工具不是生产的替代——它验证"约定知识库 vs 输出"，但不能保证"生产代码到那个输出"。任何新增 IPC 接缝/markdown 转换接缝都要补一条 vitest 集成测试。
+- 视觉验收若声称"通过"，必须基于**生产产物**（真实 Obsidian vault `.md`）或与生产同形态的渲染产物，不能只读 audit-tool 的中间产物。
+
+**未来可选升级（BACKLOG）**：playwright headless 加载扩展、自动裁剪、拦截 `obsidian://` URL、提取 content 参数、用 audit-tool 校验。代价：脚本依赖重 + Chrome 版本脱手。当前 mock-based 集成测试已覆盖两类根因 bug。

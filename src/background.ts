@@ -751,6 +751,39 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
+		if (typedRequest.action === 'fetchFeishuCommentImage') {
+			const token = (typedRequest as any).token as string;
+			if (!token) {
+				sendResponse({ success: false, error: 'Missing token' });
+				return true;
+			}
+			(async () => {
+				try {
+					const tenantToken = await getFeishuTenantToken();
+					const resp = await fetch(
+						`https://open.feishu.cn/open-apis/drive/v1/medias/${encodeURIComponent(token)}/download`,
+						{ headers: { Authorization: `Bearer ${tenantToken}` } },
+					);
+					if (!resp.ok) {
+						sendResponse({ success: false, error: `HTTP ${resp.status}` });
+						return;
+					}
+					const mime = resp.headers.get('content-type') || 'image/png';
+					const buf = await resp.arrayBuffer();
+					const bytes = new Uint8Array(buf);
+					let binary = '';
+					for (let i = 0; i < bytes.byteLength; i++) {
+						binary += String.fromCharCode(bytes[i]);
+					}
+					const base64 = btoa(binary);
+					sendResponse({ success: true, mime, base64 });
+				} catch (e) {
+					sendResponse({ success: false, error: String(e) });
+				}
+			})();
+			return true;
+		}
+
 		if (typedRequest.action === 'getFeishuApiHost') {
 			const tabId = sender.tab?.id;
 			if (!tabId) {

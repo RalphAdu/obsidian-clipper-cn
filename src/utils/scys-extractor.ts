@@ -796,6 +796,29 @@ export function renderScysArticleComments(items: ScysArticleComment[], total: nu
 	return `<hr><h2>💬 评论（${total} 条）</h2>${bodies}`;
 }
 
+// Convert scys "plain-text articleContent" (no <p>/<div>) into proper HTML:
+//   1. <e type="web" href="URL-encoded" title="URL-encoded" />  →  <a href="…">…</a>
+//   2. Split on blank lines (\n\n+) into paragraphs; inner single \n → <br>.
+// Without this defuddle treats the whole blob as one paragraph since there's
+// no block-level structure to anchor on.
+export function preprocessScysEntityHtml(html: string): string {
+	// 1. Decode <e type="web" href="…" title="…" /> into clickable <a>.
+	const safeDecode = (s: string) => {
+		try { return decodeURIComponent(s); } catch { return s; }
+	};
+	const out1 = html.replace(
+		/<e\s+type="web"\s+href="([^"]*)"\s+title="([^"]*)"\s*\/?>/g,
+		(_m, hrefEnc, titleEnc) => {
+			const href = safeDecode(hrefEnc);
+			const title = safeDecode(titleEnc) || href;
+			return `<a href="${href}">${title}</a>`;
+		}
+	);
+	// 2. Paragraph-ize on blank lines; preserve inner single newlines as <br>.
+	const paras = out1.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
+	return paras.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('\n');
+}
+
 async function extractScysArticleStandalone(doc: Document): Promise<ScysStructuredContent | null> {
 	const parsed = parseScysArticleUrl(doc.URL);
 	if (!parsed) return null;
@@ -825,19 +848,28 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 		);
 		wordCount = countWordsFromBlocks(flattenScysBlocks(detail.docBlocks, articleOptions));
 	} else {
-		// Legacy path: Quill ql-editor HTML string (pre-2024 posts).
-		// articleContent is already rendered HTML; just feed it through the
-		// pipeline. Rewrite img src to the scys: token form so resolveScysImages
-		// inlines base64 (same as docBlocks path). Comment images and body
-		// images get the same treatment in one pass below.
-		html = (detail.articleHtml || '').replace(
+		// Legacy path: articleContent has two sub-shapes:
+		//   (a) Quill ql-editor HTML: outer <div class="content ql-editor"> with
+		//       <p>/<ol>/<strong>/<img> children. Pre-2024 posts (e.g. 418444442181248).
+		//   (b) Plain text + \n\n paragraph separators + scys custom entity tags
+		//       like <e type="web" href="URL-encoded" title="URL-encoded" />. Some
+		//       pre-2024 posts (e.g. 2852488814854211) — no block-level HTML at all.
+		// detect (b) by absence of <p> / <div / <ol > and presence of plain newlines.
+		html = detail.articleHtml || '';
+		const looksPlainText = !/<(p|div|ol|ul|h\d)\b/i.test(html);
+		if (looksPlainText) {
+			// (b) plain-text path: expand <e> entities → <a>, paragraph-ize on \n\n.
+			html = preprocessScysEntityHtml(html);
+		}
+		// (a) ql-editor path is now a no-op fall-through; (b) lands here already paragraphed.
+		// Rewrite img src → scys: token (resolveScysImages inlines base64).
+		html = html.replace(
 			/<img([^>]*?)src="(https?:\/\/[^"]+)"/g,
 			(_m, attrs, src) => `<img${attrs}src="feishu-image://scys:${encodeURIComponent(src)}"`
 		);
-		// Strip the <div class="content ql-editor"> wrapper (defuddle would keep
-		// the div noise otherwise).
+		// Strip the <div class="content ql-editor"> wrapper (ql-editor path only).
 		html = html.replace(/^<div class="content ql-editor">/, '').replace(/<\/div>$/, '');
-		// Autolink bare URLs in plain text segments (same as renderTextElements does).
+		// Autolink bare URLs in plain text segments.
 		html = autolinkBareUrls(html);
 		// Word count: rough char-count of stripped text.
 		wordCount = html.replace(/<[^>]+>/g, '').length;

@@ -737,7 +737,7 @@ describe('renderScysComments (real fixture)', () => {
 	});
 });
 
-import { extractScysStructuredContent } from './scys-extractor';
+import { extractScysStructuredContent, preprocessScysEntityHtml } from './scys-extractor';
 
 describe('extractScysStructuredContent (orchestration)', () => {
 	const originalFetch = global.fetch;
@@ -1436,6 +1436,62 @@ describe('extractScysStructuredContent — article route', () => {
 	// Legacy article body: pre-2024 posts (e.g. 418444442181248) deliver
 	// `topicDTO.articleContent` as a Quill ql-editor HTML string instead of a
 	// docBlocks array. The extractor must fall back to that.
+	it('fixture 2852488814854211: legacy plain-text article (no <p>) paragraphizes + decodes <e> entities', async () => {
+		// Real pre-2024 post (2852488814854211). articleContent is plain text
+		// separated by \n\n with scys custom <e type="web" href="URL-encoded"
+		// title="URL-encoded"/> entities — no <p>/<div>/<ol> wrappers at all.
+		// Old extractor passed it through unchanged → defuddle collapsed
+		// everything into a single markdown paragraph. New behaviour: paragraph-
+		// ize on \n\n + expand <e> → <a>.
+		const detail = await import('./fixtures/scys-article-2852488814854211-detail.json');
+		const comments = await import('./fixtures/scys-article-2852488814854211-comments.json');
+		const pageIter = [...(comments.default as any[])];
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			const u = String(url);
+			if (u.includes('topicDetail')) return Promise.resolve({ ok: true, json: () => Promise.resolve(detail.default) } as any);
+			if (u.includes('pageTopicComment')) {
+				const next = pageIter.shift();
+				return Promise.resolve({ ok: true, json: () => Promise.resolve(next || { data: { total: 0, items: [] } }) } as any);
+			}
+			return Promise.resolve({ ok: false } as any);
+		});
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/2852488814854211' } as Document;
+		const r = await extractScysStructuredContent(doc);
+		expect(r?.title).toBe('高考Agent「AI高考通」可能是做高考志愿填报业务的一大变现助力');
+		// Paragraph-ized: html should contain many <p> wrappers (≥10 paragraphs)
+		const pCount = (r?.content.match(/<p>/g) || []).length;
+		expect(pCount).toBeGreaterThanOrEqual(10);
+		// First paragraph text survived
+		expect(r?.content).toContain('QQ浏览器推出行业首个高考Agent');
+		// scys <e> entity decoded to <a> with full URL + decoded title
+		expect(r?.content).toContain('<a href="https://browser.qq.com/gaokao-agent">搜索落地页</a>');
+		expect(r?.content).toContain('<a href="https://mp.weixin.qq.com/');
+		// Raw <e> tags must NOT survive
+		expect(r?.content).not.toMatch(/<e\s+type/);
+		// URL-encoded title fragments must not leak
+		expect(r?.content).not.toContain('%E6%90%9C');
+	});
+
+	it('preprocessScysEntityHtml: <e type="web"> decodes href + title; \\n\\n → <p>', () => {
+		const input = 'para A\n\npara B\n\nlink: <e type="web" href="https%3A%2F%2Fa.com" title="%E6%90%9C" />';
+		const out = preprocessScysEntityHtml(input);
+		expect(out).toContain('<p>para A</p>');
+		expect(out).toContain('<p>para B</p>');
+		expect(out).toContain('<a href="https://a.com">搜</a>');
+		expect(out).not.toMatch(/<e\s+type/);
+	});
+
+	it('preprocessScysEntityHtml: empty title falls back to href text', () => {
+		const out = preprocessScysEntityHtml('x <e type="web" href="https%3A%2F%2Fb.com" title="" />');
+		expect(out).toContain('<a href="https://b.com">https://b.com</a>');
+	});
+
+	it('preprocessScysEntityHtml: inner single \\n becomes <br>', () => {
+		const out = preprocessScysEntityHtml('line1\nline2\n\npara B');
+		expect(out).toContain('<p>line1<br>line2</p>');
+		expect(out).toContain('<p>para B</p>');
+	});
+
 	it('fixture 418444442181248: legacy ql-editor article renders all key sections', async () => {
 		// Real pre-2024 post (2021-06-23). 23K char articleContent HTML with 247
 		// <p>/<ol> children, 6 imgs (article-images.zsxq.com + docimg3.docs.qq.com),

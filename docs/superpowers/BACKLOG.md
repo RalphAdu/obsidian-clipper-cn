@@ -5,7 +5,7 @@
 > 每条 feature 都标了"为什么这么做 / 已知什么不行 / 推荐怎么做"。
 
 **最后更新**：2026-05-17
-**最新 commit 基线**：`3c37532`（zsxq published frontmatter）/ `23010c1`（zsxq 5-part fix for second test URL）/ `143d9e5`（zsxq article link card — mirror page, don't expand）
+**最新 commit 基线**：`c5efe22`（articles.zsxq.com SSR article extractor）/ `3c37532`（zsxq published frontmatter）/ `23010c1`（zsxq 5-part fix for second test URL）
 
 ---
 
@@ -978,6 +978,29 @@ scys article (`xq_topic`) 后端按帖子写作时间和编辑器返回**三种 
 
 ---
 
+### 6.15 ~~articles.zsxq.com 专栏文章 SSR 页面提取~~（**已完成 2026-05-17**，commit `c5efe22`）
+
+**触发**：用户裁剪 `https://articles.zsxq.com/id_j31pruhtakqc.html` 时发现 frontmatter `published` 空——这个 URL **host 是 `articles.zsxq.com`**，旧 `isZsxqArticleUrl` 只匹配 wx.zsxq.com，所以走通用 Defuddle，抓不到 `#article-date` 这种站点专属 DOM。
+
+**实施**：zsxq-extractor 内部新增第三种 dispatch kind `articles-html`，**直接 DOM 提取**（无 API 调用）：
+
+| 字段 | DOM 选择器 |
+|---|---|
+| title | `document.title` |
+| author | `.author-info .nick-name` |
+| published | `#article-date` 文本 `"2026年05月01日 21:02"` → `YYYY-MM-DD`（新增 `parseChineseArticleDate`） |
+| content | `.ql-editor` outerHTML（img src 重写到 zsxq token） |
+
+**触发判定**：新增 `isZsxqArticlesHtmlUrl(url)`（host=articles.zsxq.com + path=`/id_{token}.html`）。`parseZsxqUrl` 返回 `kind: 'articles-html'`。content.ts dispatch + page-world bridge origin regex 都扩展。
+
+**特点**：articles.zsxq.com 是 SSR HTML（**不是** SPA），不需要 fetch / retry / sentinel —— 30 行代码 + 1 commit 解决。SPA-vs-SSR 决定了提取范式繁简差距巨大。
+
+**验证**：测试 URL 正确产出 `title="2026.4月记录"` / `author="释老毛"` / `published=2026-05-01` / 3 张 base64 图。
+
+详见**附录 H**。
+
+---
+
 ### 6.12 ~~scys article (xq_topic) 提取~~（**已完成 2026-05-16**，commit `5720539` → `5812d62`）
 
 **实施方案**：URL pattern `scys.com/articleDetail/{type}/{id}`（首个 type 是 `xq_topic`，知识星球 topic 镜像）。后端 API 反向工程：
@@ -1035,7 +1058,7 @@ article 数据**特殊性**（与 course/docx 不同）：
 | `src/utils/scys-extractor.ts:extractScysArticleStandalone` | article body 已知 3 种形态（docBlocks / Quill HTML / plain-text+`<e>`），未来若发现第 4 种（如 markdown 字符串、XML、JSON-AST 等）需要再加分支 | 取决于实际发现 |
 | `scripts/scys-visual-audit.py` | 硬编码 `/tmp/scys-article-dom-dump.json` + 单 vault md 路径；改 CLI 参数 + 多 fixture 批量跑能作为 CI 回归 | 低 |
 | `src/utils/zsxq-extractor.ts:parseZsxqInlineText` | 当前覆盖 hashtag/mention/emoji/web/text_bold/text_italic；未来可能遇到 text_color / text_strike / image / topic-ref / mention-link 等新 `<e>` type — 实际看到再扩展，spec 阶段抓 fixture 时主动留意 | 中-低 |
-| `src/utils/zsxq-extractor.ts:extractZsxqStructuredContent` | `kind === 'article'`（`wx.zsxq.com/group/{gid}/article/{aid}`）当前 return null，退化到 Defuddle 兜底；专栏文章 URL 提取未实施 — 抓到一个真实 article URL 后再开 plan | 低 |
+| `src/utils/zsxq-extractor.ts:extractZsxqStructuredContent` | `kind === 'article'`（`wx.zsxq.com/group/{gid}/article/{aid}`）当前 return null，退化到 Defuddle 兜底；专栏文章 URL 提取未实施 — 抓到一个真实 article URL 后再开 plan。注：`kind === 'articles-html'` (host=articles.zsxq.com) 已在 commit `c5efe22` 实施 | 低 |
 | `src/utils/zsxq-extractor.ts:fetchZsxqAllComments` | 评论 image 字段（fixture 都不含）若实际遇到，需要走 `resolveZsxqImages` pipeline；当前 `renderCommentBody` 已渲染 `<img>` 占位符，端到端未验证 | 低 |
 | `src/utils/zsxq-extractor.ts:fetchZsxqArticleHtml` + `background.ts:fetchZsxqArticleHtml` | 保留为未使用的 background handler（topic 路径已不再 fetch article HTML）；如 §6.14 提到的 `article` URL 提取启动可直接复用 | 极低（保留即可） |
 
@@ -1502,4 +1525,68 @@ zsxq 是 cn fork 独有 feature，**不计划上游化**（知识星球是中文
 - **5 个 follow-up bug 共性**：都源自"第一个样本不能代表所有样本"——单 URL pattern 内变化范围被低估
 
 **最大的认知更新**（与附录 F 一致但角度不同）：spec 阶段做"假设标记"（先写假设 + 后续 Task 0 实测）已经是好实践，但**至少跑 2 个真实样本端到端**应该是新基线。Subagent-Driven Development 在 spec 详尽时效率极高（2 次派发 0 额外迭代），但 spec 详尽的前提是**先抓多样本 fixture**。
+
+---
+
+## 附录 H：articles.zsxq.com SSR 文章页提取（2026-05-17）
+
+紧接附录 G。用户给了第三个 zsxq URL `articles.zsxq.com/id_j31pruhtakqc.html`——发布时间没填进 frontmatter。30 分钟、1 个 commit 完成（`c5efe22`），但暴露了一个**之前 spec 没考虑到的入口**和几个可沉淀的小模式。
+
+### 一句话：为什么这么小却值得反思
+
+附录 G 的 spec 把 zsxq 的 URL 范围限定在 `wx.zsxq.com`，理由是"用户从知识星球客户端打开都是这个域"。**漏掉了 articles.zsxq.com**——topic 内嵌的"专栏文章卡片"点开就跳这个域。Defuddle 兜底虽然能抓正文，但**抓不到站点专属的 frontmatter 元数据**（`#article-date`、`.nick-name`）。
+
+**根因**：spec 的 URL 范围 = "用户怎么进入"，而非"用户怎么 *从* 你支持的能力进入新内容"。任何 extractor 实施时，**spec 阶段都要列出"该站点所有可能的内容页 URL host + path"**，不仅是用户最常用的那种。
+
+### 做对的事情
+
+1. **承认 spec scope 漏 + 立即补**：用户截图+URL，30 分钟 commit 落地。没辩"按 spec 这是 Defuddle 兜底"——用户实际想要的是元数据，spec 的 scope 不够。
+2. **DOM-first 提取范式**：articles.zsxq.com 是纯 SSR，**不调 API、不 retry、不 sentinel**——直接 `doc.querySelector(...)`。29 行新代码（含注释）、0 个新单测（直接端到端验证）。**SSR vs SPA 的提取范式繁简差距大**：SPA 走 §1.7 的 fetch+retry+sentinel 全套，SSR 一句 querySelector 就完。
+3. **复用现有 pipeline**：`rewriteArticleImageSrcsToTokens` + `resolveZsxqImages` 是 §6.14 已有函数，原本用来处理 SPA fetch 来的 articles.zsxq.com HTML —— 现在直接给 DOM 的 ql-editor outerHTML 用，**零修改、复用率 100%**。这印证了附录 B "优先写薄适配层把数据转换到现有管线"的判断。
+4. **dispatch kind 第三类直接加进 ZsxqUrlInfo discriminated union**：`kind: 'articles-html'` 自然嵌入现有 `parseZsxqUrl` switch，调用方 type-safe 自动 narrow。**discriminated union 是 extractor 内部多入口的首选模式**。
+
+### 走过的弯路（很少，本次基本一遍过）
+
+1. **首先想"是不是要给 Defuddle 加一个 metadata hook"**：很快否决——已有 zsxq-extractor 是更自然的归属（同站点系列），不要污染通用 Defuddle 流水线。
+2. **`parseZsxqUrl` 旧版直接 `if hostname !== 'wx.zsxq.com' return null` 早返**：扩展时要先判 articles.zsxq.com，再 wx.zsxq.com fallthrough。否则 URL 落到 null 走 Defuddle。**教训**：早返判断逻辑在扩展多 host 支持时要拆。
+
+### 可借鉴的模式（沉淀进基础设施）
+
+1. **"以页面用户最终如何访问内容"为 spec URL scope 的依据**，而不是"用户最常点进来的那个 URL"。任何站点都列：
+   - 客户端/SPA 容器 URL（如 wx.zsxq.com）
+   - 内嵌/分享出来的独立 URL（如 articles.zsxq.com）
+   - 移动端跳转中间页（如 t.zsxq.com）
+   - PDF / 打印视图 URL
+   spec 阶段 grep + 走一遍页面的"分享 / 复制链接 / 卡片点击"动作记下所有 host。
+
+2. **`parseChineseArticleDate(raw)` 中文日期解析**：`"2026年05月01日 21:02"` → `"2026-05-01"`。当前定义在 zsxq-extractor.ts。**若 scys/微信公众号/其他站点也用同一格式**，提到 `src/utils/date-utils.ts`。先内部用，第二个用例再抽。
+
+3. **SSR DOM 提取 checklist**（articles.zsxq.com 的 4 个字段，未来 SSR 站点照抄）：
+   - title：`document.title`（注意去除站点 "-后缀"）
+   - author：站点专属选择器（`.nick-name` / `.author-name` 等）
+   - published：站点专属时间元素（`#article-date` / `.publish-time` 等），解析为 `YYYY-MM-DD`
+   - content：站点专属正文容器（`.ql-editor` / `.article-content` / `article` 等），rewrite img src 后过 resolveImages
+
+4. **discriminated-union dispatch kind 模式**：
+   ```ts
+   type ZsxqUrlInfo =
+     | { kind: 'topic'; ... }
+     | { kind: 'article'; ... }
+     | { kind: 'articles-html'; ... };
+   ```
+   单一入口函数 `extractZsxqStructuredContent(doc)` 内 switch on kind，每种 kind 独立 pipeline。比"多个 export function `extractZsxqTopicContent` / `extractZsxqArticleContent`"路由更聚合。
+
+### 仍可改进的地方
+
+1. **fixture-level 单测缺失**：本次 SSR 提取依赖 DOM API，vitest 默认无 jsdom——加 SSR fixture 测试需要先解决环境（feishu-extractor.test.ts 用了什么？）。低优先级，端到端已覆盖。
+2. **articles.zsxq.com 的评论 / 点赞数 / 阅读量信号**：当前只抓 title/author/published/content；如果用户后续想加，DOM 还有 `.reading-amount` / `.likes-count` 等元素。等用户提需求。
+
+### 总结性观察
+
+- **commits 数**：1（feat + spec extend + content.ts wire + bridge origin = 单 commit）
+- **从用户报问题 → 端到端验证 OK**：约 30 分钟
+- **新沉淀进 BACKLOG**：§6.15 完成标记 + §7 update + 本附录
+- **触发的核心反思**：**spec URL scope 要列全所有"该站点可能产生的内容页 URL"**，不仅是用户首次截图给的那个。这条规则后续 extractor 实施时主动应用：抓样本时同时 grep 站点所有 link/share 出口，列入 spec URL allowlist。
+
+**最大的认知更新**：附录 G 是"两个真实样本最低门槛"，附录 H 是"**两个不同 URL host 的最低门槛**"。同一站点用户实际访问内容的入口 URL 可能跨 host，spec 阶段一并列举，避免后期补丁。
 

@@ -369,7 +369,7 @@ declare global {
 					image: bilibiliContent?.image || defuddled.image,
 					language: defuddled.language || '',
 					parseTime: defuddled.parseTime,
-					published: bilibiliContent?.published || defuddled.published,
+					published: bilibiliContent?.published || zsxqContent?.published || defuddled.published,
 					schemaOrgData: defuddled.schemaOrgData,
 					selectedHtml: selectedHtml,
 					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : defuddled.site,
@@ -674,7 +674,7 @@ declare global {
 				description: '',
 				favicon: '',
 				image: '',
-				published: '',
+				published: (result as any)?.published || '',
 				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : '',
 				language: '',
 				wordCount: (result as any)?.wordCount || 0,
@@ -695,12 +695,13 @@ declare global {
 			const fmTitle = fmEscape(simulatedVars['{{title}}'] || '');
 			const fmDescription = fmEscape(simulatedVars['{{description}}'] || '');
 			const fmAuthor = fmEscape(simulatedVars['{{author}}'] || '');
+			const fmPublished = fmEscape(simulatedVars['{{published}}'] || '');
 			const obsidianNote = [
 				'---',
 				`title: "${fmTitle}"`,
 				`source: "${document.URL}"`,
 				`author:${fmAuthor ? ` "${fmAuthor}"` : ''}`,
-				`published:`,
+				`published:${fmPublished ? ` ${fmPublished}` : ''}`,
 				`created: ${today}`,
 				`description: ${fmDescription ? `"${fmDescription}"` : ''}`,
 				`tags:`,

@@ -657,6 +657,18 @@ export interface ZsxqStructuredContent {
 	author: string;
 	content: string;
 	wordCount: number;
+	/** Topic publish time as YYYY-MM-DD (from topic.create_time ISO8601). */
+	published: string;
+}
+
+function buildZsxqPublished(topic: ZsxqTopic): string {
+	if (!topic.create_time) return '';
+	const d = new Date(topic.create_time);
+	if (Number.isNaN(d.getTime())) return '';
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
 }
 
 function buildZsxqTitle(topic: ZsxqTopic): string {
@@ -740,6 +752,7 @@ export async function extractZsxqStructuredContent(doc: Document): Promise<ZsxqS
 	return {
 		title: buildZsxqTitle(topic),
 		author: buildZsxqAuthor(topic),
+		published: buildZsxqPublished(topic),
 		content,
 		wordCount: countZsxqWords(topic, comments, null),
 	};

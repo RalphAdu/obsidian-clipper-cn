@@ -14,7 +14,7 @@ import { createLogger } from './utils/logger';
 import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bilibili-extractor';
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
-import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl } from './utils/zsxq-extractor';
+import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
 import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
@@ -281,7 +281,7 @@ declare global {
 					return null;
 				})
 				: null;
-			const zsxqContent = (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL))
+			const zsxqContent = (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL) || isZsxqArticlesHtmlUrl(document.URL))
 				? await extractZsxqStructuredContent(document).catch((error) => {
 					contentLogger.warn('Failed to extract zsxq structured content', { error: String(error) });
 					return null;
@@ -624,7 +624,7 @@ declare global {
 		const data = event.data;
 		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
 		const origin = location.hostname;
-		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$/.test(origin)) return;
+		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$/.test(origin)) return;
 		const testId = data.testId;
 		const key = '__obsidianClipperTestResult__:' + testId;
 		try {
@@ -640,7 +640,7 @@ declare global {
 			} else if (isFeishuDocUrl(document.URL)) {
 				result = await extractFeishuStructuredContent(document);
 				source = 'feishu';
-			} else if (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL)) {
+			} else if (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL) || isZsxqArticlesHtmlUrl(document.URL)) {
 				result = await extractZsxqStructuredContent(document);
 				source = 'zsxq';
 			} else {

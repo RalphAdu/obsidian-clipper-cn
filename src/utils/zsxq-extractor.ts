@@ -29,9 +29,23 @@ export function isZsxqArticleUrl(url: string): boolean {
 	}
 }
 
+// Standalone article page on articles.zsxq.com — full SSR HTML, no API call
+// needed. Reachable independently from a wx.zsxq.com topic (which links to it
+// via talk.article.article_url) or pasted directly by the user.
+export function isZsxqArticlesHtmlUrl(url: string): boolean {
+	try {
+		const u = new URL(url);
+		if (u.hostname !== 'articles.zsxq.com') return false;
+		return /^\/id_[A-Za-z0-9]+\.html\/?$/.test(u.pathname);
+	} catch {
+		return false;
+	}
+}
+
 export type ZsxqUrlInfo =
 	| { kind: 'topic'; groupId: string; topicId: string }
-	| { kind: 'article'; groupId: string; articleId: string };
+	| { kind: 'article'; groupId: string; articleId: string }
+	| { kind: 'articles-html'; articleId: string };
 
 // ─── Inline text parsing ──────────────────────────────────────────────────────
 // zsxq text fields embed self-closing <e> tags for hashtags, mentions, emoji
@@ -635,6 +649,10 @@ export async function resolveZsxqImages(html: string): Promise<string> {
 export function parseZsxqUrl(url: string): ZsxqUrlInfo | null {
 	try {
 		const u = new URL(url);
+		if (u.hostname === 'articles.zsxq.com') {
+			const m = u.pathname.match(/^\/id_([A-Za-z0-9]+)\.html\/?$/);
+			return m ? { kind: 'articles-html', articleId: m[1] } : null;
+		}
 		if (u.hostname !== 'wx.zsxq.com') return null;
 		const topicMatch = u.pathname.match(/^\/group\/(\d+)\/topic\/(\d+)\/?$/);
 		if (topicMatch) {
@@ -648,6 +666,18 @@ export function parseZsxqUrl(url: string): ZsxqUrlInfo | null {
 	} catch {
 		return null;
 	}
+}
+
+// articles.zsxq.com publish-time text format: "2026年05月01日 21:02" — single space
+// between date and time; month/day are zero-padded. Return YYYY-MM-DD or '' on
+// parse failure.
+function parseChineseArticleDate(raw: string): string {
+	const m = raw.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+	if (!m) return '';
+	const y = m[1];
+	const mo = m[2].padStart(2, '0');
+	const d = m[3].padStart(2, '0');
+	return `${y}-${mo}-${d}`;
 }
 
 // ─── Top-level entry ────────────────────────────────────────────────────────
@@ -717,9 +747,34 @@ function countZsxqWords(topic: ZsxqTopic, comments: ZsxqComment[], articleHtml: 
 	return total;
 }
 
+// articles.zsxq.com SSR HTML extractor — DOM-driven (no API call). The page
+// is plain server-rendered HTML so we read .author-info / .ql-editor directly.
+async function extractZsxqArticlesHtml(doc: Document): Promise<ZsxqStructuredContent | null> {
+	const ql = doc.querySelector('.ql-editor');
+	if (!ql) {
+		logger.warn('[articles-html] .ql-editor not found');
+		return null;
+	}
+	// Title: <h1>/<title>/document.title. The page header isn't structured as
+	// an <h1> — Obsidian-friendly title comes from doc.title (no "-知识星球"
+	// suffix on articles.zsxq.com; the suffix is wx.zsxq.com only).
+	const title = (doc.title || '').trim() || 'zsxq 文章';
+	const author = doc.querySelector('.nick-name')?.textContent?.trim() ?? '';
+	const dateRaw = doc.querySelector('#article-date')?.textContent?.trim() ?? '';
+	const published = parseChineseArticleDate(dateRaw);
+
+	const bodyHtml = rewriteArticleImageSrcsToTokens(ql.outerHTML);
+	const content = await resolveZsxqImages(bodyHtml);
+	const wordCount = ql.textContent?.length ?? 0;
+
+	return { title, author, published, content, wordCount };
+}
+
 export async function extractZsxqStructuredContent(doc: Document): Promise<ZsxqStructuredContent | null> {
 	const parsed = parseZsxqUrl(doc.URL);
-	if (!parsed || parsed.kind !== 'topic') return null;
+	if (!parsed) return null;
+	if (parsed.kind === 'articles-html') return extractZsxqArticlesHtml(doc);
+	if (parsed.kind !== 'topic') return null;
 
 	const topic = await fetchZsxqTopic(parsed.topicId);
 	if (!topic) return null;

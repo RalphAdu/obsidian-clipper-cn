@@ -18,7 +18,11 @@
 		"http://*/*",
 		"https://*/*",
 		"https://scys.com/*",
-		"https://*.aliyuncs.com/*"
+		"https://*.aliyuncs.com/*",
+		"https://api.zsxq.com/*",
+		"https://articles.zsxq.com/*",
+		"https://images.zsxq.com/*",
+		"https://article-images.zsxq.com/*"
 	],
 	"action": {
 		"default_popup": "popup.html",

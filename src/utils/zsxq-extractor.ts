@@ -258,22 +258,27 @@ export function renderZsxqTopicBodyHtml(topic: ZsxqTopic, articleBodyHtml: strin
 	const parts: string[] = [];
 	const talkBody = body as ZsxqTalkBody;
 
-	// If a real article body is supplied, use it as the primary content. The
-	// article body already contains the full text (talk.text is a truncated
-	// teaser — including it would just duplicate the first 205 chars).
-	// Rewrite raw <img src="https://...zsxq.com/..."/> in the article HTML to
-	// the feishu-image://zsxq: token form so resolveZsxqImages can convert
-	// them to base64 / fall back to raw URL uniformly.
-	if (talkBody.article && articleBodyHtml) {
-		parts.push(rewriteArticleImageSrcsToTokens(articleBodyHtml));
-	} else {
-		parts.push(renderTextAsParagraphs(body.text || ''));
+	// Mirror what the zsxq topic page itself displays: the talk.text teaser
+	// (whatever length the API returned — typically a 200-char preview ending
+	// in "...") followed by an article-link card (NOT the article body).
+	// The full article lives on articles.zsxq.com and is reachable via the
+	// link; expanding it here would diverge from what the user sees on the
+	// topic page they clipped.
+	parts.push(renderTextAsParagraphs(body.text || ''));
+
+	if (talkBody.article) {
+		parts.push(renderArticleLinkCard(talkBody.article));
 	}
 
 	parts.push(renderImages(body.images));
 	parts.push(renderFiles(body.files));
 
 	return parts.join('');
+}
+
+function renderArticleLinkCard(article: { title: string; article_url: string }): string {
+	const safeTitle = escapeHtml(article.title || '链接');
+	return `<p>🔗 <a href="${article.article_url}">${safeTitle}</a></p>`;
 }
 
 // ─── Comment types + rendering ──────────────────────────────────────────────
@@ -643,7 +648,10 @@ export async function extractZsxqStructuredContent(doc: Document): Promise<ZsxqS
 	const topic = await fetchZsxqTopic(parsed.topicId);
 	if (!topic) return null;
 
-	// Concurrently fetch comments + article body HTML.
+	// Match what the zsxq topic page itself shows: talk.text teaser + article
+	// link card + comments. Don't fetch the full article body — that's a
+	// separate page (articles.zsxq.com) the user can clip individually.
+	//
 	// Comments retry: zsxq API intermittently returns an empty array (HTTP 200)
 	// when content-script fetch races SPA session warmup. Retry up to 3× with
 	// short backoff when the topic claims comments but we got none.
@@ -659,14 +667,9 @@ export async function extractZsxqStructuredContent(doc: Document): Promise<ZsxqS
 		}
 		return [];
 	};
-	const [comments, articleHtml] = await Promise.all([
-		fetchCommentsWithRetry(),
-		topic.talk?.article?.article_id
-			? fetchZsxqArticleHtml(topic.talk.article.article_id).catch(() => null)
-			: Promise.resolve<string | null>(null),
-	]);
+	const comments = await fetchCommentsWithRetry();
 
-	const bodyHtml = renderZsxqTopicBodyHtml(topic, articleHtml);
+	const bodyHtml = renderZsxqTopicBodyHtml(topic, null);
 	const commentsHtml = renderZsxqCommentsHtml(comments, topic.comments_count ?? comments.length);
 	const content = await resolveZsxqImages(bodyHtml + commentsHtml);
 
@@ -674,6 +677,6 @@ export async function extractZsxqStructuredContent(doc: Document): Promise<ZsxqS
 		title: buildZsxqTitle(topic),
 		author: buildZsxqAuthor(topic),
 		content,
-		wordCount: countZsxqWords(topic, comments, articleHtml),
+		wordCount: countZsxqWords(topic, comments, null),
 	};
 }

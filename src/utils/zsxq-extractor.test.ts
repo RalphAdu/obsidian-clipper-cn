@@ -163,20 +163,26 @@ describe('parseZsxqInlineText', () => {
 describe('renderZsxqTopicBodyHtml', () => {
 	const topic: ZsxqTopic = topicFixture.resp_data.topic;
 
-	it('uses the articleBodyHtml as primary body when talk.article exists', () => {
-		const out = renderZsxqTopicBodyHtml(topic, articleHtmlFixture);
-		// The article body HTML should be embedded verbatim.
-		expect(out).toContain('<div class="content ql-editor">');
+	it('renders talk.text teaser and an article link card (does NOT expand the article body)', () => {
+		// Mirrors what the zsxq topic page itself shows: teaser text + a link to
+		// the full article on articles.zsxq.com. The article body is NOT fetched.
+		const out = renderZsxqTopicBodyHtml(topic, null);
+		// Teaser is rendered as paragraphs.
 		expect(out).toContain('我是鹏哥');
+		// Article link card uses 🔗 + anchor pointing at article_url.
+		expect(out).toContain('🔗');
+		expect(out).toContain(`href="${topic.talk!.article!.article_url}"`);
+		expect(out).toContain(topic.talk!.article!.title);
+		// No article body markup should leak in.
+		expect(out).not.toContain('<div class="content ql-editor">');
 	});
 
-	it('prepends the talk.text teaser as a blockquote when article is provided', () => {
+	it('ignores any articleBodyHtml parameter for back-compat (always renders link card)', () => {
+		// Even when callers pass article HTML, the new policy is to render only
+		// the link card. Argument is kept on the signature for compatibility.
 		const out = renderZsxqTopicBodyHtml(topic, articleHtmlFixture);
-		// The teaser is talk.text — it gets quoted before the article body.
-		expect(out).toContain('<blockquote>');
-		// The first 30 chars of the teaser must appear inside that blockquote.
-		const teaser = topic.talk!.text.slice(0, 30);
-		expect(out.indexOf(teaser)).toBeLessThan(out.indexOf('我是鹏哥'));
+		expect(out).not.toContain('<div class="content ql-editor">');
+		expect(out).toContain('🔗');
 	});
 
 	it('falls back to talk.text paragraphs when no article body is available', () => {

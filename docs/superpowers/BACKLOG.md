@@ -494,6 +494,27 @@ sha = hashlib.sha256(base64.b64decode(key_b64)).hexdigest()[:32]
 print(''.join(chr(ord('a') + int(c, 16)) for c in sha))
 ```
 
+### 2.14 新 extractor spec 阶段：3 维 fixture 覆盖 checklist
+
+来自 zsxq 实施期间 G/H/I 三次回归暴露的同一根因——**spec 阶段对"接口形态多样性"的低估**。**任何新 extractor 立项前**，spec 必须明确列出 3 个维度的真实样本覆盖：
+
+| 维度 | 来源 | 最低样本数 | 验收方式 | 未达标后果 |
+|---|---|---|---|---|
+| **真实样本数** | 附录 G（zsxq topic 1 → topic 2 暴露 5 bug）| ≥ 2，不同作者/时间/内容形态 | 端到端跑通 | 单 URL 假设过窄 |
+| **URL host 覆盖** | 附录 H（articles.zsxq.com vs wx.zsxq.com）| 站点所有可能内容页 host | grep 站点"复制链接/分享/卡片"出口 | 某 host 的元数据丢失 |
+| **type 枚举值覆盖** | 附录 I（zsxq talk vs q&a author 错位）| 每个 type 字段值至少 1 个真实样本 | **业务字段断言**（"q&a 的 author 应等于 answer.owner.name"）不是只测渲染连通 | 按 type 分支的字段选择逻辑 untested |
+
+**辅助 audit**（同样要在 spec 阶段做）：
+- `grep -oE '<标签 type="[^"]+"'` 列出该站点 inline 标签的所有 unique type（zsxq 的 `<e>` / 飞书的 block_type / 等），确保 spec 覆盖到全集
+- 探一次该站 API 的所有可能 path（DevTools Network 看 SPA 自身 XHR）—— 比照 spec 假设的 endpoint 是否真实存在
+
+**例外**：如果某 type / host 无法获得真实 URL 样本，spec 必须**显式标注 `untested-in-real-data`**，并把该分支的字段映射作为推测保留——**禁止合成 mock 单测冒充覆盖**。合成 mock 只能验证渲染管线连通，不能替代真实数据上的业务字段断言。
+
+**与现有规则的关系**：
+- §1.10（bridge popup-path simulation） 防的是路径分歧
+- §1.12（视觉对比工作流） 防的是渲染层差异
+- §2.14（本节） 防的是接口形态盲点 —— **更上游，spec 阶段就堵漏**
+
 ---
 
 ## 3. 用户偏好 / 协作约定
@@ -1687,3 +1708,92 @@ zsxq 是 cn fork 独有 feature，**不计划上游化**（知识星球是中文
 - 视觉验收若声称"通过"，必须基于**生产产物**（真实 Obsidian vault `.md`）或与生产同形态的渲染产物，不能只读 audit-tool 的中间产物。
 
 **未来可选升级（BACKLOG）**：playwright headless 加载扩展、自动裁剪、拦截 `obsidian://` URL、提取 content 参数、用 audit-tool 校验。代价：脚本依赖重 + Chrome 版本脱手。当前 mock-based 集成测试已覆盖两类根因 bug。
+
+---
+
+## 附录 J：zsxq extractor 项目全程综合（2026-05-17）
+
+整合附录 G + H + I 三次 retro 的内容，从项目整体视角看 zsxq extractor 的完成状态、累计成本、横向规律。结构模仿附录 F（scys article 全程回顾）。
+
+### 累计 commits（21 个 zsxq/articles 相关）
+
+| Commit | 主题 | 类别 |
+|---|---|---|
+| `1ec9161` | test: topic + comments + article HTML fixtures（185414442218552）| Task 0 fixture |
+| `f0a742e` | docs: mark Task 0 complete + API discovery | Task 0 plan update |
+| `4e179f5` | feat: URL detection + parseZsxqUrl | Task 1 |
+| `394feee` | feat: parseZsxqInlineText — `<e>` tags / `<br>` / entities | Task 2 |
+| `3241954` | feat: topic types + renderZsxqTopicBodyHtml（talk/q&a/task）| Task 3 |
+| `7e2d007` | feat: comment types + renderZsxqCommentsHtml（nested blockquotes）| Task 4-5 |
+| `b924a4a` | feat: API fetchers — topic /info / comments / article SSR | Task 6 |
+| `908a35d` | feat: resolveZsxqImages — 三级 fallback | Task 7 |
+| `5e53eec` | feat: extractZsxqStructuredContent top-level | Task 8 |
+| `f3e5dae` | feat: manifest host_permissions（api/articles/images）| Task 9 |
+| `ef2ea7a` | feat: background handlers | Task 9 |
+| `83640e6` | feat: wire into content.ts + page-world test bridge | Task 9 |
+| `3847ad8` | fix: rewrite article image srcs + drop redundant teaser | 第一轮 e2e fix |
+| `d016199` | fix: retry empty comments fetch（content-script SPA race）| 第一轮 e2e fix |
+| `143d9e5` | **fix: match original page — render article link card, not body** | **附录 G #1：过度抓取回退** |
+| `23010c1` | **fix: unblock second test topic（5-part fix）** | **附录 G #2-5：text_bold / image size / web link / topic retry / title** |
+| `3c37532` | feat: expose topic create_time as published frontmatter | 第二轮补缺 |
+| `af0ba4f` | docs: backlog + appendix G | 反思 G |
+| `c5efe22` | **feat: articles.zsxq.com SSR article page extractor** | **附录 H：URL host 缺口** |
+| `e7090b9` | docs: backlog + appendix H | 反思 H |
+| `0949660` | **fix: q&a topic author resolves to answerer** | **附录 I：type 枚举缺口** |
+| `f8b33f1` | docs: appendix I + 3-dim spec coverage rule | 反思 I |
+
+### 完成的能力清单
+
+| 能力 | 体现 |
+|---|---|
+| URL 检测 + 路由（3 种 kind） | `isZsxqTopicUrl` / `isZsxqArticleUrl` / `isZsxqArticlesHtmlUrl`；`parseZsxqUrl` discriminated union |
+| API 调用（同源 fetch + 3× retry） | `fetchZsxqTopic` (`/v2/topics/{id}/info`) / `fetchZsxqAllComments` 分页 |
+| 跨域 SPA 时序 retry 模板 | content-script 首次跨 origin fetch race 通用解 |
+| inline `<e>` 标签解析 | hashtag/mention/emoji/web/text_bold/text_italic；`\x01...\x03` sentinel 穿透 escapeHtml/turndown |
+| Topic body 渲染（type 分支）| talk / q&a / task / solution；**mirror page**（不展开 articles.zsxq.com）|
+| 评论嵌套渲染 | API 已是 `replied_comments[]` 嵌套（depth=2），直接 walk |
+| 图片三级 fallback | L1 content-script / L2 background / L3 raw URL；`large > original > thumbnail` |
+| Title / Author / Published 三字段策略 | type-aware：q&a 用 answer.owner；published 从 ISO8601 → `YYYY-MM-DD` |
+| articles.zsxq.com SSR 直接 DOM 提取 | 与 SPA 提取范式形成对照（30 行代码 vs 600+） |
+| Page-world test bridge 接入 | content.ts dispatch + origin 白名单 + ContentResponse cascade |
+| Fixture-level 回归测试 | 3 个真实 fixture（topic / comments / article HTML）+ q&a fixture + 62 unit tests |
+
+### 已接受的 trade-off（不再追修）
+
+| 项 | 原因 |
+|---|---|
+| `articles.zsxq.com` 评论 / 点赞数 / 阅读量未抓 | 用户未提需求，DOM 元素已知（`.likes-count` 等）可加 |
+| `kind === 'article'`（`wx.zsxq.com/group/{gid}/article/{aid}`）返回 null | 未抓到真实样本 URL，等用户给再实施 |
+| 闲置 `fetchZsxqArticleHtml` + background handler | 留作 article URL 提取启动时复用，否则 deadcode 删除 |
+| 评论内 image 字段未端到端验证 | 当前 fixture 都不含；代码已写 placeholder |
+
+### 未来潜在的 follow-up（不紧急）
+
+| 项 | 优先级 | 触发 |
+|---|---|---|
+| 未见过的 `<e>` type 扩展（text_color / image / topic-ref / mention-link 等）| 中-低 | 用户报新差异时 |
+| `wx.zsxq.com/group/{gid}/article/{aid}` 专栏文章 URL 提取 | 低 | 抓到真实样本 URL |
+| `parseChineseArticleDate` 提到 `src/utils/date-utils.ts` | 极低 | 第二个 extractor 复用此格式时 |
+| q&a / task / solution 真实样本进 fixture | 低 | task / solution 真实 URL 抓到时 |
+| 评论中 image 字段的端到端验证 | 低 | 抓到含图评论的真实样本 |
+
+### 横向规律（3 个附录的同一根因）
+
+| 附录 | 漏检维度 | 触发 bug | 修复 |
+|---|---|---|---|
+| G | **真实样本数**（topic 1 不能代表 topic 2）| 5 个独立 bug（text_bold / image size / web link / retry / title）| 一轮 23010c1 修齐 |
+| H | **URL host**（wx.zsxq.com ↮ articles.zsxq.com）| frontmatter published 缺失 | c5efe22 新增 dispatch kind |
+| I | **type 枚举**（talk ↮ q&a）| author 错位（提问者 vs 答主）| 0949660 type-aware buildZsxqAuthor |
+
+3 个都源于 spec 阶段对**接口形态多样性的低估** → 已上升为 §2.14 "新 extractor 3 维 fixture 覆盖 checklist"。
+
+### 总结性观察
+
+- **commits 数**：21（spec/plan/fixture 3 + extractor 7 + wiring 3 + e2e fix 4 + 反思 4）
+- **从 brainstorm → 当前稳定**：约 6 小时（含 3 次跨日小修：articles.zsxq.com / published / q&a）
+- **subagent 派发**：2 次（Task 1-7 + Task 8-9），0 额外迭代——证明 spec + plan 详尽时效率极高
+- **真实 fixture 数**：4（topic talk × 2 + comments × 1 + article qleditor HTML × 1 + topic q&a × 1）
+- **新沉淀进 BACKLOG**：§2.14（3 维 checklist 提到顶层）+ §6.14 / §6.15 完成标记 + §7 加 5 条 TODO + 附录 G/H/I/J
+- **基线认知**：未来任何 extractor，spec 阶段强制走 §2.14 3 维 checklist；缺一个维度都标 `untested-in-real-data` 而非合成 mock 冒充
+
+**最大的认知更新**（跨 G/H/I/J）：bug 不是在代码里"修不完"，bug 是在 **spec 上游"看不全"**。Subagent-Driven Development + 双 reviewer 在 spec 详尽时是高质量高效率的实施保障，但 spec 详尽的**前提**是 §2.14 的 3 维 fixture 覆盖。**spec 阶段一小时的样本走查比实施期一小时的 bug 修复价值高 10 倍**——这一规律以后 extractor 立项时反复 quote。

@@ -145,3 +145,32 @@ describe('convertBlocksToHtml — mention_doc', () => {
 		expect(html).not.toContain('<a href');
 	});
 });
+
+describe('convertBlocksToHtml — H1 auto-numbering', () => {
+	it('numbers each H1 by document order; H2/H3 are not numbered', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['h1a', 'h2', 'h1b', 'h3', 'h1c'] },
+			{ block_id: 'h1a', block_type: 3, parent_id: 'p', heading1: { elements: [{ text_run: { content: '起心动念' } }] } } as any,
+			{ block_id: 'h2', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: '小节 A' } }] } } as any,
+			{ block_id: 'h1b', block_type: 3, parent_id: 'p', heading1: { elements: [{ text_run: { content: '抬高视角' } }] } } as any,
+			{ block_id: 'h3', block_type: 5, parent_id: 'p', heading3: { elements: [{ text_run: { content: '更小一层' } }] } } as any,
+			{ block_id: 'h1c', block_type: 3, parent_id: 'p', heading1: { elements: [{ text_run: { content: '极致简单' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<h1>1. 起心动念</h1>');
+		expect(html).toContain('<h1>2. 抬高视角</h1>');
+		expect(html).toContain('<h1>3. 极致简单</h1>');
+		expect(html).toContain('<h2>小节 A</h2>');
+		expect(html).toContain('<h3>更小一层</h3>');
+	});
+
+	it('does not number when there are no H1 blocks', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['h2'] },
+			{ block_id: 'h2', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: 'only h2' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<h2>only h2</h2>');
+		expect(html).not.toMatch(/<h\d>\d+\./);
+	});
+});

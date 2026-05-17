@@ -595,13 +595,14 @@ async function fetchDocumentMeta(documentId: string): Promise<{ title: string; o
 //   2. block-level text-align (style.align): scys/feishu encodes alignment as
 //      1=left (default), 2=center, 3=right. We translate to <div align="…">
 //      wrapper so Obsidian Reading view renders the alignment.
-function renderHeading(level: number, elements: any, style: any): string {
+function renderHeading(level: number, elements: any, _style: any, seqNumber?: number): string {
 	// skipBold: heading <h*> tag is already visually bold; nested <strong> →
 	// markdown `## **…**` is noisy and breaks `**` pair counting in adjacent
 	// runs (downstream `****` literal artifacts).
 	// Note: alignment (style.align) is not represented in pure markdown.
 	const inner = renderTextElements(elements, { skipBold: true });
-	return `<h${level}>${inner}</h${level}>`;
+	const prefix = seqNumber !== undefined ? `${seqNumber}. ` : '';
+	return `<h${level}>${prefix}${inner}</h${level}>`;
 }
 
 interface RenderTextOptions {
@@ -745,14 +746,27 @@ export function convertBlocksToHtml(blocks: FeishuBlock[]): string {
 		blockMap.set(b.block_id, b);
 	}
 
+	// Pre-scan H1 numbering. Feishu web renders "1./2./..." for H1s via CSS
+	// counter; OpenAPI returns no number, so we generate one by document order.
+	const headingNumbers = new Map<string, number>();
+	{
+		let h1Seq = 0;
+		for (const b of blocks) {
+			if (b.block_type === FEISHU_BLOCK_TYPE.HEADING1) {
+				h1Seq += 1;
+				headingNumbers.set(b.block_id, h1Seq);
+			}
+		}
+	}
+
 	const pageBlock = blocks.find(b => b.block_type === FEISHU_BLOCK_TYPE.PAGE);
 	if (!pageBlock?.children?.length) {
 		return blocks.filter(b => b.block_type !== FEISHU_BLOCK_TYPE.PAGE)
-			.map(b => renderBlock(b, blockMap))
+			.map(b => renderBlock(b, blockMap, headingNumbers))
 			.join('');
 	}
 
-	return renderChildren(pageBlock.children, blockMap);
+	return renderChildren(pageBlock.children, blockMap, headingNumbers);
 }
 
 const LIST_KINDS = [
@@ -785,11 +799,12 @@ function isListKind(t: number): t is ListKind {
 function renderTodoItem(
 	block: FeishuBlock,
 	blockMap: Map<string, FeishuBlock>,
+	headingNumbers: Map<string, number>,
 	appendHtml = '',
 ): string {
 	const done = (block.todo as any)?.style?.done === true;
 	const inner = renderTextElements(block.todo?.elements);
-	const children = renderBlockChildren(block, blockMap);
+	const children = renderBlockChildren(block, blockMap, headingNumbers);
 	const checkbox = done ? '[x] ' : '[ ] ';
 	return `<li>${escapeHtml(checkbox)}${inner}${children}${appendHtml}</li>`;
 }
@@ -805,6 +820,7 @@ function collectListGroup(
 	childIds: string[],
 	startIdx: number,
 	blockMap: Map<string, FeishuBlock>,
+	headingNumbers: Map<string, number>,
 ): { html: string; nextIdx: number } {
 	type Entry = { block: FeishuBlock; followerBlocks: FeishuBlock[] };
 	const entries: Entry[] = [];
@@ -837,10 +853,12 @@ function collectListGroup(
 		entries[entries.length - 1].followerBlocks.push(...pendingFollowers);
 	}
 
-	const renderItem = kind === FEISHU_BLOCK_TYPE.TODO ? renderTodoItem : renderListItem;
 	const liHtml = entries.map(({ block, followerBlocks }) => {
-		const appendHtml = followerBlocks.map((fb) => renderBlock(fb, blockMap)).join('');
-		return renderItem(block, blockMap, appendHtml);
+		const appendHtml = followerBlocks.map((fb) => renderBlock(fb, blockMap, headingNumbers)).join('');
+		if (kind === FEISHU_BLOCK_TYPE.TODO) {
+			return renderTodoItem(block, blockMap, headingNumbers, appendHtml);
+		}
+		return renderListItem(block, blockMap, headingNumbers, appendHtml);
 	}).join('');
 
 	const openTag =
@@ -852,7 +870,7 @@ function collectListGroup(
 	return { html: `${openTag}${liHtml}${closeTag}`, nextIdx: i };
 }
 
-function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>): string {
+function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>, headingNumbers: Map<string, number>): string {
 	const parts: string[] = [];
 	let i = 0;
 
@@ -866,13 +884,14 @@ function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>):
 				childIds,
 				i,
 				blockMap,
+				headingNumbers,
 			);
 			parts.push(html);
 			i = nextIdx;
 			continue;
 		}
 
-		parts.push(renderBlock(block, blockMap));
+		parts.push(renderBlock(block, blockMap, headingNumbers));
 		i++;
 	}
 
@@ -882,23 +901,24 @@ function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>):
 function renderListItem(
 	block: FeishuBlock,
 	blockMap: Map<string, FeishuBlock>,
+	headingNumbers: Map<string, number>,
 	appendHtml = '',
 ): string {
 	const body = getTextBody(block);
 	const inner = renderTextElements(body?.elements);
-	const children = renderBlockChildren(block, blockMap);
+	const children = renderBlockChildren(block, blockMap, headingNumbers);
 	return `<li>${inner}${children}${appendHtml}</li>`;
 }
 
-function renderBlockChildren(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderBlockChildren(block: FeishuBlock, blockMap: Map<string, FeishuBlock>, headingNumbers: Map<string, number>): string {
 	if (!block.children?.length) return '';
-	return renderChildren(block.children, blockMap);
+	return renderChildren(block.children, blockMap, headingNumbers);
 }
 
-function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>, headingNumbers: Map<string, number>): string {
 	switch (block.block_type) {
 		case FEISHU_BLOCK_TYPE.PAGE:
-			return renderBlockChildren(block, blockMap);
+			return renderBlockChildren(block, blockMap, headingNumbers);
 
 		case FEISHU_BLOCK_TYPE.TEXT: {
 			const inner = renderTextElements(block.text?.elements);
@@ -907,7 +927,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		}
 
 		case FEISHU_BLOCK_TYPE.HEADING1:
-			return renderHeading(1, block.heading1?.elements, (block.heading1 as any)?.style);
+			return renderHeading(1, block.heading1?.elements, (block.heading1 as any)?.style, headingNumbers.get(block.block_id));
 		case FEISHU_BLOCK_TYPE.HEADING2:
 			return renderHeading(2, block.heading2?.elements, (block.heading2 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING3:
@@ -926,9 +946,9 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		}
 
 		case FEISHU_BLOCK_TYPE.BULLET:
-			return `<ul>${renderListItem(block, blockMap)}</ul>`;
+			return `<ul>${renderListItem(block, blockMap, headingNumbers)}</ul>`;
 		case FEISHU_BLOCK_TYPE.ORDERED:
-			return `<ol>${renderListItem(block, blockMap)}</ol>`;
+			return `<ol>${renderListItem(block, blockMap, headingNumbers)}</ol>`;
 
 		case FEISHU_BLOCK_TYPE.CODE: {
 			const inner = renderTextElements(block.code?.elements);
@@ -941,7 +961,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		}
 
 		case FEISHU_BLOCK_TYPE.QUOTE_CONTAINER: {
-			const children = renderBlockChildren(block, blockMap);
+			const children = renderBlockChildren(block, blockMap, headingNumbers);
 			return `<blockquote>${children}</blockquote>`;
 		}
 
@@ -989,7 +1009,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 					bodyChildIds = allChildIds.slice(1);
 				}
 			}
-			const childrenHtml = renderChildren(bodyChildIds, blockMap);
+			const childrenHtml = renderChildren(bodyChildIds, blockMap, headingNumbers);
 			const title = [emoji, titleText].filter(Boolean).join(' ');
 			const titleLine = `[!${calloutType}]${title ? ' ' + title : ''}`;
 			return `<blockquote class="feishu-callout"><p>${titleLine}</p>${childrenHtml}</blockquote>`;
@@ -1019,15 +1039,15 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		}
 
 		case FEISHU_BLOCK_TYPE.TABLE: {
-			return renderTable(block, blockMap);
+			return renderTable(block, blockMap, headingNumbers);
 		}
 
 		case FEISHU_BLOCK_TYPE.GRID: {
-			return renderBlockChildren(block, blockMap);
+			return renderBlockChildren(block, blockMap, headingNumbers);
 		}
 
 		case FEISHU_BLOCK_TYPE.GRID_COLUMN: {
-			return renderBlockChildren(block, blockMap);
+			return renderBlockChildren(block, blockMap, headingNumbers);
 		}
 
 		// VIEW (33) is Feishu's container for embedded attachments / referenced
@@ -1035,7 +1055,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		// render it instead of dropping the whole subtree.
 		case FEISHU_BLOCK_TYPE.VIEW:
 		case FEISHU_BLOCK_TYPE.QUOTE_CONTAINER: {
-			return renderBlockChildren(block, blockMap);
+			return renderBlockChildren(block, blockMap, headingNumbers);
 		}
 
 		case FEISHU_BLOCK_TYPE.SHEET: {
@@ -1066,7 +1086,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 	}
 }
 
-function renderTable(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderTable(block: FeishuBlock, blockMap: Map<string, FeishuBlock>, headingNumbers: Map<string, number>): string {
 	const table = block.table;
 	if (!table?.property) return '';
 
@@ -1085,7 +1105,7 @@ function renderTable(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 			const cellBlock = cellId ? blockMap.get(cellId) : undefined;
 			const tag = r === 0 ? 'th' : 'td';
 			if (cellBlock?.children?.length) {
-				const content = renderChildren(cellBlock.children, blockMap);
+				const content = renderChildren(cellBlock.children, blockMap, headingNumbers);
 				cells.push(`<${tag}>${content}</${tag}>`);
 			} else {
 				cells.push(`<${tag}></${tag}>`);

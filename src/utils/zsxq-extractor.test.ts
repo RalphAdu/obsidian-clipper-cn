@@ -136,9 +136,12 @@ describe('parseZsxqInlineText', () => {
 		expect(parseZsxqInlineText('<e type="emoji" />')).toBe('[表情]');
 	});
 
-	it('expands web <e> tag into a markdown link', () => {
+	it('expands web <e> tag into a link sentinel (promoted to <a> downstream)', () => {
+		// parseZsxqInlineText emits a sentinel that renderTextAsParagraphs
+		// converts to a real <a> tag AFTER escapeHtml; this preserves links
+		// through turndown without `\[t\](u)` escaping.
 		const out = parseZsxqInlineText('<e type="web" href="https://x.com" title="%E5%B7%A5%E5%85%B7" />');
-		expect(out).toBe('[工具](https://x.com)');
+		expect(out).toBe('\x01LINK\x02https://x.com\x02工具\x03');
 	});
 
 	it('drops unknown <e> types silently', () => {
@@ -156,7 +159,7 @@ describe('parseZsxqInlineText', () => {
 
 	it('handles mixed-order tags and entities', () => {
 		const out = parseZsxqInlineText('Hi <e type="mention" title="%40bob" />! see <e type="web" href="https://a.com" title="here" /><br>END');
-		expect(out).toBe('Hi @bob! see [here](https://a.com)\nEND');
+		expect(out).toBe('Hi @bob! see \x01LINK\x02https://a.com\x02here\x03\nEND');
 	});
 });
 
@@ -225,7 +228,11 @@ describe('renderZsxqTopicBodyHtml', () => {
 		expect(out).toContain('答案内容');
 	});
 
-	it('emits image placeholders via feishu-image://zsxq: protocol (prefer original)', () => {
+	it('emits image placeholders via feishu-image://zsxq: protocol (prefer large)', () => {
+		// `large` (800px, quality 75) is preferred over `original` (full-res, q100)
+		// to keep base64-encoded markdown small. zsxq screenshots routinely produce
+		// 5-6 MB originals; clipping a topic with 3 of them yielded a 17 MB note
+		// Obsidian refused to open.
 		const synthetic: ZsxqTopic = {
 			topic_id: 3,
 			type: 'talk',
@@ -245,11 +252,11 @@ describe('renderZsxqTopicBodyHtml', () => {
 		};
 		const out = renderZsxqTopicBodyHtml(synthetic, null);
 		expect(out).toContain('feishu-image://zsxq:');
-		expect(out).toContain(encodeURIComponent('https://images.zsxq.com/orig.jpg'));
+		expect(out).toContain(encodeURIComponent('https://images.zsxq.com/large.jpg'));
 		expect(out).toContain('alt="99"');
 	});
 
-	it('falls back to large then thumbnail when original is missing', () => {
+	it('falls back to original then thumbnail when large is missing', () => {
 		const onlyLarge: ZsxqTopic = {
 			topic_id: 4, type: 'talk',
 			create_time: '2024-01-01T00:00:00+0800',

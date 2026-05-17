@@ -79,10 +79,20 @@ export function parseZsxqInlineText(text: string): string {
 			case 'emoji':
 				return title || '[表情]';
 			case 'web':
+				// Emit a sentinel-wrapped link; renderTextAsParagraphs converts
+				// to a real <a> tag AFTER escapeHtml. Returning markdown like
+				// `[t](u)` would otherwise be escaped to `\[t\](u)` by turndown.
 				if (href) {
-					return `[${title || href}](${href})`;
+					return `LINK${href}${title || href}`;
 				}
 				return title;
+			case 'text_bold':
+				// zsxq stores bold section headings as <e type="text_bold" title="..."/>.
+				// The title attribute holds the actual bold text; dropping the tag
+				// loses these headings entirely. Render as **markdown bold**.
+				return title ? `**${title}**` : '';
+			case 'text_italic':
+				return title ? `*${title}*` : '';
 			default:
 				return '';
 		}
@@ -171,7 +181,11 @@ function escapeHtml(s: string): string {
 }
 
 function pickImageUrl(img: ZsxqImage): string | null {
-	return img.original?.url || img.large?.url || img.thumbnail?.url || null;
+	// Prefer `large` (800px, quality 75) over `original` (full-resolution,
+	// quality 100). A typical zsxq screenshot's `original` is 5-6 MB raw;
+	// base64-encoding 3 of them produced a 17 MB markdown file that Obsidian
+	// refused to open. `large` is 200-400 KB and visually equivalent for notes.
+	return img.large?.url || img.original?.url || img.thumbnail?.url || null;
 }
 
 // Emit an <img> with the feishu-image://zsxq:{encoded-url} protocol placeholder
@@ -219,7 +233,26 @@ function renderTextAsParagraphs(text: string): string {
 	const plain = parseZsxqInlineText(text || '');
 	if (!plain.trim()) return '';
 	const paragraphs = plain.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
-	return paragraphs.map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`).join('');
+	return paragraphs.map(p => {
+		const escaped = escapeHtml(p).replace(/\n/g, '<br/>');
+		// Promote markdown emphasis emitted by parseZsxqInlineText to real HTML
+		// tags so defuddle's markdown converter renders them as bold/italic
+		// instead of leaving literal ** / * characters in the note. Regex is
+		// non-greedy and rejects newlines / nested markers.
+		return `<p>${promoteEmphasis(escaped)}</p>`;
+	}).join('');
+}
+
+function promoteEmphasis(html: string): string {
+	let out = html.replace(/\*\*([^*\n][^*\n]*?)\*\*/g, '<strong>$1</strong>');
+	out = out.replace(/(^|[^*])\*([^*\n][^*\n]*?)\*(?!\*)/g, '$1<em>$2</em>');
+	// Restore <e type="web"> sentinels emitted by parseZsxqInlineText:
+	// \x01LINK\x02{href}\x02{text}\x03  →  <a href="{href}">{text}</a>
+	out = out.replace(/\x01LINK\x02([^\x02]+)\x02([^\x03]+)\x03/g, (_m, href, text) => {
+		const safeHref = href.replace(/"/g, '&quot;');
+		return `<a href="${safeHref}">${text}</a>`;
+	});
+	return out;
 }
 
 export function renderZsxqTopicBodyHtml(topic: ZsxqTopic, articleBodyHtml: string | null): string {
@@ -366,7 +399,7 @@ const COMMENTS_PAGE_SIZE = 30;
 const COMMENTS_PAGE_CAP = 50;
 const COMMENTS_PAGE_DELAY_MS = 200;
 
-export async function fetchZsxqTopic(topicId: string): Promise<ZsxqTopic | null> {
+async function fetchZsxqTopicOnce(topicId: string): Promise<ZsxqTopic | null> {
 	try {
 		const res = await fetch(`${ZSXQ_API_BASE}/topics/${topicId}/info`, { credentials: 'include' });
 		if (!res.ok) {
@@ -388,6 +421,22 @@ export async function fetchZsxqTopic(topicId: string): Promise<ZsxqTopic | null>
 		logger.warn(`[topic] fetch error: ${String(err)}`);
 		return null;
 	}
+}
+
+// Same retry pattern as comments: content-script cross-origin fetch to
+// api.zsxq.com sometimes returns succeeded=false (HTTP 200) on the first
+// attempt right after navigation, before the SPA's session warmup completes.
+// 3× retry with 800ms / 1600ms backoff.
+export async function fetchZsxqTopic(topicId: string): Promise<ZsxqTopic | null> {
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const topic = await fetchZsxqTopicOnce(topicId);
+		if (topic) return topic;
+		if (attempt < 2) {
+			logger.warn(`[topic] empty/failed — retry ${attempt + 1}/3`);
+			await sleep(800 * (attempt + 1));
+		}
+	}
+	return null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -617,7 +666,22 @@ function buildZsxqTitle(topic: ZsxqTopic): string {
 	if (articleTitle) return articleTitle;
 	if (topic.title) return topic.title;
 	const body = topic.talk ?? topic.question ?? topic.task ?? topic.solution;
-	const plain = parseZsxqInlineText(body?.text ?? '').replace(/\n/g, ' ').trim();
+	// If talk.text starts with a bold heading (text_bold <e>), prefer that as
+	// title — zsxq users typically put the post's full title in the first
+	// text_bold tag. The raw <e type="text_bold" title="..."/> appears
+	// literally at the start of text in this case.
+	const rawText = body?.text ?? '';
+	const firstBoldMatch = rawText.match(/^\s*<e\s+[^>]*type="text_bold"[^>]*title="([^"]+)"[^>]*\/?>/);
+	if (firstBoldMatch) {
+		try {
+			const decoded = decodeURIComponent(firstBoldMatch[1]).trim();
+			if (decoded) return decoded.length > 80 ? decoded.slice(0, 80) + '…' : decoded;
+		} catch { /* fall through */ }
+	}
+	const plain = parseZsxqInlineText(rawText)
+		.replace(/\*+/g, '') // strip markdown emphasis that parseZsxqInlineText now emits
+		.replace(/\n/g, ' ')
+		.trim();
 	if (!plain) return 'zsxq 帖子';
 	return plain.length > 40 ? plain.slice(0, 40) + '…' : plain;
 }

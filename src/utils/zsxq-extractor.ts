@@ -267,6 +267,74 @@ export function renderZsxqTopicBodyHtml(topic: ZsxqTopic, articleBodyHtml: strin
 	return parts.join('');
 }
 
+// ─── Comment types + rendering ──────────────────────────────────────────────
+// zsxq comments are nested exactly 2 deep: each top-level comment may carry a
+// `replied_comments` array of 1-level replies; replies have no further nesting.
+// No tree reconstruction needed — just walk the structure.
+
+export interface ZsxqComment {
+	comment_id: number;
+	create_time: string;
+	text: string;
+	owner: ZsxqUser;
+	likes_count: number;
+	group_owner_liked: boolean;
+	topic_owner_liked: boolean;
+	rewards_count: number;
+	sticky: boolean;
+	images?: ZsxqImage[];
+	replies_count?: number;
+	replied_comments?: ZsxqReply[];
+}
+
+export interface ZsxqReply extends Omit<ZsxqComment, 'replied_comments' | 'replies_count'> {
+	parent_comment_id: number;
+	repliee?: ZsxqUser;
+}
+
+function formatZsxqDate(iso: string): string {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return iso;
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
+function renderCommentHeader(c: ZsxqComment | ZsxqReply, opts?: { repliee?: ZsxqUser }): string {
+	const name = escapeHtml(c.owner?.name || `匿名#${c.comment_id}`);
+	const likes = (c.likes_count ?? 0) > 0 ? ` · ${c.likes_count} ❤️` : '';
+	const date = formatZsxqDate(c.create_time);
+	const reply = opts?.repliee?.name ? ` · 回复 @${escapeHtml(opts.repliee.name)}` : '';
+	return `<p><strong>${name}</strong>${likes} · ${date}${reply}</p>`;
+}
+
+function renderCommentBody(text: string, images?: ZsxqImage[]): string {
+	const parts: string[] = [];
+	parts.push(renderTextAsParagraphs(text));
+	parts.push(renderImages(images));
+	return parts.join('');
+}
+
+function renderOneReply(r: ZsxqReply): string {
+	const header = renderCommentHeader(r, { repliee: r.repliee });
+	const body = renderCommentBody(r.text, r.images);
+	return `<blockquote>${header}${body}</blockquote>`;
+}
+
+function renderOneComment(c: ZsxqComment): string {
+	const header = renderCommentHeader(c);
+	const body = renderCommentBody(c.text, c.images);
+	const replies = (c.replied_comments ?? []).map(renderOneReply).join('');
+	return `<blockquote>${header}${body}${replies}</blockquote>`;
+}
+
+export function renderZsxqCommentsHtml(comments: ZsxqComment[], totalCount: number): string {
+	if (!comments.length) return '';
+	const bodies = comments.map(renderOneComment).join('');
+	return `<hr/><h2>💬 全部评论（${totalCount} 条）</h2>${bodies}`;
+}
+
 export function parseZsxqUrl(url: string): ZsxqUrlInfo | null {
 	try {
 		const u = new URL(url);

@@ -7,7 +7,9 @@ import {
 	parseZsxqUrl,
 	parseZsxqInlineText,
 	renderZsxqTopicBodyHtml,
+	renderZsxqCommentsHtml,
 	type ZsxqTopic,
+	type ZsxqComment,
 } from './zsxq-extractor';
 
 const FIXTURE_DIR = join(__dirname, 'fixtures');
@@ -17,6 +19,9 @@ const topicFixture = JSON.parse(
 const articleHtmlFixture = readFileSync(
 	join(FIXTURE_DIR, 'zsxq-article-qleditor-0rpvzt86eie6.html'),
 	'utf8',
+);
+const commentsFixture = JSON.parse(
+	readFileSync(join(FIXTURE_DIR, 'zsxq-comments-185414442218552.json'), 'utf8'),
 );
 
 describe('isZsxqTopicUrl', () => {
@@ -290,5 +295,114 @@ describe('renderZsxqTopicBodyHtml', () => {
 		const out = renderZsxqTopicBodyHtml(synthetic, null);
 		expect(out).not.toContain('<script>x</script>');
 		expect(out).toContain('&lt;script&gt;');
+	});
+});
+
+describe('renderZsxqCommentsHtml', () => {
+	it('returns empty string for empty array', () => {
+		expect(renderZsxqCommentsHtml([], 0)).toBe('');
+	});
+
+	it('renders a single top-level comment with author + date', () => {
+		const c: ZsxqComment = {
+			comment_id: 1,
+			create_time: '2024-01-11T13:23:50.636+0800',
+			text: 'hello',
+			owner: { user_id: 1, name: 'alice', avatar_url: '' },
+			likes_count: 0,
+			group_owner_liked: false,
+			topic_owner_liked: false,
+			rewards_count: 0,
+			sticky: false,
+		};
+		const out = renderZsxqCommentsHtml([c], 1);
+		expect(out).toContain('<h2>💬 全部评论（1 条）</h2>');
+		expect(out).toContain('<strong>alice</strong>');
+		expect(out).toContain('2024-01-11');
+		expect(out).toContain('hello');
+		// likes_count = 0 — heart suffix MUST be omitted
+		expect(out).not.toContain('❤️');
+	});
+
+	it('shows likes count when > 0', () => {
+		const c: ZsxqComment = {
+			comment_id: 1,
+			create_time: '2024-01-11T13:23:50.636+0800',
+			text: 'x',
+			owner: { user_id: 1, name: 'alice', avatar_url: '' },
+			likes_count: 5,
+			group_owner_liked: false,
+			topic_owner_liked: false,
+			rewards_count: 0,
+			sticky: false,
+		};
+		const out = renderZsxqCommentsHtml([c], 1);
+		expect(out).toContain('5 ❤️');
+	});
+
+	it('renders nested replied_comments as inner blockquotes', () => {
+		// Use the fixture: pick a comment with replied_comments.
+		const all: ZsxqComment[] = commentsFixture.resp_data.comments;
+		const withReplies = all.find(c => Array.isArray(c.replied_comments) && c.replied_comments!.length > 0);
+		expect(withReplies).toBeTruthy();
+		const out = renderZsxqCommentsHtml([withReplies!], 1);
+		// outer blockquote + at least one inner blockquote
+		expect((out.match(/<blockquote>/g) || []).length).toBeGreaterThanOrEqual(2);
+		// each reply author appears
+		for (const r of withReplies!.replied_comments!) {
+			expect(out).toContain(`<strong>${r.owner.name}</strong>`);
+		}
+	});
+
+	it('totalCount drives the header label, even when items array is partial', () => {
+		const c: ZsxqComment = {
+			comment_id: 1,
+			create_time: '2024-01-11T13:23:50.636+0800',
+			text: 'x',
+			owner: { user_id: 1, name: 'a', avatar_url: '' },
+			likes_count: 0,
+			group_owner_liked: false,
+			topic_owner_liked: false,
+			rewards_count: 0,
+			sticky: false,
+		};
+		const out = renderZsxqCommentsHtml([c], 54);
+		expect(out).toContain('💬 全部评论（54 条）');
+	});
+
+	it('passes comment text through parseZsxqInlineText (decodes <e> tags)', () => {
+		const c: ZsxqComment = {
+			comment_id: 1,
+			create_time: '2024-01-11T13:23:50.636+0800',
+			text: 'hi <e type="mention" title="%40bob" />',
+			owner: { user_id: 1, name: 'a', avatar_url: '' },
+			likes_count: 0,
+			group_owner_liked: false,
+			topic_owner_liked: false,
+			rewards_count: 0,
+			sticky: false,
+		};
+		const out = renderZsxqCommentsHtml([c], 1);
+		expect(out).toContain('hi @bob');
+		// raw <e> tag should not survive
+		expect(out).not.toContain('<e type=');
+	});
+
+	it('renders comment images via the same feishu-image://zsxq: protocol', () => {
+		const c: ZsxqComment = {
+			comment_id: 1,
+			create_time: '2024-01-11T13:23:50.636+0800',
+			text: '',
+			owner: { user_id: 1, name: 'a', avatar_url: '' },
+			likes_count: 0,
+			group_owner_liked: false,
+			topic_owner_liked: false,
+			rewards_count: 0,
+			sticky: false,
+			images: [{ image_id: 11, original: { url: 'https://x/a.jpg' } }],
+		};
+		const out = renderZsxqCommentsHtml([c], 1);
+		expect(out).toContain('feishu-image://zsxq:');
+		expect(out).toContain(encodeURIComponent('https://x/a.jpg'));
 	});
 });

@@ -12,7 +12,8 @@ export interface FeishuParsedUrl {
 export interface FeishuStructuredContent {
 	title: string;
 	author: string;
-	content: string;
+	content: string;             // HTML (no comments appended)
+	commentsMarkdown?: string;   // already markdown — must NOT pass through turndown
 	wordCount: number;
 }
 
@@ -1184,7 +1185,6 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	} catch (e) {
 		logger.warn(`Comments extraction threw: ${String(e)}`);
 	}
-	const fullContent = commentsMarkdown ? `${content}\n\n${commentsMarkdown}` : content;
 
 	const title = meta?.title || doc.title || '';
 
@@ -1204,7 +1204,8 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	return {
 		title,
 		author: meta?.owner || '',
-		content: fullContent,
+		content,
+		commentsMarkdown: commentsMarkdown || undefined,
 		wordCount,
 	};
 }

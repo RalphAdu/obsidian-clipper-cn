@@ -72,4 +72,88 @@ describe('feishu-comments integration — production IPC path', () => {
 		expect(got[0].comment_id).toBe('c1');
 		expect(got[1].is_solved).toBe(true);
 	});
+
+	it('extractFeishuStructuredContent surfaces commentsMarkdown as a separate field, not inside content HTML (Bug 2 regression guard)', async () => {
+		// Mock sendMessage routes by inspecting request shape:
+		//  - { action: 'fetchFeishuApi', url } where url contains "/blocks?" → blocks response
+		//  - { action: 'fetchFeishuApi', url } where url contains "/comments?" → comments response
+		//  - { action: 'fetchFeishuApi', url } otherwise (e.g. /documents/{id}) → meta response
+		vi.spyOn(browser.runtime, 'sendMessage').mockImplementation(async (req: any) => {
+			if (req?.action === 'fetchFeishuApi' && typeof req.url === 'string') {
+				if (req.url.includes('/blocks?')) {
+					return {
+						success: true,
+						data: {
+							code: 0,
+							data: {
+								items: [
+									{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['t'] },
+									{ block_id: 't', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: '正文段落' } }] } },
+								],
+								has_more: false,
+								page_token: '',
+							},
+							msg: 'Success',
+						},
+					};
+				}
+				if (req.url.includes('/comments?')) {
+					return {
+						success: true,
+						data: {
+							code: 0,
+							data: {
+								items: [
+									{
+										comment_id: 'c1',
+										create_time: 1700000000,
+										is_solved: false,
+										is_whole: true,
+										user_id: 'ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxabcd1234',
+										solver_user_id: null,
+										reply_list: {
+											replies: [
+												{
+													reply_id: 'r1',
+													create_time: 1700000000,
+													user_id: 'ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxabcd1234',
+													content: { elements: [{ type: 'text_run', text_run: { text: 'a comment' } }] },
+													extra: { image_list: [] },
+												},
+											],
+										},
+									},
+								],
+								has_more: false,
+								page_token: '',
+							},
+							msg: 'Success',
+						},
+					};
+				}
+				// Fall-through for the meta endpoint /documents/{id} (no /blocks suffix)
+				return {
+					success: true,
+					data: {
+						code: 0,
+						data: { document: { title: 'fake doc', owner_id: 'ou_owner' } },
+						msg: 'Success',
+					},
+				};
+			}
+			return { success: true };
+		});
+
+		const { extractFeishuStructuredContent } = await import('./feishu-extractor');
+		const fakeDoc = { URL: 'https://x.feishu.cn/docx/abc', title: '' } as any;
+		const result = await extractFeishuStructuredContent(fakeDoc);
+
+		expect(result).not.toBeNull();
+		expect(result!.commentsMarkdown).toBeDefined();
+		expect(result!.commentsMarkdown).toMatch(/## 评论/);
+		expect(result!.commentsMarkdown).toMatch(/> \[!quote\]\+ 评论者 abcd1234 ·/);
+		// Critical separation: the HTML content must NOT contain comment markdown.
+		expect(result!.content).not.toMatch(/## 评论/);
+		expect(result!.content).not.toMatch(/\[!quote\]/);
+	});
 });

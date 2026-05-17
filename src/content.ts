@@ -301,6 +301,10 @@ declare global {
 				extractedContent.page = String(bilibiliContent.page);
 			}
 
+			if (feishuContent?.commentsMarkdown) {
+				extractedContent.commentsMarkdown = feishuContent.commentsMarkdown;
+			}
+
 			// scysContent's title/author/content/wordCount/description are already
 			// surfaced via the ContentResponse cascade (line ~352-367) which feeds
 			// initializePageContent → buildVariables, where {{title}}/{{author}}/

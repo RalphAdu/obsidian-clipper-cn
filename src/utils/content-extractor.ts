@@ -158,7 +158,10 @@ export async function initializePageContent(
 			content = processHighlights(content, highlights);
 		}
 
-		const markdownBody = postProcessExtractorMarkdown(createMarkdownContent(content, currentUrl));
+		let markdownBody = postProcessExtractorMarkdown(createMarkdownContent(content, currentUrl));
+		if (extractedContent && typeof extractedContent.commentsMarkdown === 'string' && extractedContent.commentsMarkdown.length > 0) {
+			markdownBody = `${markdownBody}\n\n${extractedContent.commentsMarkdown}`;
+		}
 
 		const highlightsData = collapseGroupsForExport(highlights, c => postProcessExtractorMarkdown(createMarkdownContent(c, currentUrl)));
 

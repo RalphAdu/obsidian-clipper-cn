@@ -20,4 +20,13 @@ describe('convertBlocksToHtml — IFRAME', () => {
 		const html = convertBlocksToHtml(noUrl);
 		expect(html).toContain('[Embedded content: type 26]');
 	});
+
+	it('preserves query string in the label when the path is empty', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['i'] },
+			{ block_id: 'i', block_type: 26, parent_id: 'p', iframe: { component: { iframe_type: 99, url: 'https%3A%2F%2Fdocs.example.com%2F%3Fid%3Dabc123' } } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<a href="https://docs.example.com/?id=abc123">docs.example.com?id=abc123</a>');
+	});
 });

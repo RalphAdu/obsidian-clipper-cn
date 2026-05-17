@@ -1101,7 +1101,8 @@ function extractDomainLabel(url: string): string {
 		const u = new URL(url);
 		const hostname = u.hostname.replace(/^www\./, '');
 		const path = u.pathname && u.pathname !== '/' ? u.pathname : '';
-		return hostname + path;
+		const search = !path && u.search ? u.search : '';
+		return hostname + path + search;
 	} catch {
 		return '';
 	}

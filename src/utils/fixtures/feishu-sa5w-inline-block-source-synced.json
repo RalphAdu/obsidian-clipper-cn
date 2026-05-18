@@ -1,0 +1,79 @@
+[
+  {
+    "block_id": "page",
+    "block_type": 1,
+    "page": { "elements": [], "style": { "align": 1 } },
+    "children": ["sync1", "text1", "view1"]
+  },
+  {
+    "block_id": "sync1",
+    "block_type": 49,
+    "parent_id": "page",
+    "source_synced": {
+      "elements": [{ "text_run": { "content": "同步块", "text_element_style": {} } }],
+      "align": 1
+    },
+    "children": ["img1"]
+  },
+  {
+    "block_id": "img1",
+    "block_type": 27,
+    "parent_id": "sync1",
+    "image": {
+      "token": "GI3bbDFW9oUf1WxuiAdcTsIrn9e",
+      "width": 246,
+      "height": 27,
+      "align": 2,
+      "scale": 1,
+      "caption": { "content": "EXE为更新和启动的主要组件。" }
+    }
+  },
+  {
+    "block_id": "text1",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        {
+          "inline_block": {
+            "block_id": "file1",
+            "text_element_style": {
+              "bold": false,
+              "inline_code": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false
+            }
+          }
+        }
+      ],
+      "style": { "align": 1, "folded": false }
+    },
+    "children": ["file1"]
+  },
+  {
+    "block_id": "file1",
+    "block_type": 23,
+    "parent_id": "text1",
+    "file": {
+      "name": "测试连通多账号软件小工具.bat",
+      "token": "X5STbwerko4oM8xZXHLcxceXnlh"
+    }
+  },
+  {
+    "block_id": "view1",
+    "block_type": 33,
+    "parent_id": "page",
+    "view": { "view_type": 2 },
+    "children": ["file2"]
+  },
+  {
+    "block_id": "file2",
+    "block_type": 23,
+    "parent_id": "view1",
+    "file": {
+      "name": "1.软件使用方法.mp4",
+      "token": "MP4TokenABCDEFGHIJKLMNOP"
+    }
+  }
+]

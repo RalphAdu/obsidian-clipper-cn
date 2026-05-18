@@ -1867,3 +1867,15 @@ zsxq 是 cn fork 独有 feature，**不计划上游化**（知识星球是中文
 - **加密图片解密**：研究 feishu imageManager 内部解密逻辑（拆 feishu web bundle 反推 key derivation）。当前 3 策略改善了 missing-block 的部分，但加密字节仍 unfixable，靠 octet-stream filter 兜成 placeholder。
 - **自动化端到端 clip 验证**：playwright + extension loaded + 拦截 `obsidian://` URL，把 audit 整个链路（含 frontmatter + 图片）一键化。当前需用户手动重裁 → 我跑 audit --vault-md 循环。
 - **contact:user.base:readonly 权限申请**：用户去飞书开发者后台开 https://open.feishu.cn/app/cli_a9074898cdf8dcba/auth?q=contact:user.base:readonly 后，author 自动从 `创建者 d065f814` 升级为 `创建者 刘智行`。
+
+**2026-05-18 更新 — contact:user.base:readonly 实测限制**：
+
+用户已开通 App `contact:user.base:readonly` 两个身份（应用 + 用户）。实测：
+- `/contact/v3/scopes?user_id_type=open_id` 返 code=0、**仅 1 个 user_id**（App 创建者本人）
+- 查跨租户 user（如 `my.feishu.cn` 的 doc owner）仍返 41050 "no user authority error"
+
+**根因**：tenant_access_token 走"应用身份"，数据范围 = App 创建时配置的「**可见通讯录范围**」（默认仅含 App 创建者）。doc owner 在别人企业 → 不可能加入 App 可见范围 → 41050 是飞书硬性租户隔离。
+
+**绕开方案（暂不实施）**：用 `user_access_token` 走"用户身份"，数据范围 = "与用户权限范围一致" → 能查用户自己可见的所有人（含跨企业协作者）。但需要 OAuth redirect 流程，与 cn 当前的"tenant token 全自动"架构冲突，UX 改动大。
+
+**结论**：`创建者 d065f814` 兜底是 by design 的最优解，open_id 后 8 位有 hex 唯一性（同一 author 跨文档可识别）。已沉淀到 author 字段格式约定。

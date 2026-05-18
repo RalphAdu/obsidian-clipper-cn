@@ -527,6 +527,21 @@ async function resolveFeishuImages(html: string): Promise<string> {
 		);
 	}
 
+	// Defensive filter: if an image was fetched but stayed as application/octet-stream,
+	// the bytes are likely encrypted (feishu's copy_out/asynccode path returns encrypted
+	// blobs that the cn extractor doesn't decrypt). Drop those from base64Results so the
+	// substitution loop below leaves the token as an unresolved placeholder.
+	let droppedOctetStream = 0;
+	for (const [token, dataUrl] of [...base64Results.entries()]) {
+		if (dataUrl.startsWith('data:application/octet-stream')) {
+			base64Results.delete(token);
+			droppedOctetStream++;
+		}
+	}
+	if (droppedOctetStream > 0) {
+		logger.warn(`[img-resolve] dropped ${droppedOctetStream} image(s) with application/octet-stream MIME (likely encrypted)`);
+	}
+
 	let resolved = html;
 	for (const token of tokenList) {
 		const replacement = base64Results.get(token);

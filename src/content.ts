@@ -373,7 +373,7 @@ declare global {
 					image: bilibiliContent?.image || defuddled.image,
 					language: defuddled.language || '',
 					parseTime: defuddled.parseTime,
-					published: bilibiliContent?.published || zsxqContent?.published || defuddled.published,
+					published: bilibiliContent?.published || scysContent?.published || zsxqContent?.published || defuddled.published,
 					schemaOrgData: defuddled.schemaOrgData,
 					selectedHtml: selectedHtml,
 					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : defuddled.site,

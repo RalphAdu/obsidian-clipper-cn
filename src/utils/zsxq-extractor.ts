@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { createLogger } from './logger';
+import { convertDate } from './date-utils';
 
 const logger = createLogger('zsxq-extractor');
 
@@ -695,10 +696,7 @@ function buildZsxqPublished(topic: ZsxqTopic): string {
 	if (!topic.create_time) return '';
 	const d = new Date(topic.create_time);
 	if (Number.isNaN(d.getTime())) return '';
-	const y = d.getFullYear();
-	const m = String(d.getMonth() + 1).padStart(2, '0');
-	const day = String(d.getDate()).padStart(2, '0');
-	return `${y}-${m}-${day}`;
+	return convertDate(d);
 }
 
 function buildZsxqTitle(topic: ZsxqTopic): string {

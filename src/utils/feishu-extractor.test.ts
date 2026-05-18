@@ -257,6 +257,46 @@ describe('convertBlocksToHtml — list spacer boundary', () => {
 		expect(html).not.toMatch(/<li>[^<]*<p>These issues/);
 		expect(html).toContain('<h2>Next section</h2>');
 	});
+
+	it('BULLET → empty TEXT × 2 → non-empty TEXT: consecutive spacers do not block lookahead', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['u1', 'sp1', 'sp2', 't1'] },
+			{ block_id: 'u1', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'item' } }] } } as any,
+			{ block_id: 'sp1', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: '' } }] } } as any,
+			{ block_id: 'sp2', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: '  ' } }] } } as any,
+			{ block_id: 't1', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: 'standalone paragraph' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html.match(/<li>/g)?.length).toBe(1);
+		expect(html).toContain('<li>item</li>');
+		expect(html).toContain('<p>standalone paragraph</p>');
+		expect(html).not.toMatch(/<li>[^<]*<p>standalone/);
+	});
+
+	it('BULLET → empty TEXT → EOF: list closes cleanly, no orphan empty <p>', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['u1', 'sp'] },
+			{ block_id: 'u1', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'only item' } }] } } as any,
+			{ block_id: 'sp', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: '' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<ul><li>only item</li></ul>');
+		expect(html).not.toContain('<p></p>');
+	});
+
+	it('BULLET → empty TEXT → ORDERED: <ul> closes, <ol> stands alone', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['u1', 'sp', 'o1'] },
+			{ block_id: 'u1', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'bullet item' } }] } } as any,
+			{ block_id: 'sp', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: '' } }] } } as any,
+			{ block_id: 'o1', block_type: 13, parent_id: 'p', ordered: { elements: [{ text_run: { content: 'ordered item' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<ul><li>bullet item</li></ul>');
+		expect(html).toContain('<ol><li>ordered item</li></ol>');
+		// bullet item must NOT appear inside the <ol>
+		expect(html).not.toMatch(/<ol>[^]*bullet item/);
+	});
 });
 
 describe('extractFeishuStructuredContent — comments wiring', () => {

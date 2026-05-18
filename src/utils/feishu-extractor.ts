@@ -672,6 +672,9 @@ interface RenderTextOptions {
 	skipBold?: boolean;
 }
 
+// Side effect: marks blockId in ctx.consumedInlineIds so renderBlock skips it
+// later (prevents double-render when the inlined block also appears as a child
+// in its parent's children traversal).
 function renderInlineBlock(blockId: string, ctx: RenderCtx): string {
 	const target = ctx.blockMap.get(blockId);
 	if (!target) return '';

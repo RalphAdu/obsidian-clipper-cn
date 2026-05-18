@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
-import { convertBlocksToHtml, type FeishuBlock } from './feishu-extractor';
+import { convertBlocksToHtml, resolveFeishuFiles, type FeishuBlock } from './feishu-extractor';
+import sa5wFixture from './fixtures/feishu-sa5w-inline-block-source-synced.json';
 
 // One-shot audit test loading the user's reproducing doc
 // (https://ly5achi80l.feishu.cn/docx/KREbdOvMsoowcrxt9Bbcc9w7n2d)
@@ -120,3 +121,29 @@ const blocks = haveFixture
 		});
 	},
 );
+
+describe('audit — Sa5W… (SOURCE_SYNCED + inline_block + IMAGE caption)', () => {
+	const docUrl = 'https://my.feishu.cn/docx/Sa5Wdx0Naoq2AExhFx1cKFrUnXd';
+
+	it('full pipeline preserves all three previously-lost content kinds', () => {
+		const rawHtml = convertBlocksToHtml(sa5wFixture as unknown as FeishuBlock[]);
+		const finalHtml = resolveFeishuFiles(rawHtml, docUrl);
+
+		// (1) SOURCE_SYNCED container's IMAGE survived
+		expect(finalHtml).toContain('feishu-image://GI3bbDFW9oUf1WxuiAdcTsIrn9e');
+
+		// (2) IMAGE caption surfaced
+		expect(finalHtml).toContain('<figcaption>EXE为更新和启动的主要组件。</figcaption>');
+
+		// (3) inline_block → FILE resolved to anchor link inside parent <p>
+		expect(finalHtml).toContain(`<a href="${docUrl}#file1">测试连通多账号软件小工具.bat</a>`);
+		// …and that anchor is NOT wrapped in a stray <p>📎
+		expect(finalHtml).not.toMatch(/<p>📎 <a[^>]*>测试连通多账号软件小工具\.bat<\/a><\/p>/);
+
+		// (4) Top-level VIEW→FILE (.mp4 control group) still renders with <p>📎 wrap
+		expect(finalHtml).toContain(`<p>📎 <a href="${docUrl}#file2">1.软件使用方法.mp4</a></p>`);
+
+		// (5) No unknown-block fallback marker (means all referenced inline targets resolved)
+		expect(finalHtml).not.toContain('[内联块');
+	});
+});

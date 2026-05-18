@@ -1179,11 +1179,11 @@ function renderBlock(block: FeishuBlock, ctx: RenderCtx): string {
 			return renderBlockChildren(block, ctx);
 		}
 
-		// VIEW (33) is Feishu's container for embedded attachments / referenced
-		// documents. The actual FILE child sits one level down — must recurse to
-		// render it instead of dropping the whole subtree.
+		// VIEW (33) and SOURCE_SYNCED (49) are transparent containers — render
+		// children, drop self elements. VIEW wraps embedded attachments /
+		// referenced documents (actual FILE child sits one level down, must
+		// recurse to render it instead of dropping the whole subtree).
 		case FEISHU_BLOCK_TYPE.VIEW:
-		case FEISHU_BLOCK_TYPE.QUOTE_CONTAINER:
 		case FEISHU_BLOCK_TYPE.SOURCE_SYNCED: {
 			return renderBlockChildren(block, ctx);
 		}

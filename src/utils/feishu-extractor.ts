@@ -1067,6 +1067,9 @@ function renderBlockChildren(block: FeishuBlock, ctx: RenderCtx): string {
 }
 
 function renderBlock(block: FeishuBlock, ctx: RenderCtx): string {
+	if (ctx.consumedInlineIds.has(block.block_id)) {
+		return '';
+	}
 	switch (block.block_type) {
 		case FEISHU_BLOCK_TYPE.PAGE:
 			return renderBlockChildren(block, ctx);

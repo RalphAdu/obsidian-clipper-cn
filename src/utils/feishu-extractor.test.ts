@@ -375,4 +375,13 @@ describe('convertBlocksToHtml — inline_block element', () => {
 		const html = convertBlocksToHtml(blocks);
 		expect(html).toContain('[内联块 u1234567]');
 	});
+
+	it('does not double-render: inline-consumed FILE child is skipped during children traversal', () => {
+		const html = convertBlocksToHtml(sa5wFixture as unknown as FeishuBlock[]);
+		// file1 should render exactly once (inline only), not twice (inline + as text1's child block).
+		// Match the href which is unique per anchor (filename string alone would double-count
+		// because it appears in both `data-filename=` attribute and link text).
+		const fileOneAnchors = html.match(/<a href="feishu-file-(?:inline|block):\/\/file1"/g) || [];
+		expect(fileOneAnchors.length).toBe(1);
+	});
 });

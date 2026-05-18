@@ -1,6 +1,7 @@
 import browser from './browser-polyfill';
 import { createLogger } from './logger';
 import { extractFeishuComments } from './feishu-comments';
+import { convertDate } from './date-utils';
 
 const logger = createLogger('Feishu');
 
@@ -14,6 +15,7 @@ export interface FeishuStructuredContent {
 	author: string;
 	content: string;             // HTML (no comments appended)
 	commentsMarkdown?: string;   // already markdown — must NOT pass through turndown
+	published?: string;          // YYYY-MM-DD, from latest_modify_time
 	wordCount: number;
 }
 
@@ -579,14 +581,45 @@ async function fetchAllBlocks(documentId: string): Promise<FeishuBlock[]> {
 	return allBlocks;
 }
 
-async function fetchDocumentMeta(documentId: string): Promise<{ title: string; owner?: string } | null> {
+async function fetchFeishuDocMeta(documentId: string, docType: 'docx' | 'doc' = 'docx'): Promise<{ ownerOpenId?: string; latestModifyTime?: number; title?: string } | null> {
 	try {
 		const result = await fetchFeishuApi(
-			`https://open.feishu.cn/open-apis/docx/v1/documents/${documentId}`
+			'https://open.feishu.cn/open-apis/drive/v1/metas/batch_query?user_id_type=open_id',
+			{
+				method: 'POST',
+				body: JSON.stringify({
+					request_docs: [{ doc_token: documentId, doc_type: docType }],
+					with_url: false,
+				}),
+			},
 		);
-		const doc = result?.data?.document;
-		return doc ? { title: doc.title || '', owner: doc.owner_id } : null;
-	} catch {
+		const meta = result?.data?.metas?.[0];
+		if (!meta) return null;
+		return {
+			ownerOpenId: meta.owner_id,
+			latestModifyTime: meta.latest_modify_time ? Number(meta.latest_modify_time) : undefined,
+			title: meta.title,
+		};
+	} catch (e) {
+		logger.warn(`fetchFeishuDocMeta failed: ${String(e)}`);
+		return null;
+	}
+}
+
+async function resolveFeishuUserName(openId: string): Promise<string | null> {
+	try {
+		const result = await fetchFeishuApi(
+			`https://open.feishu.cn/open-apis/contact/v3/users/${openId}?user_id_type=open_id`,
+		);
+		return result?.data?.user?.name || null;
+	} catch (e) {
+		// 41050: App lacks contact scope. Expected until user grants permission.
+		const msg = String(e);
+		if (msg.includes('41050') || msg.includes('no user authority')) {
+			logger.debug('Contact API blocked (41050) — falling back to open_id suffix');
+		} else {
+			logger.warn(`resolveFeishuUserName error: ${msg}`);
+		}
 		return null;
 	}
 }
@@ -1162,9 +1195,9 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	logger.debug('Resolved document', { documentId: resolved.documentId, objType: resolved.objType });
 
-	const [blocks, meta] = await Promise.all([
+	const [blocks, docMeta] = await Promise.all([
 		fetchAllBlocks(resolved.documentId),
-		fetchDocumentMeta(resolved.documentId),
+		fetchFeishuDocMeta(resolved.documentId, resolved.objType as 'docx' | 'doc'),
 	]);
 
 	if (!blocks.length) {
@@ -1186,7 +1219,14 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 		logger.warn(`Comments extraction threw: ${String(e)}`);
 	}
 
-	const title = meta?.title || doc.title || '';
+	const ownerOpenId = docMeta?.ownerOpenId || '';
+	const realName = ownerOpenId ? await resolveFeishuUserName(ownerOpenId) : null;
+	const authorTag = realName
+		? `创建者 ${realName}`
+		: (ownerOpenId ? `创建者 ${ownerOpenId.slice(-8)}` : '');
+	const publishedDate = docMeta?.latestModifyTime
+		? convertDate(new Date(docMeta.latestModifyTime * 1000))
+		: '';
 
 	const textContent = blocks
 		.map(b => {
@@ -1202,10 +1242,11 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	const wordCount = textContent.split(/\s+/).filter(Boolean).length || textContent.length;
 
 	return {
-		title,
-		author: meta?.owner || '',
+		title: docMeta?.title || doc.title || '',
+		author: authorTag,
 		content,
 		commentsMarkdown: commentsMarkdown || undefined,
+		published: publishedDate || undefined,
 		wordCount,
 	};
 }

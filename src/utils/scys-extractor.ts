@@ -2,6 +2,7 @@ import browser from 'webextension-polyfill';
 import { createLogger } from './logger';
 import { convertBlocksToHtml, autolinkBareUrls } from './feishu-extractor';
 import type { FeishuBlock } from './feishu-extractor';
+import { convertDate } from './date-utils';
 
 const logger = createLogger('scys-extractor');
 
@@ -503,6 +504,9 @@ export interface ScysStructuredContent {
 	author: string;
 	content: string;
 	wordCount: number;
+	/** Article publish date as YYYY-MM-DD (from topicDTO.gmtCreate unix seconds).
+	 *  Empty string for course/docx paths (no publish-time semantics). */
+	published: string;
 }
 
 function countWordsFromBlocks(blocks: FeishuBlock[]): number {
@@ -575,6 +579,7 @@ async function extractScysCourseChapter(doc: Document): Promise<ScysStructuredCo
 		author: courseMeta?.author || '',
 		content: html + commentsMd,
 		wordCount,
+		published: '',
 	};
 }
 
@@ -606,7 +611,7 @@ async function extractScysDocxStandalone(doc: Document): Promise<ScysStructuredC
 
 	const wordCount = countWordsFromBlocks(flattenScysBlocks(blocks));
 
-	return { title, author: '', content: html, wordCount };
+	return { title, author: '', content: html, wordCount, published: '' };
 }
 
 // ─── /articleDetail/{entityType}/{entityId} (zsxq topic mirror) ───────────────
@@ -884,11 +889,16 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 	// Resolve scys: image tokens (body + comment images) in one pass.
 	html = await resolveScysImages(html + commentsHtml);
 
+	const published = detail.gmtCreate
+		? convertDate(new Date(detail.gmtCreate * 1000))
+		: '';
+
 	return {
 		title: detail.showTitle,
 		author: detail.authorName,
 		content: html,
 		wordCount,
+		published,
 	};
 }
 

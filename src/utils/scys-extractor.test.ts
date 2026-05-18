@@ -738,6 +738,7 @@ describe('renderScysComments (real fixture)', () => {
 });
 
 import { extractScysStructuredContent, preprocessScysEntityHtml } from './scys-extractor';
+import { convertDate } from './date-utils';
 
 describe('extractScysStructuredContent (orchestration)', () => {
 	const originalFetch = global.fetch;
@@ -1401,6 +1402,30 @@ describe('extractScysStructuredContent — article route', () => {
 		expect(r?.author).toBe('Tester');
 		expect(r?.content).toContain('body text');
 		expect(r?.content).not.toContain('💬 评论');
+		expect(r?.published).toBe(convertDate(new Date(1762503084 * 1000)));
+	});
+
+	it('returns published="" when gmtCreate is 0/missing', async () => {
+		global.fetch = vi.fn().mockImplementation((url: any) => {
+			if (String(url).includes('topicDetail')) {
+				return Promise.resolve({ ok: true, json: () => Promise.resolve({
+					success: true, data: {
+						topicDTO: {
+							entityId: '2', entityType: 'xq_topic', showTitle: 'No Date',
+							docBlocks: [
+								{ block_id: 'b1', block_type: 2, text: { elements: [{ text_run: { content: 'x' } }] } } as any,
+							],
+							gmtCreate: 0, commentsCount: 0, likeCount: 0, readingCount: 0,
+						},
+						topicUserDTO: { name: 'T' },
+					},
+				}) } as any);
+			}
+			return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: { total: 0, items: [] } }) } as any);
+		});
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/2' } as Document;
+		const r = await extractScysStructuredContent(doc);
+		expect(r?.published).toBe('');
 	});
 
 	it('resolves FILE block links to article URL anchors (video/.mp4 attachments)', async () => {

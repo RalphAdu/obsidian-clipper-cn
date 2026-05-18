@@ -1879,3 +1879,63 @@ zsxq 是 cn fork 独有 feature，**不计划上游化**（知识星球是中文
 **绕开方案（暂不实施）**：用 `user_access_token` 走"用户身份"，数据范围 = "与用户权限范围一致" → 能查用户自己可见的所有人（含跨企业协作者）。但需要 OAuth redirect 流程，与 cn 当前的"tenant token 全自动"架构冲突，UX 改动大。
 
 **结论**：`创建者 d065f814` 兜底是 by design 的最优解，open_id 后 8 位有 hex 唯一性（同一 author 跨文档可识别）。已沉淀到 author 字段格式约定。
+
+---
+
+## 2026-05-18 反思 - II：H4 编号 / DOM author / 自动化重裁
+
+第一轮修复（图片 + 元数据）后，用户最终验收暴露的两个剩余问题，以及修复中暴露的回归风险。
+
+### 1. 飞书 web 标题编号规则 = CSS counter
+
+飞书 web 显示的 "1. 起心动念"、"4.1 …" 不是文档里的字面文本，是 CSS counter：
+- **H1**：全局编号（一个 counter 跨整文档累加）
+- **H4**：按 H2 分段编号（counter 在每个 H2 边界 reset）
+- **H2 / H3 / H5+**：**不**自动编号 — 用户惯例手写 "一、" / "二、" / "2.1.1" 前缀
+
+OpenAPI 返回的 block 文本里没有这些数字，渲染层必须复刻 counter。`convertBlocksToHtml` pre-scan 两遍 blockMap：第一遍按 doc order 给 H1 / H4 分配 `headingNumbers.get(block_id)`；第二遍渲染时把 `N.` 拼到 heading 内文前。
+
+### 2. autoNumberHeadings 必须是 opt-in（防 scys 回归）
+
+`convertBlocksToHtml` 是 feishu + scys **共享**的 util。scys 文档惯例是人工写 "2.1.1 用途…" 标题前缀，无脑加 "N. " 会变 "1. 2.1.1 用途…" 双编号。
+
+修复：option 显式开关。feishu `extractFeishuStructuredContent` 传 `{ autoNumberHeadings: true }`；scys `renderScysChapterContent` 不传 option。
+
+**沉淀给共享 util 的纪律**：往多个调用方共用的工具函数加新行为时，**先看所有 callsite**，不行就显式 opt-in。"对一个有效 → 对所有有效" 是基础设施级错觉。
+
+### 3. DOM scrape 优先于 contact API（"不要展示飞书ID"）
+
+contact API 跨租户必 41050（前节已述），原方案 `创建者 d065f814` 兜底用 open_id 后 8 位。用户明确反馈："**你都知道作者是刘智行了，填进去就可以了，不要展示飞书 ID**" — 飞书 ID 对人类读者就是噪声。
+
+修复：author 解析改为三层优先级：
+1. **DOM scrape `.docs-info-avatar-name-text`**（页面 runtime 里裁剪 = 主路径，永远拿真名）
+2. contact API（仅 DOM 失败时尝试，跨租户必 fail）
+3. **空字符串**（不再用 `创建者 <id>` 兜底，open_id 对人类毫无价值）
+
+`frontmatter_field_empty` audit 桶仍能在两个 API 都失败时报警。
+
+**沉淀**：用户域的中间产物（OpenAPI internal ID）默认**不展示**给人类读者。要么解析成有意义的标签，要么空白。`创建者 d065f814` 是技术债的对症兜底，不是产品。
+
+### 4. 自动化重裁 + audit：chrome.alarms hot-reload + test bridge
+
+用户反馈："插件需要配置很多内容，移除重载会非常麻烦" — 不能让用户每次重装扩展。
+
+`src/background.ts` 用 `chrome.alarms` 周期 fetch `build-marker.txt`，时间戳变化就 `chrome.runtime.reload()` 保留配置。利用这个：
+
+```
+build 完 → rsync -a --delete dist/ <main 检出 dist/> → 3s 内扩展自动 reload
+```
+
+然后 `content.ts` 暴露的测试桥 `window.postMessage({type: '__obsidianClipperTestExtract__', testId, uploadUrl})` 可被 claude-in-chrome 触发：上传 simulated Obsidian note 到本地 HTTP server（`/tmp/feishu-clip-server`，port 18877），落地到 `/tmp/feishu-clip-uploaded.md`。
+
+完整自动化链：dev build → rsync → 自动 reload → claude-in-chrome 调测试桥 → upload server 收 markdown → audit `--vault-md` 校验。**用户只管最终视觉验收**。
+
+**测试桥局限**：simulated 路径不一定 plumb 真实链路全字段（`commentsMarkdown` 是 bridge 不走 background 的分流字段，需要单独补丁）。bridge 是开发期快速验证工具，**不替代真实裁剪**。最终视觉验收仍需用户在 Obsidian 里看真裁剪产物。
+
+### 5. audit 盲区再补：image_unresolved 桶
+
+第一轮加了 `image_mime_invalid`（catch octet-stream data URL），但**漏掉**了"图片 fetch 完全失败 → markdown 里残留 `feishu-image://TOKEN` placeholder"的 case。这种 placeholder Obsidian 直接渲染破图。
+
+修复：新增 `image_unresolved` 桶扫 `feishu-image://[A-Za-z0-9_-]+`。
+
+**沉淀**：bug 修完后必问 "audit 之前为什么没抓到这个？" — 如果是盲区，必须**补桶**。修一个 bug 不补一个 audit 桶，下次同类回归还会再来一次。本会话 wiki 修复总共补了 3 个桶（image_mime_invalid / image_unresolved / frontmatter_field_empty），覆盖三个原本完全无监控的产物层。

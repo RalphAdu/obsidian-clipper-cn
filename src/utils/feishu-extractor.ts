@@ -1148,10 +1148,11 @@ function renderBlock(block: FeishuBlock, ctx: RenderCtx): string {
 
 		case FEISHU_BLOCK_TYPE.IMAGE: {
 			const img = block.image;
-			if (img?.token) {
-				return `<figure><img src="feishu-image://${img.token}" alt="" width="${img.width || ''}" height="${img.height || ''}"></figure>`;
-			}
-			return '';
+			if (!img?.token) return '';
+			const captionHtml = img.caption?.content
+				? `<figcaption>${escapeHtml(img.caption.content)}</figcaption>`
+				: '';
+			return `<figure><img src="feishu-image://${img.token}" alt="" width="${img.width || ''}" height="${img.height || ''}">${captionHtml}</figure>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.FILE: {

@@ -305,3 +305,24 @@ describe('extractFeishuStructuredContent — comments wiring', () => {
 		expect(typeof mod.extractFeishuComments).toBe('function');
 	});
 });
+
+describe('convertBlocksToHtml — IMAGE caption', () => {
+	it('renders <figcaption> when image.caption.content is non-empty', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['i'] } as any,
+			{ block_id: 'i', block_type: 27, parent_id: 'p', image: { token: 'GI3bbDFW9oUf1WxuiAdcTsIrn9e', width: 246, height: 27, caption: { content: 'EXE为更新和启动的主要组件。' } } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<figcaption>EXE为更新和启动的主要组件。</figcaption>');
+	});
+
+	it('omits <figcaption> when caption.content is missing', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['i'] },
+			{ block_id: 'i', block_type: 27, parent_id: 'p', image: { token: 'T1', width: 100, height: 50 } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).not.toContain('<figcaption>');
+		expect(html).toContain('feishu-image://T1');
+	});
+});

@@ -147,7 +147,7 @@ describe('convertBlocksToHtml — mention_doc', () => {
 });
 
 describe('convertBlocksToHtml — H1 auto-numbering', () => {
-	it('numbers each H1 by document order; H2/H3 are not numbered', () => {
+	it('numbers each H1 by document order; H2/H3 are not numbered (autoNumberHeadings: true)', () => {
 		const blocks: FeishuBlock[] = [
 			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['h1a', 'h2', 'h1b', 'h3', 'h1c'] },
 			{ block_id: 'h1a', block_type: 3, parent_id: 'p', heading1: { elements: [{ text_run: { content: '起心动念' } }] } } as any,
@@ -156,7 +156,7 @@ describe('convertBlocksToHtml — H1 auto-numbering', () => {
 			{ block_id: 'h3', block_type: 5, parent_id: 'p', heading3: { elements: [{ text_run: { content: '更小一层' } }] } } as any,
 			{ block_id: 'h1c', block_type: 3, parent_id: 'p', heading1: { elements: [{ text_run: { content: '极致简单' } }] } } as any,
 		];
-		const html = convertBlocksToHtml(blocks);
+		const html = convertBlocksToHtml(blocks, { autoNumberHeadings: true });
 		expect(html).toContain('<h1>1. 起心动念</h1>');
 		expect(html).toContain('<h1>2. 抬高视角</h1>');
 		expect(html).toContain('<h1>3. 极致简单</h1>');
@@ -164,14 +164,31 @@ describe('convertBlocksToHtml — H1 auto-numbering', () => {
 		expect(html).toContain('<h3>更小一层</h3>');
 	});
 
-	it('does not number when there are no H1 blocks', () => {
+	it('does not number when autoNumberHeadings is false (scys path)', () => {
+		// Default behavior — scys reuses convertBlocksToHtml; its docs hand-write
+		// "2.1.1"-style prefixes, so cn must not double-number.
 		const blocks: FeishuBlock[] = [
-			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['h2'] },
-			{ block_id: 'h2', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: 'only h2' } }] } } as any,
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['h1a'] },
+			{ block_id: 'h1a', block_type: 3, parent_id: 'p', heading1: { elements: [{ text_run: { content: '起心动念' } }] } } as any,
 		];
 		const html = convertBlocksToHtml(blocks);
-		expect(html).toContain('<h2>only h2</h2>');
+		expect(html).toContain('<h1>起心动念</h1>');
 		expect(html).not.toMatch(/<h\d>\d+\./);
+	});
+
+	it('numbers H4 within each H2 section (reset at H2 boundary)', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['h2a', 'h4a1', 'h4a2', 'h2b', 'h4b1'] },
+			{ block_id: 'h2a', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: '一、自我介绍' } }] } } as any,
+			{ block_id: 'h4a1', block_type: 6, parent_id: 'p', heading4: { elements: [{ text_run: { content: '每天朝九晚五' } }] } } as any,
+			{ block_id: 'h4a2', block_type: 6, parent_id: 'p', heading4: { elements: [{ text_run: { content: '三个重大决定' } }] } } as any,
+			{ block_id: 'h2b', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: '二、取得的成绩' } }] } } as any,
+			{ block_id: 'h4b1', block_type: 6, parent_id: 'p', heading4: { elements: [{ text_run: { content: '行动起来' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks, { autoNumberHeadings: true });
+		expect(html).toContain('<h4>1. 每天朝九晚五</h4>');
+		expect(html).toContain('<h4>2. 三个重大决定</h4>');
+		expect(html).toContain('<h4>1. 行动起来</h4>'); // reset at H2b boundary
 	});
 });
 

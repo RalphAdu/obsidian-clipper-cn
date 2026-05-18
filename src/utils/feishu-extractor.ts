@@ -790,19 +790,20 @@ function getTextBody(block: FeishuBlock): FeishuTextBody | undefined {
 	}
 }
 
-export function convertBlocksToHtml(blocks: FeishuBlock[]): string {
+export function convertBlocksToHtml(blocks: FeishuBlock[], options?: { autoNumberHeadings?: boolean }): string {
 	const blockMap = new Map<string, FeishuBlock>();
 	for (const b of blocks) {
 		blockMap.set(b.block_id, b);
 	}
 
-	// Pre-scan H1 + H4 numbering.
+	// Optional H1+H4 auto-numbering — feishu-only (scys reuses convertBlocksToHtml
+	// but its docs hand-write their own "2.1.1" prefixes, so we'd double-number).
 	// Feishu web's CSS counter:
 	//   - H1: global "1./2./..." across the doc (one counter for the whole doc)
 	//   - H4: "1./2./..." within each H2 section (counter resets at each H2)
 	// H2/H3/H5+ are NOT auto-numbered (users typically hand-write "一、二、" prefixes).
 	const headingNumbers = new Map<string, number>();
-	{
+	if (options?.autoNumberHeadings) {
 		let h1Seq = 0;
 		let h4Seq = 0;
 		for (const b of blocks) {
@@ -1231,7 +1232,7 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	logger.info('Extraction complete', { documentId: resolved.documentId, blockCount: blocks.length });
 
-	const rawContent = convertBlocksToHtml(blocks);
+	const rawContent = convertBlocksToHtml(blocks, { autoNumberHeadings: true });
 	const imagesResolved = await resolveFeishuImages(rawContent);
 	const sheetsResolved = await resolveFeishuSheets(imagesResolved);
 	const content = resolveFeishuFiles(sheetsResolved, doc.URL);

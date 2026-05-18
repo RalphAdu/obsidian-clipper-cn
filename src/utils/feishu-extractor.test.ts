@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { convertBlocksToHtml, type FeishuBlock } from './feishu-extractor';
 import fixture from './fixtures/feishu-iframe-orderedlist.json';
+import sa5wFixture from './fixtures/feishu-sa5w-inline-block-source-synced.json';
 
 const blocks = fixture as unknown as FeishuBlock[];
 
@@ -324,5 +325,24 @@ describe('convertBlocksToHtml — IMAGE caption', () => {
 		const html = convertBlocksToHtml(blocks);
 		expect(html).not.toContain('<figcaption>');
 		expect(html).toContain('feishu-image://T1');
+	});
+});
+
+describe('convertBlocksToHtml — SOURCE_SYNCED (block_type 49)', () => {
+	it('renders children of source_synced block (sync container contents preserved)', () => {
+		const html = convertBlocksToHtml(sa5wFixture as unknown as FeishuBlock[]);
+		expect(html).toContain('feishu-image://GI3bbDFW9oUf1WxuiAdcTsIrn9e');
+	});
+
+	it('discards source_synced.elements metadata text "同步块"', () => {
+		const html = convertBlocksToHtml(sa5wFixture as unknown as FeishuBlock[]);
+		expect(html).not.toContain('同步块');
+	});
+
+	// AMENDMENT (deferred from Task 3): verify the figcaption survives the SOURCE_SYNCED traversal path,
+	// proving end-to-end that the Task 3 figcaption code path is reachable for the real-world Sa5W doc.
+	it('preserves figcaption when IMAGE is inside SOURCE_SYNCED container', () => {
+		const html = convertBlocksToHtml(sa5wFixture as unknown as FeishuBlock[]);
+		expect(html).toContain('<figcaption>EXE为更新和启动的主要组件。</figcaption>');
 	});
 });

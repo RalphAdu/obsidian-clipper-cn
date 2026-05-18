@@ -1183,7 +1183,8 @@ function renderBlock(block: FeishuBlock, ctx: RenderCtx): string {
 		// documents. The actual FILE child sits one level down — must recurse to
 		// render it instead of dropping the whole subtree.
 		case FEISHU_BLOCK_TYPE.VIEW:
-		case FEISHU_BLOCK_TYPE.QUOTE_CONTAINER: {
+		case FEISHU_BLOCK_TYPE.QUOTE_CONTAINER:
+		case FEISHU_BLOCK_TYPE.SOURCE_SYNCED: {
 			return renderBlockChildren(block, ctx);
 		}
 

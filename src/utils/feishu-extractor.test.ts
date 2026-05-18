@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertBlocksToHtml, type FeishuBlock } from './feishu-extractor';
+import { convertBlocksToHtml, resolveFeishuFiles, type FeishuBlock } from './feishu-extractor';
 import fixture from './fixtures/feishu-iframe-orderedlist.json';
 import sa5wFixture from './fixtures/feishu-sa5w-inline-block-source-synced.json';
 
@@ -383,5 +383,31 @@ describe('convertBlocksToHtml — inline_block element', () => {
 		// because it appears in both `data-filename=` attribute and link text).
 		const fileOneAnchors = html.match(/<a href="feishu-file-(?:inline|block):\/\/file1"/g) || [];
 		expect(fileOneAnchors.length).toBe(1);
+	});
+});
+
+describe('resolveFeishuFiles — inline vs top-level placeholders', () => {
+	const docUrl = 'https://my.feishu.cn/docx/DOC1';
+
+	it('top-level feishu-file-block:// → wraps in <p>📎 <a>…</a></p>', () => {
+		const input = '<a href="feishu-file-block://BLK1" data-filename="x.pdf">x.pdf</a>';
+		const out = resolveFeishuFiles(input, docUrl);
+		expect(out).toContain('<p>📎 <a href="https://my.feishu.cn/docx/DOC1#BLK1">x.pdf</a></p>');
+	});
+
+	it('inline feishu-file-inline:// → bare <a>, no <p>📎 wrapping', () => {
+		const input = '<p>see <a href="feishu-file-inline://BLK2" data-filename="y.bat">y.bat</a> please</p>';
+		const out = resolveFeishuFiles(input, docUrl);
+		expect(out).toContain('<a href="https://my.feishu.cn/docx/DOC1#BLK2">y.bat</a>');
+		expect(out).not.toContain('📎');
+		expect(out).toContain('<p>see ');
+		expect(out).toContain(' please</p>');
+	});
+
+	it('handles both placeholder kinds in the same HTML', () => {
+		const input = '<a href="feishu-file-block://A" data-filename="a.pdf">a.pdf</a><p>x <a href="feishu-file-inline://B" data-filename="b.bat">b.bat</a> y</p>';
+		const out = resolveFeishuFiles(input, docUrl);
+		expect(out).toContain('<p>📎 <a href="https://my.feishu.cn/docx/DOC1#A">a.pdf</a></p>');
+		expect(out).toContain('<p>x <a href="https://my.feishu.cn/docx/DOC1#B">b.bat</a> y</p>');
 	});
 });

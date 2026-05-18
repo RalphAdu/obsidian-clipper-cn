@@ -439,28 +439,21 @@ async function resolveFeishuSheets(html: string): Promise<string> {
 	return result;
 }
 
-function resolveFeishuFiles(html: string, sourceDocUrl: string): string {
-	const linkPattern = /<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">([^<]*)<\/a>/g;
-	const matches: Array<{ full: string; blockId: string; filename: string }> = [];
-	let m: RegExpExecArray | null;
-	while ((m = linkPattern.exec(html)) !== null) {
-		matches.push({ full: m[0], blockId: m[1], filename: m[2] });
-	}
+export function resolveFeishuFiles(html: string, sourceDocUrl: string): string {
+	// Pass 1: top-level FILE block placeholder → <p>📎 <a>…</a></p>
+	const topPattern = /<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">([^<]*)<\/a>/g;
+	let result = html.replace(topPattern, (_full, blockId, filename) => {
+		const url = `${sourceDocUrl}#${blockId}`;
+		return `<p>📎 <a href="${escapeHtml(url)}">${escapeHtml(filename)}</a></p>`;
+	});
 
-	if (matches.length === 0) return html;
+	// Pass 2: inline FILE placeholder → bare <a>…</a> (no <p>📎 wrap; sits inside existing <p>)
+	const inlinePattern = /<a href="feishu-file-inline:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">([^<]*)<\/a>/g;
+	result = result.replace(inlinePattern, (_full, blockId, filename) => {
+		const url = `${sourceDocUrl}#${blockId}`;
+		return `<a href="${escapeHtml(url)}">${escapeHtml(filename)}</a>`;
+	});
 
-	logger.debug(`Resolving ${matches.length} Feishu file(s) -> source doc + block anchor`);
-
-	// Feishu attachments don't have standalone URLs. Instead, link to the
-	// parent doc URL with the file block's id as URL hash — Feishu's docx
-	// reader scrolls the matching block into view on load, so clicking the
-	// link opens the doc with the PDF preview already in viewport.
-	let result = html;
-	for (const item of matches) {
-		const url = `${sourceDocUrl}#${item.blockId}`;
-		const replacement = `<p>📎 <a href="${escapeHtml(url)}">${escapeHtml(item.filename)}</a></p>`;
-		result = result.replace(item.full, replacement);
-	}
 	return result;
 }
 

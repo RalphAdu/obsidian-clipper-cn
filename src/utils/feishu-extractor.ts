@@ -672,10 +672,33 @@ interface RenderTextOptions {
 	skipBold?: boolean;
 }
 
+function renderInlineBlock(blockId: string, ctx: RenderCtx): string {
+	const target = ctx.blockMap.get(blockId);
+	if (!target) return '';
+	ctx.consumedInlineIds.add(blockId);
+	switch (target.block_type) {
+		case FEISHU_BLOCK_TYPE.FILE: {
+			const file = target.file;
+			if (!file?.name) return '';
+			return `<a href="feishu-file-inline://${target.block_id}" data-filename="${escapeHtml(file.name)}">${escapeHtml(file.name)}</a>`;
+		}
+		case FEISHU_BLOCK_TYPE.IMAGE: {
+			const img = target.image;
+			if (!img?.token) return '';
+			return `<img src="feishu-image://${img.token}" alt="">`;
+		}
+		default:
+			return `[内联块 ${blockId.slice(0, 8)}]`;
+	}
+}
+
 function renderTextElements(elements: FeishuTextBody['elements'], ctx: RenderCtx, opts: RenderTextOptions = {}): string {
 	if (!elements || !elements.length) return '';
 
 	const rendered = elements.map((el) => {
+		if (el.inline_block?.block_id) {
+			return renderInlineBlock(el.inline_block.block_id, ctx);
+		}
 		if (el.equation?.content) {
 			return `<code>${escapeHtml(el.equation.content)}</code>`;
 		}

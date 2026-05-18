@@ -346,3 +346,33 @@ describe('convertBlocksToHtml — SOURCE_SYNCED (block_type 49)', () => {
 		expect(html).toContain('<figcaption>EXE为更新和启动的主要组件。</figcaption>');
 	});
 });
+
+describe('convertBlocksToHtml — inline_block element', () => {
+	it('renders inline_block→FILE as <a feishu-file-inline://> placeholder inside parent paragraph', () => {
+		const html = convertBlocksToHtml(sa5wFixture as unknown as FeishuBlock[]);
+		expect(html).toContain('<a href="feishu-file-inline://file1" data-filename="测试连通多账号软件小工具.bat">测试连通多账号软件小工具.bat</a>');
+	});
+
+	it('renders inline_block→IMAGE as bare <img> (no <figure> wrapping in inline context)', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['t', 'i'] } as any,
+			{ block_id: 't', block_type: 2, parent_id: 'p', text: { elements: [{ inline_block: { block_id: 'i' } }] } } as any,
+			{ block_id: 'i', block_type: 27, parent_id: 't', image: { token: 'INLINE_T', width: 50, height: 50 } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('<img src="feishu-image://INLINE_T" alt="">');
+		// inline IMAGE should NOT be wrapped in <figure> (that's for standalone IMAGE blocks)
+		const figureCount = (html.match(/<figure>/g) || []).length;
+		expect(figureCount).toBe(0);
+	});
+
+	it('renders unsupported inline_block target as "[内联块 xxxxxxxx]" placeholder', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['t', 'u'] } as any,
+			{ block_id: 't', block_type: 2, parent_id: 'p', text: { elements: [{ inline_block: { block_id: 'u12345678abc' } }] } } as any,
+			{ block_id: 'u12345678abc', block_type: 99, parent_id: 't' } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html).toContain('[内联块 u1234567]');
+	});
+});

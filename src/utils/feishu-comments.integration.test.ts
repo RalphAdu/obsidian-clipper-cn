@@ -224,13 +224,16 @@ describe('feishu-comments integration — production IPC path', () => {
 		const result = await extractFeishuStructuredContent(fakeDoc);
 
 		expect(result).not.toBeNull();
-		expect(result!.author).toBe('创建者 刘智行');
+		// fakeDoc has no .docs-info-avatar-name-text (no DOM) → DOM scrape returns '';
+		// falls back to contact API which returns "刘智行". No "创建者" prefix per
+		// 2026-05-18 user feedback ("不要展示飞书ID").
+		expect(result!.author).toBe('刘智行');
 		// Don't hardcode '2025-11-01' — CI timezone may differ. Use convertDate() to match impl path.
 		expect(result!.published).toBe(convertDate(new Date(1762012415 * 1000)));
 		expect(result!.title).toBe('fake doc');
 	});
 
-	it('extractFeishuStructuredContent falls back to "创建者 <last 8 of open_id>" when contact API returns 41050', async () => {
+	it('extractFeishuStructuredContent falls back to empty author when both DOM scrape and contact API fail (Bug 2 regression guard)', async () => {
 		vi.spyOn(browser.runtime, 'sendMessage').mockImplementation(async (req: any) => {
 			if (req?.action !== 'fetchFeishuApi' || typeof req.url !== 'string') return { success: true };
 
@@ -284,7 +287,10 @@ describe('feishu-comments integration — production IPC path', () => {
 		const result = await extractFeishuStructuredContent(fakeDoc);
 
 		expect(result).not.toBeNull();
-		expect(result!.author).toBe('创建者 d065f814');
+		// No DOM author + contact API fails (41050) → author is empty string.
+		// Per 2026-05-18 user feedback, we don't surface "创建者 <open_id last 8>"
+		// — feishu open_id is internal noise, useless to a human reader.
+		expect(result!.author).toBe('');
 		expect(result!.published).toBe(convertDate(new Date(1762012415 * 1000)));
 	});
 });

@@ -796,15 +796,24 @@ export function convertBlocksToHtml(blocks: FeishuBlock[]): string {
 		blockMap.set(b.block_id, b);
 	}
 
-	// Pre-scan H1 numbering. Feishu web renders "1./2./..." for H1s via CSS
-	// counter; OpenAPI returns no number, so we generate one by document order.
+	// Pre-scan H1 + H4 numbering.
+	// Feishu web's CSS counter:
+	//   - H1: global "1./2./..." across the doc (one counter for the whole doc)
+	//   - H4: "1./2./..." within each H2 section (counter resets at each H2)
+	// H2/H3/H5+ are NOT auto-numbered (users typically hand-write "一、二、" prefixes).
 	const headingNumbers = new Map<string, number>();
 	{
 		let h1Seq = 0;
+		let h4Seq = 0;
 		for (const b of blocks) {
 			if (b.block_type === FEISHU_BLOCK_TYPE.HEADING1) {
 				h1Seq += 1;
 				headingNumbers.set(b.block_id, h1Seq);
+			} else if (b.block_type === FEISHU_BLOCK_TYPE.HEADING2) {
+				h4Seq = 0; // reset H4 counter at each H2 boundary
+			} else if (b.block_type === FEISHU_BLOCK_TYPE.HEADING4) {
+				h4Seq += 1;
+				headingNumbers.set(b.block_id, h4Seq);
 			}
 		}
 	}
@@ -1009,7 +1018,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>, hea
 		case FEISHU_BLOCK_TYPE.HEADING3:
 			return renderHeading(3, block.heading3?.elements, (block.heading3 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING4:
-			return renderHeading(4, block.heading4?.elements, (block.heading4 as any)?.style);
+			return renderHeading(4, block.heading4?.elements, (block.heading4 as any)?.style, headingNumbers.get(block.block_id));
 		case FEISHU_BLOCK_TYPE.HEADING5:
 			return renderHeading(5, block.heading5?.elements, (block.heading5 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING6:
@@ -1234,11 +1243,24 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 		logger.warn(`Comments extraction threw: ${String(e)}`);
 	}
 
+	// Author resolution priority:
+	//   1. DOM scrape — feishu web renders the doc owner's display name in
+	//      `.docs-info-avatar-name-text` (first match = primary owner).
+	//      Works without OpenAPI permissions because the page already loaded
+	//      contact info for current user's view.
+	//   2. Contact API — fallback for clipping flows without page DOM
+	//      (e.g., headless test). Returns null on 41050 (cross-tenant user).
+	//   3. Empty string — open_id is a useless feishu internal ID for users;
+	//      we don't surface it. frontmatter `author:` stays empty.
 	const ownerOpenId = docMeta?.ownerOpenId || '';
-	const realName = ownerOpenId ? await resolveFeishuUserName(ownerOpenId) : null;
-	const authorTag = realName
-		? `创建者 ${realName}`
-		: (ownerOpenId ? `创建者 ${ownerOpenId.slice(-8)}` : '');
+	const domAuthor = (() => {
+		try {
+			const el = doc.querySelector?.('.docs-info-avatar-name-text');
+			return el?.textContent?.trim() || '';
+		} catch { return ''; }
+	})();
+	const apiName = !domAuthor && ownerOpenId ? await resolveFeishuUserName(ownerOpenId) : null;
+	const authorTag = domAuthor || apiName || '';
 	const publishedDate = docMeta?.latestModifyTime
 		? convertDate(new Date(docMeta.latestModifyTime * 1000))
 		: '';

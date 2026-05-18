@@ -25,6 +25,7 @@ export type ExpectedUnit =
 	| { kind: 'comment_image'; commentId: string; replyId: string; imageToken: string }
 	| { kind: 'no_placeholder' }
 	| { kind: 'no_invalid_image_mime' }
+	| { kind: 'no_unresolved_image' }
 	| { kind: 'frontmatter_present' };
 
 function textOf(elements: any[] | undefined): string {
@@ -125,6 +126,7 @@ export function deriveExpected(blocks: FeishuBlock[], comments: FeishuComment[])
 	}
 
 	expected.push({ kind: 'no_invalid_image_mime' });
+	expected.push({ kind: 'no_unresolved_image' });
 	expected.push({ kind: 'frontmatter_present' });
 
 	return expected;

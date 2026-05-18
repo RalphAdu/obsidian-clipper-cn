@@ -108,6 +108,18 @@ function checkImageMimes(unit: Extract<ExpectedUnit, { kind: 'no_invalid_image_m
 	};
 }
 
+function checkUnresolvedImages(unit: Extract<ExpectedUnit, { kind: 'no_unresolved_image' }>, vaultMd: string): Miss | null {
+	// `feishu-image://TOKEN` placeholders mean an image block didn't get its base64
+	// resolved — Obsidian renders these as a broken image icon. After the v2/cover
+	// + magic-byte fix, this count should be 0 (or very close to it).
+	const matches = vaultMd.match(/feishu-image:\/\/[A-Za-z0-9_-]+/g) || [];
+	if (matches.length === 0) return null;
+	return {
+		unit,
+		reason: `${matches.length} unresolved image placeholder(s) — Obsidian renders these as broken images`,
+	};
+}
+
 function checkFrontmatter(unit: Extract<ExpectedUnit, { kind: 'frontmatter_present' }>, vaultMd: string): Miss[] {
 	const fmMatch = vaultMd.match(/^---\n([\s\S]*?)\n---/);
 	if (!fmMatch) {
@@ -136,6 +148,7 @@ export function audit(expected: ExpectedUnit[], md: string, vaultMd?: string): B
 		comment_thread: { name: 'comment_thread', misses: [] },
 		comment_image: { name: 'comment_image', misses: [] },
 		image_mime_invalid: { name: 'image_mime_invalid', misses: [] },
+		image_unresolved: { name: 'image_unresolved', misses: [] },
 		frontmatter_field_empty: { name: 'frontmatter_field_empty', misses: [] },
 	};
 
@@ -186,6 +199,12 @@ export function audit(expected: ExpectedUnit[], md: string, vaultMd?: string): B
 				if (vaultMd) {
 					miss = checkImageMimes(unit, vaultMd);
 					if (miss) buckets.image_mime_invalid.misses.push(miss);
+				}
+				break;
+			case 'no_unresolved_image':
+				if (vaultMd) {
+					miss = checkUnresolvedImages(unit, vaultMd);
+					if (miss) buckets.image_unresolved.misses.push(miss);
 				}
 				break;
 			case 'frontmatter_present':

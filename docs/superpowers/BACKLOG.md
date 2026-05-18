@@ -515,6 +515,38 @@ print(''.join(chr(ord('a') + int(c, 16)) for c in sha))
 - §1.12（视觉对比工作流） 防的是渲染层差异
 - §2.14（本节） 防的是接口形态盲点 —— **更上游，spec 阶段就堵漏**
 
+### 2.15 `ContentResponse` 合并表达式是 grep 盲区（scys published 修复反思，2026-05-18）
+
+scys 文章裁剪笔记 frontmatter `published` 字段空值——bug 跨三层，但**只有第三层无类型保护**：
+
+| 层 | 文件 | 漏改后果 |
+|---|---|---|
+| 接口（`ScysStructuredContent`） | `scys-extractor.ts:501` | TS 必填字段编译报错（守住） |
+| 产生（return） | `scys-extractor.ts` 内 3 个路径 return | TS 编译报错（守住） |
+| **合并（`ContentResponse`）** | `content.ts:365-381` inline `\|\|` 链 | **静默空值**——TS 不报错，frontmatter 默认空 |
+
+第三层是 grep 盲区：
+
+- 接口名 / 字段名 grep 时只命中 `interface` 定义和 extractor 内的 `published:` return key——**不命中合并表达式**，因为 merge 写成 `bilibiliContent?.published || zsxqContent?.published || defuddled.published`，每个 source 出现一次但都不是字段定义点
+- 这一行就是 inline，没有函数 seam 可单测；改完只能靠 trace 或运行时验证
+
+**Spec 阶段必做 checklist**——`content.ts:365-381` 同一对象字面量逐字段对照：
+
+| ContentResponse 字段 | 是否有 scysContent merge | 是否有 zsxqContent merge | 备注 |
+|---|---|---|---|
+| author / content / title / wordCount / site | ✓ | ✓ | 5 个字段已齐 |
+| published | 历史漏（本次修） | ✓ | 截至 2026-05-18 修齐 |
+| image | bilibili only | — | 其余 extractor 无 image 字段 |
+| description | bilibili only | — | 同上 |
+
+**新加任意 extractor 字段**：必看 `content.ts:365-381` 整块对象字面量；任何"在 X 处加、忘在 Y 处加"的不对称都意味着 silent drop。
+
+**测试覆盖建议**：scys/zsxq/feishu 等专项 extractor 涉及 frontmatter 字段时，写**端到端集成测试**（fixture → extractor → 复制 merge 表达式 → `buildVariables` → 变量值断言），不要只靠 spec 静态 trace。参考 `src/utils/scys-published.integration.test.ts`——头部注释钉住 merge 表达式的复制位置，drift 时人工核对。
+
+**与现有规则**：
+- §1.10 / §1.12 防的是渲染/路径分歧；本节防的是**对象字面量的字段非对称**
+- 跟 §2.14 一样属于"spec 阶段堵漏"，但聚焦的是 `content.ts` 这一个文件的对称性
+
 ---
 
 ## 3. 用户偏好 / 协作约定

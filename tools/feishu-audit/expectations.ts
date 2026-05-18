@@ -23,7 +23,9 @@ export type ExpectedUnit =
 	| { kind: 'comments_section_present'; expectedCount: number }
 	| { kind: 'comment_thread'; commentId: string; firstReplyText: string; isSolved: boolean; authorTag: string; timestamp: string }
 	| { kind: 'comment_image'; commentId: string; replyId: string; imageToken: string }
-	| { kind: 'no_placeholder' };
+	| { kind: 'no_placeholder' }
+	| { kind: 'no_invalid_image_mime' }
+	| { kind: 'frontmatter_present' };
 
 function textOf(elements: any[] | undefined): string {
 	if (!elements) return '';
@@ -121,6 +123,9 @@ export function deriveExpected(blocks: FeishuBlock[], comments: FeishuComment[])
 			}
 		}
 	}
+
+	expected.push({ kind: 'no_invalid_image_mime' });
+	expected.push({ kind: 'frontmatter_present' });
 
 	return expected;
 }

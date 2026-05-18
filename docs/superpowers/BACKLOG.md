@@ -1829,3 +1829,53 @@ zsxq 是 cn fork 独有 feature，**不计划上游化**（知识星球是中文
 - **基线认知**：未来任何 extractor，spec 阶段强制走 §2.14 3 维 checklist；缺一个维度都标 `untested-in-real-data` 而非合成 mock 冒充
 
 **最大的认知更新**（跨 G/H/I/J）：bug 不是在代码里"修不完"，bug 是在 **spec 上游"看不全"**。Subagent-Driven Development + 双 reviewer 在 spec 详尽时是高质量高效率的实施保障，但 spec 详尽的**前提**是 §2.14 的 3 维 fixture 覆盖。**spec 阶段一小时的样本走查比实施期一小时的 bug 修复价值高 10 倍**——这一规律以后 extractor 立项时反复 quote。
+
+
+---
+
+## 2026-05-18 反思：audit 漏掉「wiki 图片加密 + author/published 空」
+
+**症状**：用户裁 `https://my.feishu.cn/wiki/BVM5wat1wizT9ckCHi7c2C1nnne` 后 39/80 张图变成 `data:application/octet-stream;base64,<encrypted>` 渲染为破图；frontmatter `author:` 和 `published:` 全空。
+
+**根因 1（图片）**：
+- mainWorld 路径里 `block.imageManager.fetch` 对部分 block 找不到（block 在 `block.snapshot.children` 而不是 `block.children` 数组里，且只看 `block.snapshot.image.token` 一条路径，且 `seen.size > 500` 截断大文档），fallback 走 `copy_out + asynccode` 端点取回**加密字节** + `application/octet-stream` MIME。
+- cn 不会解密。
+- audit-tool 的 render-pipeline 用 `convertBlocksToHtml` 留 `feishu-image://{token}` 占位，**完全不触发** image fetch，所以 0 broken images in audit output。
+
+**根因 2（author/published）**：
+- 旧 `fetchDocumentMeta` 调 `/docx/v1/documents/{id}` endpoint，**这个端点只返 title/document_id/revision_id**，无 owner_id 也无 create_time。
+- drive `/v1/metas/batch_query` API 有完整字段（owner_id + latest_modify_time + title），wiki + docx 直链都能用 — 当初选错了 endpoint。
+- 真名解析需要 contact:user.base:readonly 权限（用户去飞书后台开通）；未开权限时兜底退到 `创建者 <open_id 后 8 位>`。
+- `published` 用 `latest_modify_time`（与飞书 web "X月X日修改" 一致），格式化复用 `src/utils/date-utils.ts` 的共享 `convertDate`（dayjs 本地时区），与 scys/zsxq 走单一路径，不再各自手写 `toISOString().slice(0, 10)`（UTC 差一天的风险）。
+- audit-tool 只看 markdown body，**完全不看 frontmatter**。
+
+**audit 盲区性质**：两个层完全不在 audit-tool 视野——image fetch 是浏览器侧、frontmatter 是 Obsidian save 后才有。修复后加了 `--vault-md <path>` flag + `image_mime_invalid` / `frontmatter_field_empty` 两个 bucket，把 vault `.md` 也纳入 audit。
+
+**修复**：
+- commit `633afb9`：`fetchFeishuDocMeta` 替换 `fetchDocumentMeta`（走 `/drive/v1/metas/batch_query`，wiki + docx 直链都覆盖）；`resolveFeishuUserName` 走 `/contact/v3/users/{id}`（41050 兜底 → open_id 后 8 位）；`published` 用 `convertDate(new Date(latest_modify_time * 1000))`，与 scys/zsxq 单一路径。
+- commit `1553a05`：`resolveFeishuImages` 末尾兜底过滤 octet-stream 条目，broken images 不再以 `data:application/octet-stream` 形式入 markdown。
+- commit `8a93e90`：mainWorld block walk 加 3 策略（A direct children / B snapshot.children IDs via `bm.getBlockById` / C `bm.allBlocks` registry）+ 4 条 token 路径覆盖 + 去 500 限制 + `console.warn` debug 输出 missed token。
+- commit `7dc4319`：audit-tool `--vault-md` flag + 两个新 bucket，**catches the next image/frontmatter regression**。
+
+**沉淀给未来 audit 的纪律**：
+- 任何"OpenAPI 返一份、浏览器 fetch 一份"的场景（image / 嵌入资源）audit 必须能比对最终 markdown 产物。
+- 任何"extractor 字段 → 模板 frontmatter"的链路 audit 必须能读 vault md 验证。
+- 单一 OpenAPI endpoint 不够时（如 docx/v1/documents 字段稀），看 drive metas 等更通用 endpoint。
+- 时间字段格式化走 `convertDate` 单一路径（与 scys/zsxq 已有约定），不手写 `toISOString().slice(0, 10)`。
+
+**未来 BACKLOG**：
+- **加密图片解密**：研究 feishu imageManager 内部解密逻辑（拆 feishu web bundle 反推 key derivation）。当前 3 策略改善了 missing-block 的部分，但加密字节仍 unfixable，靠 octet-stream filter 兜成 placeholder。
+- **自动化端到端 clip 验证**：playwright + extension loaded + 拦截 `obsidian://` URL，把 audit 整个链路（含 frontmatter + 图片）一键化。当前需用户手动重裁 → 我跑 audit --vault-md 循环。
+- **contact:user.base:readonly 权限申请**：用户去飞书开发者后台开 https://open.feishu.cn/app/cli_a9074898cdf8dcba/auth?q=contact:user.base:readonly 后，author 自动从 `创建者 d065f814` 升级为 `创建者 刘智行`。
+
+**2026-05-18 更新 — contact:user.base:readonly 实测限制**：
+
+用户已开通 App `contact:user.base:readonly` 两个身份（应用 + 用户）。实测：
+- `/contact/v3/scopes?user_id_type=open_id` 返 code=0、**仅 1 个 user_id**（App 创建者本人）
+- 查跨租户 user（如 `my.feishu.cn` 的 doc owner）仍返 41050 "no user authority error"
+
+**根因**：tenant_access_token 走"应用身份"，数据范围 = App 创建时配置的「**可见通讯录范围**」（默认仅含 App 创建者）。doc owner 在别人企业 → 不可能加入 App 可见范围 → 41050 是飞书硬性租户隔离。
+
+**绕开方案（暂不实施）**：用 `user_access_token` 走"用户身份"，数据范围 = "与用户权限范围一致" → 能查用户自己可见的所有人（含跨企业协作者）。但需要 OAuth redirect 流程，与 cn 当前的"tenant token 全自动"架构冲突，UX 改动大。
+
+**结论**：`创建者 d065f814` 兜底是 by design 的最优解，open_id 后 8 位有 hex 唯一性（同一 author 跨文档可识别）。已沉淀到 author 字段格式约定。

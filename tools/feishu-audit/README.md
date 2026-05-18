@@ -6,8 +6,10 @@ Node CLI that audits a feishu docx against the cn extractor pipeline + a
 ## Usage
 
 ```bash
-npx tsx --tsconfig tools/feishu-audit/tsconfig.json tools/feishu-audit/feishu-audit.ts <feishu-doc-url>
+npx tsx --tsconfig tools/feishu-audit/tsconfig.json tools/feishu-audit/feishu-audit.ts <feishu-doc-url> [--vault-md <path>]
 ```
+
+`--vault-md` is optional — when provided, enables 2 additional buckets that read the actual Obsidian vault markdown the user clipped. Recommended for verifying real-world output after each cn extractor change.
 
 Reads credentials from `docs/superpowers/feishu.md` (git-ignored).
 
@@ -15,7 +17,7 @@ Output:
 
 - Renders the doc + its comments to `/tmp/feishu-audit-output.md` (so a
   human can read the actual markdown).
-- Prints a 10-bucket mismatch report.
+- Prints a 10-bucket mismatch report (12 buckets when `--vault-md` is supplied).
 - Exits 0 on full pass, 1 if any bucket has misses, 2 on tool error.
 
 ## Buckets
@@ -32,12 +34,14 @@ Output:
 | `comments_section` | When comments exist, the markdown contains `---\n## 评论` anchor |
 | `comment_thread` | Each comment thread renders as an Obsidian callout with the right kind, author, and timestamp |
 | `comment_image` | Each comment with images has a `data:image/...` URI or a fallback placeholder somewhere |
+| `image_mime_invalid` | (--vault-md only) vault `.md` has no `![](data:<non-image-mime>;...)` entries — catches the "broken inline image" bug where feishu's encrypted bytes leak through as data URLs |
+| `frontmatter_field_empty` | (--vault-md only) vault `.md` frontmatter has non-empty `author:` and `published:` — catches the "doc metadata not piped to frontmatter" bug |
 
 ## Limitations (BACKLOG)
 
 - Comment authors show as `评论者 <last 8 chars of open_id>`. Real names
   require `contact:user.base:readonly` permission on the App.
-- Only `/docx/{id}` URLs supported (not `/wiki/`).
+- Both `/docx/{id}` and `/wiki/{token}` URLs supported; `/wiki/` URLs are resolved via the `wiki.v2.spaces.get_node` API before fetching blocks.
 - DOM-driven audit is deferred — current audit only validates conventions
   the OpenAPI data can prove. Truly OpenAPI-invisible web-only differences
   (CSS-only decorations, etc.) are not caught.

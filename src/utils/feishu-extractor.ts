@@ -1,6 +1,7 @@
 import browser from './browser-polyfill';
 import { createLogger } from './logger';
 import { extractFeishuComments } from './feishu-comments';
+import { convertDate } from './date-utils';
 
 const logger = createLogger('Feishu');
 
@@ -14,6 +15,7 @@ export interface FeishuStructuredContent {
 	author: string;
 	content: string;             // HTML (no comments appended)
 	commentsMarkdown?: string;   // already markdown — must NOT pass through turndown
+	published?: string;          // YYYY-MM-DD, from latest_modify_time
 	wordCount: number;
 }
 
@@ -525,6 +527,21 @@ async function resolveFeishuImages(html: string): Promise<string> {
 		);
 	}
 
+	// Defensive filter: if an image was fetched but stayed as application/octet-stream,
+	// the bytes are likely encrypted (feishu's copy_out/asynccode path returns encrypted
+	// blobs that the cn extractor doesn't decrypt). Drop those from base64Results so the
+	// substitution loop below leaves the token as an unresolved placeholder.
+	let droppedOctetStream = 0;
+	for (const [token, dataUrl] of [...base64Results.entries()]) {
+		if (dataUrl.startsWith('data:application/octet-stream')) {
+			base64Results.delete(token);
+			droppedOctetStream++;
+		}
+	}
+	if (droppedOctetStream > 0) {
+		logger.warn(`[img-resolve] dropped ${droppedOctetStream} image(s) with application/octet-stream MIME (likely encrypted)`);
+	}
+
 	let resolved = html;
 	for (const token of tokenList) {
 		const replacement = base64Results.get(token);
@@ -579,14 +596,45 @@ async function fetchAllBlocks(documentId: string): Promise<FeishuBlock[]> {
 	return allBlocks;
 }
 
-async function fetchDocumentMeta(documentId: string): Promise<{ title: string; owner?: string } | null> {
+async function fetchFeishuDocMeta(documentId: string, docType: 'docx' | 'doc' = 'docx'): Promise<{ ownerOpenId?: string; latestModifyTime?: number; title?: string } | null> {
 	try {
 		const result = await fetchFeishuApi(
-			`https://open.feishu.cn/open-apis/docx/v1/documents/${documentId}`
+			'https://open.feishu.cn/open-apis/drive/v1/metas/batch_query?user_id_type=open_id',
+			{
+				method: 'POST',
+				body: JSON.stringify({
+					request_docs: [{ doc_token: documentId, doc_type: docType }],
+					with_url: false,
+				}),
+			},
 		);
-		const doc = result?.data?.document;
-		return doc ? { title: doc.title || '', owner: doc.owner_id } : null;
-	} catch {
+		const meta = result?.data?.metas?.[0];
+		if (!meta) return null;
+		return {
+			ownerOpenId: meta.owner_id,
+			latestModifyTime: meta.latest_modify_time ? Number(meta.latest_modify_time) : undefined,
+			title: meta.title,
+		};
+	} catch (e) {
+		logger.warn(`fetchFeishuDocMeta failed: ${String(e)}`);
+		return null;
+	}
+}
+
+async function resolveFeishuUserName(openId: string): Promise<string | null> {
+	try {
+		const result = await fetchFeishuApi(
+			`https://open.feishu.cn/open-apis/contact/v3/users/${openId}?user_id_type=open_id`,
+		);
+		return result?.data?.user?.name || null;
+	} catch (e) {
+		// 41050: App lacks contact scope. Expected until user grants permission.
+		const msg = String(e);
+		if (msg.includes('41050') || msg.includes('no user authority')) {
+			logger.debug('Contact API blocked (41050) — falling back to open_id suffix');
+		} else {
+			logger.warn(`resolveFeishuUserName error: ${msg}`);
+		}
 		return null;
 	}
 }
@@ -742,21 +790,31 @@ function getTextBody(block: FeishuBlock): FeishuTextBody | undefined {
 	}
 }
 
-export function convertBlocksToHtml(blocks: FeishuBlock[]): string {
+export function convertBlocksToHtml(blocks: FeishuBlock[], options?: { autoNumberHeadings?: boolean }): string {
 	const blockMap = new Map<string, FeishuBlock>();
 	for (const b of blocks) {
 		blockMap.set(b.block_id, b);
 	}
 
-	// Pre-scan H1 numbering. Feishu web renders "1./2./..." for H1s via CSS
-	// counter; OpenAPI returns no number, so we generate one by document order.
+	// Optional H1+H4 auto-numbering — feishu-only (scys reuses convertBlocksToHtml
+	// but its docs hand-write their own "2.1.1" prefixes, so we'd double-number).
+	// Feishu web's CSS counter:
+	//   - H1: global "1./2./..." across the doc (one counter for the whole doc)
+	//   - H4: "1./2./..." within each H2 section (counter resets at each H2)
+	// H2/H3/H5+ are NOT auto-numbered (users typically hand-write "一、二、" prefixes).
 	const headingNumbers = new Map<string, number>();
-	{
+	if (options?.autoNumberHeadings) {
 		let h1Seq = 0;
+		let h4Seq = 0;
 		for (const b of blocks) {
 			if (b.block_type === FEISHU_BLOCK_TYPE.HEADING1) {
 				h1Seq += 1;
 				headingNumbers.set(b.block_id, h1Seq);
+			} else if (b.block_type === FEISHU_BLOCK_TYPE.HEADING2) {
+				h4Seq = 0; // reset H4 counter at each H2 boundary
+			} else if (b.block_type === FEISHU_BLOCK_TYPE.HEADING4) {
+				h4Seq += 1;
+				headingNumbers.set(b.block_id, h4Seq);
 			}
 		}
 	}
@@ -961,7 +1019,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>, hea
 		case FEISHU_BLOCK_TYPE.HEADING3:
 			return renderHeading(3, block.heading3?.elements, (block.heading3 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING4:
-			return renderHeading(4, block.heading4?.elements, (block.heading4 as any)?.style);
+			return renderHeading(4, block.heading4?.elements, (block.heading4 as any)?.style, headingNumbers.get(block.block_id));
 		case FEISHU_BLOCK_TYPE.HEADING5:
 			return renderHeading(5, block.heading5?.elements, (block.heading5 as any)?.style);
 		case FEISHU_BLOCK_TYPE.HEADING6:
@@ -1162,9 +1220,9 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	logger.debug('Resolved document', { documentId: resolved.documentId, objType: resolved.objType });
 
-	const [blocks, meta] = await Promise.all([
+	const [blocks, docMeta] = await Promise.all([
 		fetchAllBlocks(resolved.documentId),
-		fetchDocumentMeta(resolved.documentId),
+		fetchFeishuDocMeta(resolved.documentId, resolved.objType as 'docx' | 'doc'),
 	]);
 
 	if (!blocks.length) {
@@ -1174,7 +1232,7 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	logger.info('Extraction complete', { documentId: resolved.documentId, blockCount: blocks.length });
 
-	const rawContent = convertBlocksToHtml(blocks);
+	const rawContent = convertBlocksToHtml(blocks, { autoNumberHeadings: true });
 	const imagesResolved = await resolveFeishuImages(rawContent);
 	const sheetsResolved = await resolveFeishuSheets(imagesResolved);
 	const content = resolveFeishuFiles(sheetsResolved, doc.URL);
@@ -1186,7 +1244,27 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 		logger.warn(`Comments extraction threw: ${String(e)}`);
 	}
 
-	const title = meta?.title || doc.title || '';
+	// Author resolution priority:
+	//   1. DOM scrape — feishu web renders the doc owner's display name in
+	//      `.docs-info-avatar-name-text` (first match = primary owner).
+	//      Works without OpenAPI permissions because the page already loaded
+	//      contact info for current user's view.
+	//   2. Contact API — fallback for clipping flows without page DOM
+	//      (e.g., headless test). Returns null on 41050 (cross-tenant user).
+	//   3. Empty string — open_id is a useless feishu internal ID for users;
+	//      we don't surface it. frontmatter `author:` stays empty.
+	const ownerOpenId = docMeta?.ownerOpenId || '';
+	const domAuthor = (() => {
+		try {
+			const el = doc.querySelector?.('.docs-info-avatar-name-text');
+			return el?.textContent?.trim() || '';
+		} catch { return ''; }
+	})();
+	const apiName = !domAuthor && ownerOpenId ? await resolveFeishuUserName(ownerOpenId) : null;
+	const authorTag = domAuthor || apiName || '';
+	const publishedDate = docMeta?.latestModifyTime
+		? convertDate(new Date(docMeta.latestModifyTime * 1000))
+		: '';
 
 	const textContent = blocks
 		.map(b => {
@@ -1202,10 +1280,11 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	const wordCount = textContent.split(/\s+/).filter(Boolean).length || textContent.length;
 
 	return {
-		title,
-		author: meta?.owner || '',
+		title: docMeta?.title || doc.title || '',
+		author: authorTag,
 		content,
 		commentsMarkdown: commentsMarkdown || undefined,
+		published: publishedDate || undefined,
 		wordCount,
 	};
 }

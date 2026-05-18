@@ -27,15 +27,26 @@ export async function getTenantAccessToken(creds: Creds): Promise<string> {
 }
 
 /**
- * Resolve a doc URL to its docx documentId. Currently supports /docx/{id}
- * directly. For /wiki/{token} we'd call the wiki-node API; this audit tool
- * targets docx as that's the common shape we run audits against.
+ * Resolve a doc URL to its docx documentId. Supports /docx/{id} directly and
+ * /wiki/{token} via the wiki.v2.space.node API (which returns the underlying
+ * obj_token + obj_type for the wiki node, then we use that docx token).
  */
-export async function resolveDocumentId(token: string, _accessToken: string, type: 'docx' | 'wiki' | 'doc'): Promise<string> {
-	if (type !== 'docx') {
-		throw new Error(`feishu-audit currently only supports docx URLs (got ${type}); extend resolveDocumentId when needed.`);
+export async function resolveDocumentId(token: string, accessToken: string, type: 'docx' | 'wiki' | 'doc'): Promise<string> {
+	if (type === 'docx') return token;
+	if (type === 'wiki') {
+		const url = `https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node?token=${token}`;
+		const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+		const data = await resp.json() as { data?: { node?: { obj_token?: string; obj_type?: string } }; msg?: string; code?: number };
+		if (data.code !== 0 || !data.data?.node?.obj_token) {
+			throw new Error(`wiki node resolve failed (code=${data.code}): ${data.msg || JSON.stringify(data)}`);
+		}
+		const node = data.data.node;
+		if (node.obj_type !== 'docx') {
+			throw new Error(`wiki node is type "${node.obj_type}", not docx — audit only supports docx nodes`);
+		}
+		return node.obj_token;
 	}
-	return token;
+	throw new Error(`feishu-audit does not support URL type "${type}"`);
 }
 
 export async function fetchAllBlocks(documentId: string, accessToken: string): Promise<FeishuBlock[]> {

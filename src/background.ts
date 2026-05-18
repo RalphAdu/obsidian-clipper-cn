@@ -832,18 +832,27 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 					const fetchDataUrl = function(url: string): Promise<string | undefined> {
 						return fetch(url).then(function(res: Response) {
 							if (!res.ok) return undefined;
-							const contentType = res.headers.get('Content-Type') || '';
-							if (contentType.indexOf('application/json') !== -1 || contentType.indexOf('text/') !== -1) {
-								return undefined;
-							}
-							const mimeType = contentType.split(';')[0].trim() || 'image/png';
 							return res.arrayBuffer().then(function(buf: ArrayBuffer) {
 								const bytes = new Uint8Array(buf);
+								// Magic-byte detection — server Content-Type is often wrong
+								// (e.g., encrypted box-file URLs return application/octet-stream
+								// even when underlying bytes are real PNG/JPEG).
+								let mime = '';
+								if (bytes.length >= 4 && bytes[0]===0x89 && bytes[1]===0x50 && bytes[2]===0x4e && bytes[3]===0x47) mime = 'image/png';
+								else if (bytes.length >= 3 && bytes[0]===0xff && bytes[1]===0xd8 && bytes[2]===0xff) mime = 'image/jpeg';
+								else if (bytes.length >= 3 && bytes[0]===0x47 && bytes[1]===0x49 && bytes[2]===0x46) mime = 'image/gif';
+								else if (bytes.length >= 12 && bytes[0]===0x52 && bytes[1]===0x49 && bytes[2]===0x46 && bytes[3]===0x46 && bytes[8]===0x57 && bytes[9]===0x45 && bytes[10]===0x42 && bytes[11]===0x50) mime = 'image/webp';
+								else {
+									const ct = (res.headers.get('Content-Type') || '').split(';')[0].trim();
+									if (ct.indexOf('image/') === 0) mime = ct;
+								}
+								// Not an identifiable image — caller treats as unresolved (placeholder).
+								if (mime.indexOf('image/') !== 0) return undefined;
 								let bin = '';
 								for (let i = 0; i < bytes.byteLength; i++) {
 									bin += String.fromCharCode(bytes[i]);
 								}
-								return 'data:' + mimeType + ';base64,' + btoa(bin);
+								return 'data:' + mime + ';base64,' + btoa(bin);
 							});
 						}).catch(function() {
 							return undefined;
@@ -851,55 +860,120 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 					};
 
 					const runtimeImageBlocks: Array<{ token: string; block: any }> = [];
+					const tokenSet = new Set(tokens);
+					const visited = new Set<any>();
+
+					const extractImageToken = function(block: any): string | undefined {
+						return block?.snapshot?.image?.token
+							|| block?.image?.token
+							|| block?.snapshot?.image_token
+							|| block?.image_token;
+					};
+
+					const tryRegister = function(block: any) {
+						const tk = extractImageToken(block);
+						if (tk && tokenSet.has(tk) && block?.imageManager?.fetch && !runtimeImageBlocks.find(function(x) { return x.token === tk; })) {
+							runtimeImageBlocks.push({ token: tk, block: block });
+						}
+					};
+
 					try {
-						const rootBlock = (window as any).PageMain?.blockManager?.rootBlockModel;
-						const seen = new Set<any>();
-						const walk = function(block: any) {
-							if (!block || seen.has(block) || seen.size > 500) return;
-							seen.add(block);
-							const imageToken = block?.snapshot?.image?.token;
-							if (imageToken && block?.imageManager?.fetch) {
-								runtimeImageBlocks.push({ token: imageToken, block });
+						const bm = (window as any).PageMain?.blockManager;
+						const rootBlock = bm?.rootBlockModel;
+
+						// Strategy A + B: recursive walk via direct children array AND snapshot.children IDs.
+						const visit = function(block: any) {
+							if (!block || visited.has(block)) return;
+							visited.add(block);
+							tryRegister(block);
+							// Strategy A: direct children array
+							const childArr = Array.isArray(block.children) ? block.children : [];
+							for (let i = 0; i < childArr.length; i++) visit(childArr[i]);
+							// Strategy B: snapshot.children is an ID array — look up via blockManager
+							const childIds = Array.isArray(block?.snapshot?.children) ? block.snapshot.children : [];
+							for (let i = 0; i < childIds.length; i++) {
+								const childBlock = bm?.getBlockById?.(childIds[i]);
+								if (childBlock) visit(childBlock);
 							}
-							const children = Array.isArray(block.children) ? block.children : [];
-							for (let i = 0; i < children.length; i++) walk(children[i]);
 						};
-						walk(rootBlock);
-					} catch {
-						// Fall through to copy_out fallback.
+						visit(rootBlock);
+
+						// Strategy C: defensive — if feishu exposes an enumeration of all blocks, scan it.
+						try {
+							const allBlocks = bm?.allBlocks || bm?.blockModels;
+							if (allBlocks && typeof allBlocks === 'object') {
+								const candidates = Array.isArray(allBlocks) ? allBlocks : Object.values(allBlocks);
+								for (let i = 0; i < candidates.length; i++) {
+									tryRegister(candidates[i] as any);
+								}
+							}
+						} catch (_) { /* registry API not available */ }
+					} catch (_) {
+						// Fall through to copy_out fallback below.
 					}
 
-					return runtimeImageBlocks
-						.filter(function(item) { return tokens.indexOf(item.token) !== -1; })
-						.reduce(function(chain, item) {
-							return chain.then(function() {
-								return new Promise<void>(function(resolve) {
-									try {
-										item.block.imageManager.fetch(
-											{ token: item.token, isHD: true, fuzzy: false },
-											{},
-											function(sources: any) {
-												const sourceUrl = sources?.originSrc || sources?.src || '';
-												if (!sourceUrl) {
-													resolve();
-													return;
-												}
-												fetchDataUrl(sourceUrl).then(function(dataUrl) {
-													if (dataUrl) results[item.token] = dataUrl;
+					// Debug: emit one console.warn so we can see which tokens the walk missed.
+					try {
+						const found = new Set(runtimeImageBlocks.map(function(x) { return x.token; }));
+						const missed = tokens.filter(function(t) { return !found.has(t); });
+						console.warn('[feishu-image-walk] requested=' + tokens.length + ' found=' + found.size + ' missed=' + missed.length, missed.slice(0, 5));
+					} catch (_) { /* logging best-effort */ }
+
+					// Strategy 0 (primary): /api/box/stream/download/v2/cover/{token} returns
+					// decrypted image bytes with correct image/* mime for any image visible
+					// to the current cookie-authenticated user. Same URL feishu web's <img>
+					// elements use. Avoids the encrypted box-file path that
+					// imageManager.fetch returns (sources.originSrc).
+					const strategy0 = tokens.reduce(function(chain, token) {
+						return chain.then(function() {
+							if (results[token]) return;
+							return fetchDataUrl(apiBase + '/api/box/stream/download/v2/cover/' + token).then(function(dataUrl) {
+								if (dataUrl) results[token] = dataUrl;
+							});
+						});
+					}, Promise.resolve() as Promise<void | undefined>);
+
+					return strategy0
+						.then(function() {
+							const resolvedCount = Object.keys(results).length;
+							try { console.warn('[feishu-image-cover] strategy0 resolved=' + resolvedCount + '/' + tokens.length); } catch (_) { /* logging best-effort */ }
+							if (resolvedCount === tokens.length) {
+								return { success: true as const, results };
+							}
+							// Strategy 1: PageMain walk + imageManager.fetch for tokens Strategy 0 missed.
+							return runtimeImageBlocks
+								.filter(function(item) { return tokens.indexOf(item.token) !== -1 && !results[item.token]; })
+								.reduce(function(chain, item) {
+									return chain.then(function() {
+										return new Promise<void>(function(resolve) {
+											try {
+												item.block.imageManager.fetch(
+													{ token: item.token, isHD: true, fuzzy: false },
+													{},
+													function(sources: any) {
+														const sourceUrl = sources?.originSrc || sources?.src || '';
+														if (!sourceUrl) {
+															resolve();
+															return;
+														}
+														fetchDataUrl(sourceUrl).then(function(dataUrl) {
+															if (dataUrl) results[item.token] = dataUrl;
+															resolve();
+														});
+													}
+												).catch(function() {
 													resolve();
 												});
+											} catch {
+												resolve();
 											}
-										).catch(function() {
-											resolve();
 										});
-									} catch {
-										resolve();
-									}
-								});
-							});
-						}, Promise.resolve() as Promise<void | undefined>)
+									});
+								}, Promise.resolve() as Promise<void | undefined>)
+								.then(function() { return undefined; });
+						})
 						.then(function() {
-							if (Object.keys(results).length > 0) {
+							if (Object.keys(results).length === tokens.length) {
 								return { success: true as const, results };
 							}
 
@@ -917,6 +991,7 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 								}
 								return tokens.reduce(function(chain, token) {
 									return chain.then(function() {
+										if (results[token]) return;
 										const code = tokenToCode[token];
 										return fetchDataUrl(
 											apiBase + '/api/box/stream/download/asynccode/?code=' + encodeURIComponent(code)

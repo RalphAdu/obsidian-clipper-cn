@@ -95,7 +95,44 @@ function checkCommentImage(_unit: Extract<ExpectedUnit, { kind: 'comment_image' 
 	return { unit: _unit, reason: `no embedded comment image (data URI or placeholder) found` };
 }
 
-export function audit(expected: ExpectedUnit[], md: string): Bucket[] {
+function checkImageMimes(unit: Extract<ExpectedUnit, { kind: 'no_invalid_image_mime' }>, vaultMd: string): Miss | null {
+	const matches = [...vaultMd.matchAll(/!\[[^\]]*\]\(data:([^;,)]+)[;,]/g)];
+	const invalid = matches
+		.map((m) => m[1])
+		.filter((mime) => !mime.startsWith('image/'));
+	if (invalid.length === 0) return null;
+	const uniqueMimes = [...new Set(invalid)];
+	return {
+		unit,
+		reason: `${invalid.length} image data URI(s) with non-image MIME: ${uniqueMimes.join(', ')}`,
+	};
+}
+
+function checkUnresolvedImages(unit: Extract<ExpectedUnit, { kind: 'no_unresolved_image' }>, vaultMd: string): Miss | null {
+	// `feishu-image://TOKEN` placeholders mean an image block didn't get its base64
+	// resolved — Obsidian renders these as a broken image icon. After the v2/cover
+	// + magic-byte fix, this count should be 0 (or very close to it).
+	const matches = vaultMd.match(/feishu-image:\/\/[A-Za-z0-9_-]+/g) || [];
+	if (matches.length === 0) return null;
+	return {
+		unit,
+		reason: `${matches.length} unresolved image placeholder(s) — Obsidian renders these as broken images`,
+	};
+}
+
+function checkFrontmatter(unit: Extract<ExpectedUnit, { kind: 'frontmatter_present' }>, vaultMd: string): Miss[] {
+	const fmMatch = vaultMd.match(/^---\n([\s\S]*?)\n---/);
+	if (!fmMatch) {
+		return [{ unit, reason: 'missing frontmatter block' }];
+	}
+	const fm = fmMatch[1];
+	const misses: Miss[] = [];
+	if (!/^author:[^\S\n]*\S/m.test(fm)) misses.push({ unit, reason: 'frontmatter author is empty' });
+	if (!/^published:[^\S\n]*\S/m.test(fm)) misses.push({ unit, reason: 'frontmatter published is empty' });
+	return misses;
+}
+
+export function audit(expected: ExpectedUnit[], md: string, vaultMd?: string): Bucket[] {
 	// Build a normalized md once for body-text checks.
 	const mdNorm = normalize(md);
 
@@ -110,6 +147,9 @@ export function audit(expected: ExpectedUnit[], md: string): Bucket[] {
 		comments_section: { name: 'comments_section', misses: [] },
 		comment_thread: { name: 'comment_thread', misses: [] },
 		comment_image: { name: 'comment_image', misses: [] },
+		image_mime_invalid: { name: 'image_mime_invalid', misses: [] },
+		image_unresolved: { name: 'image_unresolved', misses: [] },
+		frontmatter_field_empty: { name: 'frontmatter_field_empty', misses: [] },
 	};
 
 	for (const unit of expected) {
@@ -154,6 +194,24 @@ export function audit(expected: ExpectedUnit[], md: string): Bucket[] {
 			case 'comment_image':
 				miss = checkCommentImage(unit, md);
 				if (miss) buckets.comment_image.misses.push(miss);
+				break;
+			case 'no_invalid_image_mime':
+				if (vaultMd) {
+					miss = checkImageMimes(unit, vaultMd);
+					if (miss) buckets.image_mime_invalid.misses.push(miss);
+				}
+				break;
+			case 'no_unresolved_image':
+				if (vaultMd) {
+					miss = checkUnresolvedImages(unit, vaultMd);
+					if (miss) buckets.image_unresolved.misses.push(miss);
+				}
+				break;
+			case 'frontmatter_present':
+				if (vaultMd) {
+					const fmMisses = checkFrontmatter(unit, vaultMd);
+					buckets.frontmatter_field_empty.misses.push(...fmMisses);
+				}
 				break;
 		}
 	}

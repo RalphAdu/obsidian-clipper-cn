@@ -851,23 +851,64 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 					};
 
 					const runtimeImageBlocks: Array<{ token: string; block: any }> = [];
+					const tokenSet = new Set(tokens);
+					const visited = new Set<any>();
+
+					const extractImageToken = function(block: any): string | undefined {
+						return block?.snapshot?.image?.token
+							|| block?.image?.token
+							|| block?.snapshot?.image_token
+							|| block?.image_token;
+					};
+
+					const tryRegister = function(block: any) {
+						const tk = extractImageToken(block);
+						if (tk && tokenSet.has(tk) && block?.imageManager?.fetch && !runtimeImageBlocks.find(function(x) { return x.token === tk; })) {
+							runtimeImageBlocks.push({ token: tk, block: block });
+						}
+					};
+
 					try {
-						const rootBlock = (window as any).PageMain?.blockManager?.rootBlockModel;
-						const seen = new Set<any>();
-						const walk = function(block: any) {
-							if (!block || seen.has(block) || seen.size > 500) return;
-							seen.add(block);
-							const imageToken = block?.snapshot?.image?.token;
-							if (imageToken && block?.imageManager?.fetch) {
-								runtimeImageBlocks.push({ token: imageToken, block });
+						const bm = (window as any).PageMain?.blockManager;
+						const rootBlock = bm?.rootBlockModel;
+
+						// Strategy A + B: recursive walk via direct children array AND snapshot.children IDs.
+						const visit = function(block: any) {
+							if (!block || visited.has(block)) return;
+							visited.add(block);
+							tryRegister(block);
+							// Strategy A: direct children array
+							const childArr = Array.isArray(block.children) ? block.children : [];
+							for (let i = 0; i < childArr.length; i++) visit(childArr[i]);
+							// Strategy B: snapshot.children is an ID array — look up via blockManager
+							const childIds = Array.isArray(block?.snapshot?.children) ? block.snapshot.children : [];
+							for (let i = 0; i < childIds.length; i++) {
+								const childBlock = bm?.getBlockById?.(childIds[i]);
+								if (childBlock) visit(childBlock);
 							}
-							const children = Array.isArray(block.children) ? block.children : [];
-							for (let i = 0; i < children.length; i++) walk(children[i]);
 						};
-						walk(rootBlock);
-					} catch {
-						// Fall through to copy_out fallback.
+						visit(rootBlock);
+
+						// Strategy C: defensive — if feishu exposes an enumeration of all blocks, scan it.
+						try {
+							const allBlocks = bm?.allBlocks || bm?.blockModels;
+							if (allBlocks && typeof allBlocks === 'object') {
+								const candidates = Array.isArray(allBlocks) ? allBlocks : Object.values(allBlocks);
+								for (let i = 0; i < candidates.length; i++) {
+									tryRegister(candidates[i] as any);
+								}
+							}
+						} catch (_) { /* registry API not available */ }
+					} catch (_) {
+						// Fall through to copy_out fallback below.
 					}
+
+					// Debug: emit one console.warn so we can see which tokens the walk missed.
+					try {
+						const found = new Set(runtimeImageBlocks.map(function(x) { return x.token; }));
+						const missed = tokens.filter(function(t) { return !found.has(t); });
+						console.warn('[feishu-image-walk] requested=' + tokens.length + ' found=' + found.size + ' missed=' + missed.length, missed.slice(0, 5));
+					} catch (_) { /* logging best-effort */ }
 
 					return runtimeImageBlocks
 						.filter(function(item) { return tokens.indexOf(item.token) !== -1; })

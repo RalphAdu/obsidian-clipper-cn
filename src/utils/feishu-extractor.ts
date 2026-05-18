@@ -830,6 +830,19 @@ export function convertBlocksToHtml(blocks: FeishuBlock[], options?: { autoNumbe
 }
 
 /**
+ * Returns true if `block` is a TEXT block whose text content (joined across
+ * all text_run elements) is empty after trim. Spacer = feishu's "blank line"
+ * convention between paragraphs/sections.
+ */
+function isEmptyTextSpacer(block: FeishuBlock | undefined): boolean {
+	if (!block || block.block_type !== FEISHU_BLOCK_TYPE.TEXT) return false;
+	const text = (block.text?.elements || [])
+		.map((e) => e.text_run?.content || '')
+		.join('');
+	return text.trim().length === 0;
+}
+
+/**
  * Returns true if `block` is a TEXT block whose every non-empty `text_run`
  * element is bold — the feishu-web convention for an inline section header
  * placed between two list groups (e.g. "家长的痛点：" above a bullet list).
@@ -928,6 +941,28 @@ function collectListGroup(
 		// (e.g., "家长的痛点：" above a bullet list). Close the current list so
 		// the header renders as its own <p><strong>…</strong></p> paragraph.
 		if (isSectionHeaderText(b)) {
+			break;
+		}
+
+		// An empty TEXT spacer (feishu's blank-line convention) signals
+		// end-of-list when the next non-empty block is NOT the same list kind.
+		// If the next non-empty block IS the same kind, keep absorbing the
+		// spacer as a follower so list items separated by a blank line stay
+		// in one <ul>/<ol>.
+		if (isEmptyTextSpacer(b)) {
+			let j = i + 1;
+			while (j < childIds.length && isEmptyTextSpacer(blockMap.get(childIds[j]))) {
+				j++;
+			}
+			const next = j < childIds.length ? blockMap.get(childIds[j]) : undefined;
+			if (next && next.block_type === kind) {
+				pendingFollowers.push(b);
+				i++;
+				continue;
+			}
+			// Close the list; leave `i` pointing AT the spacer so the upper
+			// `renderChildren` loop processes spacer + following blocks as
+			// page-level siblings (empty TEXT renders as '' in renderBlock).
 			break;
 		}
 

@@ -237,6 +237,28 @@ describe('convertBlocksToHtml — section header boundary', () => {
 	});
 });
 
+describe('convertBlocksToHtml — list spacer boundary', () => {
+	it('BULLET → empty TEXT → non-empty TEXT × 3 → H2: list closes, paragraphs are siblings', () => {
+		const blocks: FeishuBlock[] = [
+			{ block_id: 'p', block_type: 1, page: { elements: [] }, children: ['u1', 'sp', 't1', 't2', 't3', 'h'] },
+			{ block_id: 'u1', block_type: 12, parent_id: 'p', bullet: { elements: [{ text_run: { content: 'frequent BUG fixes' } }] } } as any,
+			{ block_id: 'sp', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: '' } }] } } as any,
+			{ block_id: 't1', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: 'These issues require constant back-and-forth,' } }] } } as any,
+			{ block_id: 't2', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: 'and optimizing is a bottomless pit.' } }] } } as any,
+			{ block_id: 't3', block_type: 2, parent_id: 'p', text: { elements: [{ text_run: { content: 'I finally decided to learn coding myself.' } }] } } as any,
+			{ block_id: 'h', block_type: 4, parent_id: 'p', heading2: { elements: [{ text_run: { content: 'Next section' } }] } } as any,
+		];
+		const html = convertBlocksToHtml(blocks);
+		expect(html.match(/<li>/g)?.length).toBe(1);
+		expect(html).toContain('<li>frequent BUG fixes</li>');
+		expect(html).toContain('<p>These issues require constant back-and-forth,</p>');
+		expect(html).toContain('<p>and optimizing is a bottomless pit.</p>');
+		expect(html).toContain('<p>I finally decided to learn coding myself.</p>');
+		expect(html).not.toMatch(/<li>[^<]*<p>These issues/);
+		expect(html).toContain('<h2>Next section</h2>');
+	});
+});
+
 describe('extractFeishuStructuredContent — comments wiring', () => {
 	it('extractFeishuComments is imported and reachable from feishu-comments module', async () => {
 		const mod = await import('./feishu-comments');

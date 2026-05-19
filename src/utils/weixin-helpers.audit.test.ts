@@ -59,6 +59,50 @@ function simulateContentTsCleanedHtml(rawHtml: string): string {
 	return document.documentElement.outerHTML;
 }
 
+describe.concurrent('REPORT — evidence dump for ship acceptance', () => {
+	const { html } = loadHtml();
+	const articleHtml = simulateExtract(html)!;
+	const markdown = postProcessExtractorMarkdown(createMarkdownContent(articleHtml, 'https://mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA'));
+
+	it('bug 1 evidence — published value comparison (old vs new path)', () => {
+		const cleanedHtml = simulateContentTsCleanedHtml(html);
+		const oldPath = extractWeChatPublishedFromRawHtml(cleanedHtml); // pre-fix
+		const newPath = extractWeChatPublishedFromRawHtml(html);        // post-fix
+		console.log('\n=== BUG 1 (published) evidence ===');
+		console.log(`  cleanedHtml path (pre-fix) → published = ${JSON.stringify(oldPath)}  ← was wiped because <script> stripped`);
+		console.log(`  raw doc path     (post-fix) → published = ${JSON.stringify(newPath)}`);
+		expect(oldPath).toBe('');
+		expect(newPath).toBe('2026-04-14');
+	});
+
+	it('bug 2 evidence — PARA + dashboard markdown literal', () => {
+		const paraStart = markdown.indexOf('Vault/');
+		const paraEnd = markdown.indexOf('4-Archives/', paraStart) + '4-Archives/'.length;
+		// Find the fence wrapping the PARA section (walk back to last ``` line).
+		const paraFenceStart = markdown.lastIndexOf('\n```', paraStart);
+		const paraFenceEnd = markdown.indexOf('\n```', paraEnd);
+		const paraBlock = markdown.slice(paraFenceStart + 1, paraFenceEnd + 4);
+		console.log('\n=== BUG 2 (PARA block) evidence — literal markdown emitted ===');
+		console.log(paraBlock);
+
+		const dashIdx = markdown.indexOf('## 最近修改的笔记');
+		// The dashboard is wrapped in a single OUTER fence ` ```` ` (4 backticks)
+		// because it contains inner ```dataview``` literals. Walk back to find it.
+		const outerFenceStart = markdown.lastIndexOf('\n````', dashIdx);
+		const outerFenceEnd = markdown.indexOf('\n````', dashIdx);
+		const dashBlock = markdown.slice(outerFenceStart + 1, outerFenceEnd + 5);
+		console.log('\n=== BUG 2 (dashboard block w/ inner ```dataview``` literals) evidence — literal markdown emitted ===');
+		console.log(dashBlock);
+
+		// Hard assertions
+		expect(paraBlock).toMatch(/^```\n/);            // PARA uses 3-backtick fence
+		expect(paraBlock).toMatch(/├── 1-Projects\//);  // multi-line preserved
+		expect(dashBlock).toMatch(/^````/);             // dashboard outer fence ≥4 backticks
+		expect(dashBlock).toMatch(/```dataview/);       // inner ```dataview``` literal preserved
+		expect(dashBlock).not.toMatch(/\\`/);           // no backslash-escape
+	});
+});
+
 describe('weixin audit — mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA', () => {
 	const { html, source } = loadHtml();
 	const articleHtml = simulateExtract(html);

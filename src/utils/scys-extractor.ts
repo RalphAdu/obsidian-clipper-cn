@@ -3,6 +3,7 @@ import { createLogger } from './logger';
 import { convertBlocksToHtml, autolinkBareUrls } from './feishu-extractor';
 import type { FeishuBlock } from './feishu-extractor';
 import { convertDate } from './date-utils';
+import type { Attachment } from './attachment-types';
 
 const logger = createLogger('scys-extractor');
 
@@ -672,6 +673,8 @@ export interface ScysArticleDetail {
 	likeCount: number;
 	readingCount: number;
 	authorName: string;
+	imageList?: string[];
+	attachments?: Attachment[];
 }
 
 export async function fetchScysArticleDetail(entityId: string, entityType: string): Promise<ScysArticleDetail | null> {

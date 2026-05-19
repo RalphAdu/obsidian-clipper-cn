@@ -32,13 +32,13 @@ context/
 # Chrome extension signing key (do not commit)
 keys/
 
-# Superpowers work area — local notes (e.g. Feishu credentials) live here.
-# Already-tracked spec / plan / BACKLOG docs are explicitly re-included
-# below; new untracked files in this folder stay private to the local
-# checkout unless promoted via `git add -f`.
+# Superpowers work area — entire dir is gitignored. spec/plan/BACKLOG/feishu
+# credentials all live here as local-only documents. The ONLY file promoted to
+# git is BACKLOG.md via explicit `git add -f docs/superpowers/BACKLOG.md` (it's
+# the project's "cold-start handbook" maintained across features).
+# Notes:
+# - `!negate` rules below a parent-ignore directive are NO-OP in git (父目录
+#   被 ignore 时子文件 negate 规则失效). Earlier versions of this file had
+#   such rules — removed 2026-05-19 as they were dead code that misled readers.
+# - To intentionally track another file under this dir, must use `git add -f`.
 docs/superpowers/
-!docs/superpowers/BACKLOG.md
-!docs/superpowers/specs/
-!docs/superpowers/specs/**
-!docs/superpowers/plans/
-!docs/superpowers/plans/**

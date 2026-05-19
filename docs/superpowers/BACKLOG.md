@@ -1286,6 +1286,7 @@ article 数据**特殊性**（与 course/docx 不同）：
 | `src/content.ts:~133` + `src/utils/content-extractor.ts:~60` | `ContentResponse` 在两处独立 declare（不是 import）。每加字段都要同时改两处。长远应把 content.ts:~133 改成 `import type { ContentResponse }`，前提 audit 两个 interface 字段集严格一致 | 低 |
 | 未来 spec：scys/feishu PDF 附件离线缓存到 vault | 需要扩展 manifest `downloads` 权限 + 用户在扩展设置里配置 vault 附件目录 + chrome.downloads 异步流程，或依赖 obsidian-advanced-uri 社区插件扩协议。本次 §6.17 明确 out of scope | 低（用户问到再开） |
 | `scripts/scys-visual-audit.py` | 硬编码 `/tmp/scys-article-dom-dump.json` + 单 vault md 路径；改 CLI 参数 + 多 fixture 批量跑能作为 CI 回归 | 低 |
+| 🚧 **新建** `src/utils/_scys-article-write-vault.test.ts` | scys visual-audit 工具链残缺：vault md 生成需要 vitest dump test（mock fetch + writeFileSync 到 vault），当前缺失导致 audit 必须靠阿杜手动点扩展裁剪——违背"不打扰用户"初衷。下次接 scys 相关 spec 时**必须先补这步**。详见 memory `reference_scys_visual_audit.md` §工具链残缺 | 中 |
 | `src/utils/zsxq-extractor.ts:parseZsxqInlineText` | 当前覆盖 hashtag/mention/emoji/web/text_bold/text_italic；未来可能遇到 text_color / text_strike / image / topic-ref / mention-link 等新 `<e>` type — 实际看到再扩展，spec 阶段抓 fixture 时主动留意 | 中-低 |
 | `src/utils/zsxq-extractor.ts:extractZsxqStructuredContent` | `kind === 'article'`（`wx.zsxq.com/group/{gid}/article/{aid}`）当前 return null，退化到 Defuddle 兜底；专栏文章 URL 提取未实施 — 抓到一个真实 article URL 后再开 plan。注：`kind === 'articles-html'` (host=articles.zsxq.com) 已在 commit `c5efe22` 实施 | 低 |
 | `src/utils/zsxq-extractor.ts:fetchZsxqAllComments` | 评论 image 字段（fixture 都不含）若实际遇到，需要走 `resolveZsxqImages` pipeline；当前 `renderCommentBody` 已渲染 `<img>` 占位符，端到端未验证 | 低 |

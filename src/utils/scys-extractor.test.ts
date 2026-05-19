@@ -1749,3 +1749,45 @@ describe('extractScysArticleStandalone — attachments rendering', () => {
 		expect(result!.content).toContain('一个人 + AI + 一群人_直播版 PPT.pdf');
 	});
 });
+
+describe('extractScysArticleStandalone — image-only + attachments coexistence', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('renders image-only body AND ## 附件 section when both present', async () => {
+		// Synthetic fixture: image-only detail with fileList injected.
+		const hybridDetail = JSON.parse(JSON.stringify(scysArticleImageOnlyDetail));
+		hybridDetail.data.topicDTO.fileList = (scysArticleAttachmentsDetail as any).data.topicDTO.fileList;
+
+		const png1x1 = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+		const fetchMock = vi.fn().mockImplementation((url: any, _init?: any) => {
+			const u = String(url);
+			if (u.includes('/topicDetail')) {
+				return Promise.resolve({ ok: true, json: async () => hybridDetail });
+			}
+			if (u.includes('/pageTopicComment')) {
+				return Promise.resolve({ ok: true, json: async () => ({ data: { items: [], total: 0 } }) });
+			}
+			// OSS image fetch (image-only path): return a tiny blob for inlining
+			return Promise.resolve({
+				ok: true,
+				headers: new Headers({ 'Content-Type': 'image/webp' }),
+				blob: () => Promise.resolve(new Blob([png1x1], { type: 'image/webp' })),
+			});
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/45544824841421428' } as Document;
+		const result = await extractScysStructuredContent(doc);
+
+		expect(result).not.toBeNull();
+		// image-only branch renders image (data:url after blob inlining)
+		expect(result!.content).toMatch(/<img\s/);
+		// attachment section appended
+		expect(result!.content).toContain('<h2>附件</h2>');
+		expect(result!.content).toContain('一个人 + AI + 一群人：亦仁十周年直播分享整理笔记.pdf');
+		expect(result!.attachments).toHaveLength(2);
+		expect(result!.wordCount).toBe(0);
+	});
+});

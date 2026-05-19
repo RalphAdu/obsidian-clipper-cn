@@ -32,6 +32,9 @@ context/
 # Chrome extension signing key (do not commit)
 keys/
 
+# Per-feature worktrees (superpowers workflow) — never tracked
+.claude/worktrees/
+
 # Superpowers work area — entire dir is gitignored. spec/plan/BACKLOG/feishu
 # credentials all live here as local-only documents. The ONLY file promoted to
 # git is BACKLOG.md via explicit `git add -f docs/superpowers/BACKLOG.md` (it's

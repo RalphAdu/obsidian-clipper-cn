@@ -2,6 +2,7 @@ import { ExtractedContent } from '../types/types';
 import { createMarkdownContent } from 'defuddle/full';
 import { postProcessExtractorMarkdown } from './markdown-post-process';
 import { sanitizeFileName } from './string-utils';
+import type { Attachment } from './attachment-types';
 import { buildVariables, addSchemaOrgDataToVariables } from './shared';
 import browser from './browser-polyfill';
 import { debugLog } from './debug';
@@ -63,6 +64,7 @@ interface ContentResponse {
 	wordCount: number;
 	language: string;
 	metaTags: { name?: string | null; property?: string | null; content: string | null }[];
+	attachments: Attachment[];
 }
 
 async function sendExtractRequest(tabId: number): Promise<ContentResponse> {

@@ -16,6 +16,7 @@ import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-e
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
 import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
 import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
+import type { Attachment } from './utils/attachment-types';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
 const contentLogger = createLogger('Content');
@@ -149,6 +150,7 @@ declare global {
 		wordCount: number;
 		language: string;
 		metaTags: { name?: string | null; property?: string | null; content: string | null }[];
+		attachments: Attachment[];
 	}
 
 	browser.runtime.onMessage.addListener((request: any, sender, sendResponse) => {
@@ -363,6 +365,7 @@ declare global {
 
 				const response: ContentResponse = {
 					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || defuddled.author,
+					attachments: scysContent?.attachments || [],
 					content: bilibiliContent?.structuredHtml || feishuContent?.content || scysContent?.content || zsxqContent?.content || weChatArticleContent || defuddled.content,
 					description: bilibiliContent?.description || defuddled.description,
 					domain: getDomain(document.URL),

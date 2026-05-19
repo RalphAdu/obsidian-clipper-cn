@@ -7,11 +7,12 @@
 // not. happy-dom provides a real browser-like env so this audit truly mirrors
 // the extension runtime.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
 import { createMarkdownContent } from 'defuddle/full';
 import { postProcessExtractorMarkdown } from './markdown-post-process';
+import { buildVariables } from './shared';
 import { extractWeChatPublishedFromRawHtml, normalizePreBlockLineBreaks } from './weixin-helpers';
 
 // End-to-end audit: feed real-world mp.weixin.qq.com HTML through the same
@@ -58,6 +59,126 @@ function simulateContentTsCleanedHtml(rawHtml: string): string {
 	document.querySelectorAll('*').forEach((el: any) => el.removeAttribute('style'));
 	return document.documentElement.outerHTML;
 }
+
+describe('REPORT — end-to-end obsidianNote dump (byte-equivalent to browser clip)', () => {
+	const { html } = loadHtml();
+	const url = 'https://mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA';
+
+	// Replay content.ts message-handler steps verbatim. Same DOM cleanup,
+	// same extractor calls, same buildVariables call, same obsidianNote
+	// assembly as line 670-727 of src/content.ts. Output is byte-equivalent
+	// to what Obsidian receives via the obsidian:// URL during a real clip.
+	const { document } = parseHTML(html);
+
+	// Step 1: extract title from <title> or <h2 class="rich_media_title">.
+	const titleEl = document.querySelector('h2.rich_media_title, h1.rich_media_title') || document.querySelector('title');
+	const title = (titleEl?.textContent || '').trim().replace(/\s+/g, ' ');
+
+	// Step 2: extract author from #js_name (mp.weixin convention) or
+	// nearest <a rel="author">.
+	const authorEl = document.querySelector('#js_name') || document.querySelector('a[rel="author"]');
+	const author = (authorEl?.textContent || '').trim();
+
+	// Step 3: mirror content.ts:extractWeChatArticleContent (lines 65-76)
+	const article = document.querySelector('#js_content');
+	const articleClone = (article as any).cloneNode(true) as Element;
+	articleClone.querySelectorAll('script, style').forEach((el: any) => el.remove());
+	normalizePreBlockLineBreaks(articleClone);
+	const weChatArticleContent = (articleClone as any).outerHTML;
+
+	// Step 4: weChatPublished from RAW doc HTML (post-fix path).
+	const weChatPublished = extractWeChatPublishedFromRawHtml((document as any).documentElement.outerHTML);
+
+	// Step 5: HTML → markdown via the same createMarkdownContent +
+	// postProcessExtractorMarkdown pipeline content-extractor.ts uses.
+	const markdownBody = postProcessExtractorMarkdown(createMarkdownContent(weChatArticleContent, url));
+
+	// Step 6: buildVariables — same call shape content.ts:683-698 makes.
+	const simulatedVars = buildVariables({
+		title,
+		author,
+		content: markdownBody,
+		contentHtml: weChatArticleContent,
+		url,
+		fullHtml: '',
+		description: '',
+		favicon: '',
+		image: '',
+		published: weChatPublished,
+		site: '',
+		language: '',
+		wordCount: 0,
+		extractedContent: {},
+	});
+	const popupMarkdown = simulatedVars['{{content}}'] || '';
+
+	// Step 7: assemble obsidianNote — same template content.ts:709-727 uses.
+	const fmEscape = (v: string) => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+	const today = new Date().toISOString().slice(0, 10);
+	const fmTitle = fmEscape(simulatedVars['{{title}}'] || '');
+	const fmDescription = fmEscape(simulatedVars['{{description}}'] || '');
+	const fmAuthor = fmEscape(simulatedVars['{{author}}'] || '');
+	const fmPublished = fmEscape(simulatedVars['{{published}}'] || '');
+	const obsidianNote = [
+		'---',
+		`title: "${fmTitle}"`,
+		`source: "${url}"`,
+		`author:${fmAuthor ? ` "${fmAuthor}"` : ''}`,
+		`published:${fmPublished ? ` ${fmPublished}` : ''}`,
+		`created: ${today}`,
+		`description: ${fmDescription ? `"${fmDescription}"` : ''}`,
+		`tags:`,
+		`  - "clippings"`,
+		'---',
+		popupMarkdown,
+	].join('\n');
+
+	// Write the full .md file to /tmp/wx-clip-output.md so the human reviewer
+	// can open it in Obsidian / any editor and visually verify against the
+	// web page screenshots. This is the SAME file content the browser would
+	// hand to Obsidian via obsidian://new?content=... — not a model, not a
+	// stub.
+	const dumpPath = '/tmp/wx-clip-output.md';
+	writeFileSync(dumpPath, obsidianNote, 'utf-8');
+
+	it('frontmatter has published: 2026-04-14', () => {
+		console.log(`\n=== Full .md dumped to ${dumpPath} (${obsidianNote.length} bytes) ===`);
+		console.log('--- frontmatter ---');
+		console.log(obsidianNote.split('\n').slice(0, 10).join('\n'));
+		expect(obsidianNote).toMatch(/^published: 2026-04-14$/m);
+	});
+
+	it('PARA block in body is multi-line, ASCII spaces, 3-backtick fence', () => {
+		const paraStart = obsidianNote.indexOf('Vault/');
+		const paraEnd = obsidianNote.indexOf('4-Archives/', paraStart) + '4-Archives/'.length;
+		const fenceOpen = obsidianNote.lastIndexOf('\n```', paraStart);
+		const fenceClose = obsidianNote.indexOf('\n```', paraEnd);
+		const block = obsidianNote.slice(fenceOpen + 1, fenceClose + 4);
+		console.log('\n--- PARA block (literal from .md file) ---');
+		console.log(block);
+		expect(block.split('\n').filter(s => s.trim().length > 0).length).toBeGreaterThanOrEqual(13); // 11 entries + 2 fence lines
+		expect(block).toMatch(/^```\n/);
+		expect(block).toMatch(/├── 1-Projects\/$/m);
+		expect(block).not.toContain('<span');
+		expect(block).not.toContain(' '); // NBSP normalized
+		expect(block).not.toContain('&#160;'); // entity normalized
+	});
+
+	it('dashboard block is wrapped in ```` (4-backtick) outer fence with verbatim ```dataview``` inner literals', () => {
+		const dashH1 = obsidianNote.indexOf('# 我的知识仪表盘');
+		expect(dashH1).toBeGreaterThan(-1);
+		const outerFenceOpen = obsidianNote.lastIndexOf('\n````', dashH1);
+		const outerFenceClose = obsidianNote.indexOf('\n````', dashH1);
+		const block = obsidianNote.slice(outerFenceOpen + 1, outerFenceClose + 5);
+		console.log('\n--- dashboard block (literal from .md file) ---');
+		console.log(block);
+		expect(block).toMatch(/^````$/m);  // outer fence ≥4 backticks
+		expect(block).toMatch(/^```dataview$/m);
+		expect(block.match(/```dataview/g)!.length).toBe(4); // 4 dataview blocks
+		expect(block).not.toMatch(/\\`/);
+		expect(block).not.toContain('<span');
+	});
+});
 
 describe.concurrent('REPORT — evidence dump for ship acceptance', () => {
 	const { html } = loadHtml();

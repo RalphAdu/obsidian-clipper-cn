@@ -781,13 +781,19 @@ export async function fetchScysArticleComments(
 	return { items, total };
 }
 
-// Convert images field (single URL or comma-separated) into a placeholder
-// <img> using the same feishu-image://scys: protocol resolveScysImages handles.
+// Render an array of scys image URLs as <p><img></p> blocks using the
+// feishu-image://scys: protocol that resolveScysImages handles.
+function renderScysImageUrls(urls: string[]): string {
+	return urls
+		.filter(u => u && u.trim())
+		.map(u => `<p><img src="feishu-image://scys:${encodeURIComponent(u)}" alt=""></p>`)
+		.join('');
+}
+
+// Convert images field (single URL or comma-separated) into placeholder <img>.
 function renderCommentImages(images: string | undefined): string {
 	if (!images || !images.trim()) return '';
-	return images.split(',').map(u => u.trim()).filter(Boolean).map(u =>
-		`<p><img src="feishu-image://scys:${encodeURIComponent(u)}" alt=""></p>`
-	).join('');
+	return renderScysImageUrls(images.split(',').map(u => u.trim()).filter(Boolean));
 }
 
 // Header line for an article comment. Mirrors formatScysCommentHeader visual

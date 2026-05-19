@@ -787,9 +787,11 @@ export function formatScysArticleCommentHeader(comment: ScysArticleComment): str
 
 function renderOneArticleCommentHtml(c: ScysArticleComment): string {
 	const header = formatScysArticleCommentHeader(c);
-	// scys server-renders comment content as HTML but does NOT wrap URLs in
-	// <a>; autolink so Obsidian gets clickable [url](url) markdown.
-	const body = autolinkBareUrls(c.content ?? '') + renderCommentImages(c.images);
+	// scys server-renders comment content as HTML and may embed zsxq-style
+	// <e type="web" /> entities. Decode entities first so Defuddle doesn't
+	// drop the self-closing tag, then autolink any remaining bare URLs.
+	const decoded = decodeScysWebEntities(c.content ?? '');
+	const body = autolinkBareUrls(decoded) + renderCommentImages(c.images);
 	const replies = Array.isArray(c.replies) ? c.replies : [];
 	const repliesHtml = replies.map(renderOneArticleCommentHtml).join('');
 	return `<blockquote>${header}${body}${repliesHtml}</blockquote>`;
@@ -801,17 +803,19 @@ export function renderScysArticleComments(items: ScysArticleComment[], total: nu
 	return `<hr><h2>💬 评论（${total} 条）</h2>${bodies}`;
 }
 
-// Convert scys "plain-text articleContent" (no <p>/<div>) into proper HTML:
-//   1. <e type="web" href="URL-encoded" title="URL-encoded" />  →  <a href="…">…</a>
-//   2. Split on blank lines (\n\n+) into paragraphs; inner single \n → <br>.
-// Without this defuddle treats the whole blob as one paragraph since there's
-// no block-level structure to anchor on.
-export function preprocessScysEntityHtml(html: string): string {
-	// 1. Decode <e type="web" href="…" title="…" /> into clickable <a>.
+// Decode zsxq-style <e type="web" href="URL-encoded" title="URL-encoded" />
+// self-closing entities into clickable <a>. Shared by:
+//   - preprocessScysEntityHtml (legacy plain-text articleContent path)
+//   - renderOneArticleCommentHtml (article comment server-HTML path)
+// Without this, Defuddle/turndown drops the non-standard self-closing tag
+// and the embedded URL disappears from the markdown output.
+// Only handles type="web"; other zsxq entities (mention/hashtag) not yet
+// observed in scys fixtures.
+export function decodeScysWebEntities(html: string): string {
 	const safeDecode = (s: string) => {
 		try { return decodeURIComponent(s); } catch { return s; }
 	};
-	const out1 = html.replace(
+	return html.replace(
 		/<e\s+type="web"\s+href="([^"]*)"\s+title="([^"]*)"\s*\/?>/g,
 		(_m, hrefEnc, titleEnc) => {
 			const href = safeDecode(hrefEnc);
@@ -819,6 +823,15 @@ export function preprocessScysEntityHtml(html: string): string {
 			return `<a href="${href}">${title}</a>`;
 		}
 	);
+}
+
+// Convert scys "plain-text articleContent" (no <p>/<div>) into proper HTML:
+//   1. <e type="web" href="URL-encoded" title="URL-encoded" />  →  <a href="…">…</a>
+//   2. Split on blank lines (\n\n+) into paragraphs; inner single \n → <br>.
+// Without this defuddle treats the whole blob as one paragraph since there's
+// no block-level structure to anchor on.
+export function preprocessScysEntityHtml(html: string): string {
+	const out1 = decodeScysWebEntities(html);
 	// 2. Paragraph-ize on blank lines; preserve inner single newlines as <br>.
 	const paras = out1.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
 	return paras.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('\n');

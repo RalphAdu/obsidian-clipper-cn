@@ -1601,3 +1601,27 @@ describe('extractScysStructuredContent — article route', () => {
 		expect(r?.content).toContain('hi');
 	});
 });
+
+import { decodeScysWebEntities } from './scys-extractor';
+
+describe('decodeScysWebEntities', () => {
+	it('decodes <e type="web"> with URL-encoded href and title', () => {
+		const input = 'gstack <e type="web" href="https%3A%2F%2Fgithub.com%2Fgarrytan%2Fgstack" title="GitHub%20gstack" />';
+		expect(decodeScysWebEntities(input)).toBe('gstack <a href="https://github.com/garrytan/gstack">GitHub gstack</a>');
+	});
+
+	it('falls back to href as anchor text when title is empty', () => {
+		const input = '<e type="web" href="https%3A%2F%2Fa.com" title="" />';
+		expect(decodeScysWebEntities(input)).toBe('<a href="https://a.com">https://a.com</a>');
+	});
+
+	it('leaves non-web <e> entity types untouched', () => {
+		const input = '<e type="mention" uid="1" title="@x" />';
+		expect(decodeScysWebEntities(input)).toBe('<e type="mention" uid="1" title="@x" />');
+	});
+
+	it('passes through HTML with no <e> entities unchanged', () => {
+		const input = '<p>plain html</p>';
+		expect(decodeScysWebEntities(input)).toBe('<p>plain html</p>');
+	});
+});

@@ -1672,3 +1672,44 @@ describe('fetchScysArticleDetail — image-only + attachments', () => {
 		expect(result!.attachments![1].url).toBe('https://scys.com/shengcai-web/open/file/download?topicId=22255855424524441&fileId=415514845822448');
 	});
 });
+
+describe('extractScysArticleStandalone — image-only', () => {
+	const originalFetch = global.fetch;
+	afterEach(() => { global.fetch = originalFetch; });
+
+	it('renders image-only article with author + published + inlined image', async () => {
+		// Three endpoints to mock by URL:
+		//   1. POST /topicDetail            → image-only fixture
+		//   2. POST /pageTopicComment       → empty page (terminate comment loop)
+		//   3. GET  https://sphere-sh.…     → fake image blob (L1 image fetch)
+		const png1x1 = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+		global.fetch = vi.fn().mockImplementation((url: any, _init?: any) => {
+			const u = String(url);
+			if (u.includes('/topicDetail')) {
+				return Promise.resolve({ ok: true, json: async () => scysArticleImageOnlyDetail });
+			}
+			if (u.includes('/pageTopicComment')) {
+				return Promise.resolve({ ok: true, json: async () => ({ data: { items: [], total: 0 } }) });
+			}
+			// fall-through: image L1 fetch (decoded scys:URL)
+			return Promise.resolve({
+				ok: true,
+				headers: new Headers({ 'Content-Type': 'image/webp' }),
+				blob: () => Promise.resolve(new Blob([png1x1], { type: 'image/webp' })),
+			});
+		}) as any;
+
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/45544824841421428' } as Document;
+		const result = await extractScysStructuredContent(doc);
+
+		expect(result).not.toBeNull();
+		expect(result!.author).toBe('亦仁');
+		expect(result!.published).toBe(convertDate(new Date(1778307309 * 1000)));
+		// Image-only branch emits one <img> with feishu-image://scys: token, which
+		// resolveScysImages then replaces with a data: URL via the mocked L1 fetch.
+		expect(result!.content).toMatch(/<img src="data:image\/webp;base64,/);
+		expect(result!.content).not.toMatch(/feishu-image:\/\/scys:/);
+		expect(result!.wordCount).toBe(0);
+		expect(result!.attachments).toEqual([]);
+	});
+});

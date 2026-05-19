@@ -508,6 +508,10 @@ export interface ScysStructuredContent {
 	/** Article publish date as YYYY-MM-DD (from topicDTO.gmtCreate unix seconds).
 	 *  Empty string for course/docx paths (no publish-time semantics). */
 	published: string;
+	/** Article-attached files (downloads). Empty array for course/docx paths
+	 *  and for articles without fileList. Required so callers can branch on
+	 *  presence without null-guarding the field. */
+	attachments: Attachment[];
 }
 
 function countWordsFromBlocks(blocks: FeishuBlock[]): number {
@@ -581,6 +585,7 @@ async function extractScysCourseChapter(doc: Document): Promise<ScysStructuredCo
 		content: html + commentsMd,
 		wordCount,
 		published: '',
+		attachments: [],
 	};
 }
 
@@ -612,7 +617,7 @@ async function extractScysDocxStandalone(doc: Document): Promise<ScysStructuredC
 
 	const wordCount = countWordsFromBlocks(flattenScysBlocks(blocks));
 
-	return { title, author: '', content: html, wordCount, published: '' };
+	return { title, author: '', content: html, wordCount, published: '', attachments: [] };
 }
 
 // ─── /articleDetail/{entityType}/{entityId} (zsxq topic mirror) ───────────────
@@ -887,6 +892,13 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 			(_m, blockId, filename) => `<p>📎 <a href="${doc.URL}#${blockId}">${filename}</a></p>`
 		);
 		wordCount = countWordsFromBlocks(flattenScysBlocks(detail.docBlocks, articleOptions));
+	} else if (detail.imageList && detail.imageList.length > 0 && !detail.articleHtml) {
+		// Image-only article: topicDTO carries no text (docBlocks absent, articleContent
+		// empty string) but imageList holds one or more long-form images. Each image is
+		// emitted as <p><img src="feishu-image://scys:URL"></p>; resolveScysImages below
+		// inlines them as base64 (matches the other scys image pipeline).
+		html = renderScysImageUrls(detail.imageList);
+		wordCount = 0;
 	} else {
 		// Legacy path: articleContent has two sub-shapes:
 		//   (a) Quill ql-editor HTML: outer <div class="content ql-editor"> with
@@ -934,6 +946,7 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 		content: html,
 		wordCount,
 		published,
+		attachments: detail.attachments ?? [],
 	};
 }
 

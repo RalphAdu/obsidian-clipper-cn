@@ -15,6 +15,7 @@ import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bi
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
 import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
+import { extractWeChatPublishedFromRawHtml, normalizePreBlockLineBreaks } from './utils/weixin-helpers';
 import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
 import type { Attachment } from './utils/attachment-types';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
@@ -71,6 +72,7 @@ declare global {
 		const articleClone = article.cloneNode(true) as HTMLElement;
 		normalizeImageSources(articleClone as unknown as Document);
 		articleClone.querySelectorAll('script, style').forEach(el => el.remove());
+		normalizePreBlockLineBreaks(articleClone);
 		return articleClone.outerHTML;
 	}
 
@@ -362,6 +364,9 @@ declare global {
 				const weChatArticleContent = isWeChatArticleUrl(document.URL)
 					? extractWeChatArticleContent(doc)
 					: null;
+				const weChatPublished = isWeChatArticleUrl(document.URL)
+					? extractWeChatPublishedFromRawHtml(cleanedHtml)
+					: '';
 
 				const response: ContentResponse = {
 					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || defuddled.author,
@@ -376,7 +381,7 @@ declare global {
 					image: bilibiliContent?.image || defuddled.image,
 					language: defuddled.language || '',
 					parseTime: defuddled.parseTime,
-					published: bilibiliContent?.published || feishuContent?.published || scysContent?.published || zsxqContent?.published || defuddled.published,
+					published: bilibiliContent?.published || feishuContent?.published || scysContent?.published || zsxqContent?.published || weChatPublished || defuddled.published,
 					schemaOrgData: defuddled.schemaOrgData,
 					selectedHtml: selectedHtml,
 					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : defuddled.site,

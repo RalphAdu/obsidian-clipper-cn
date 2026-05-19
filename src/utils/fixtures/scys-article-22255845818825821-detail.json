@@ -1,0 +1,144 @@
+{
+  "success": true,
+  "status": 0,
+  "message": null,
+  "data": {
+    "topicDTO": {
+      "entityType": "xq_topic",
+      "entityId": "22255845818825821",
+      "articleContent": "PDF提到的书镜这个想法很厉害，找个时间来是实现下。\n\n“具体逻辑是这样的：\n\n系统先完整提取这本书全部22章内容，再为每一章启动一个独立子智能体，同步完成两件核心事：一是凝练作者核心思想，二是把书中每一个观点，精准映射到我的真实生活里。\n\n不是那种空泛的“这对管理者颇有启发”的套话废话，而是落地到个人经历的具体映射。\n\nAI 完整掌握我的全部背景：\n\n家庭层面，我是移民家庭出身，父亲来自香港、新加坡，母亲来自缅甸；\n职业层面，我运营YC、搭建开源工具、长期辅导数千名创业者；\n同时它还知道我日常在读什么书、凌晨两点的所思所想、我和心理咨询师正在梳理和疗愈的内在议题。\n\n最终会生成一份三万字的「脑页（Brain Page）」。\n全书每一章都采用双栏对照版式：左栏还原作者原文核心观点，右栏逐条拆解——这些理念如何对应、映射到我当下正在经历的人生与境遇。\n\n比如“无常”章节，精准关联到我上周和某位创始人的真实对话；\n“恐惧”章节，对应心理咨询师帮我梳理出的内在行为模式；\n“放下”章节，引用我某次深夜写作的心境，正是我写下今年重拾创作自由、卸下执念的那个夜晚。\n\n整套流程只需要约40分钟。\n换成一位时薪300美元的专业咨询师，要读完这本书、再结合我的人生经历做同深度的个性化解读，至少要花费40小时以上。原因很简单：他们没有我的职业全图谱、阅读历史、过往会议记录、创始人社交关系链，这些私人维度的信息无法批量调取、交叉关联。\n\n我已经用这套「AI深度个性化读书法」处理了20多本经典著作，包括：\n《Amplified》《罗素自传》《设计你的人生》《天才儿童的戏剧》《有限与无限的游戏》《来自大海的礼物》《悉达多》《荒原狼》《做科学与工程的艺术》《梦想机器》《禁忌之书：认识自我的禁区》《你管别人怎么想》《当事情崩溃时》《万物简史》等。\n\n每一本书，都因为个人专属脑库的持续沉淀，价值被无限放大。\n而且阅读是层层镜像、迭代沉淀的：第二次解读会继承第一次的全部认知，第二十次则能贯通前十九次所有的思想脉络与人生记录，越读越懂自己、越读越通透。”",
+      "questionImages": [],
+      "miniQuestionImageList": [],
+      "showTitle": "我用AI做的个性化读书法，40分钟把书里的观点映射到我的人生",
+      "highlightShowTitle": null,
+      "highlightArticleContent": null,
+      "gmtCreate": 1778398393,
+      "isDigested": 0,
+      "imageList": [],
+      "miniImageList": [],
+      "type": "talk",
+      "topicId": "22255845818825821",
+      "createUserId": 552158581144,
+      "createUserLevel": 50,
+      "articleId": null,
+      "menuIds": "1985685",
+      "menuList": [
+        {
+          "key": 1985685,
+          "value": "亦仁"
+        }
+      ],
+      "scGroupList": null,
+      "commentsCount": 22,
+      "likeCount": 260,
+      "coinCount": 36,
+      "favoriteCount": 92,
+      "rewardsCount": 0,
+      "readingCount": 6171,
+      "coined": false,
+      "isFavorite": false,
+      "liked": false,
+      "isCreator": false,
+      "allowAiSummary": true,
+      "aiSummaryContent": "文章介绍了“AI深度个性化读书法”，适合有阅读需求且希望深入消化书籍内容、了解自我的人群。该方法借助AI实现书籍内容与个人经历的深度映射。\n<ul>\n  <li>系统先提取书的22章内容，为每章启动子智能体，凝练核心思想并将观点映射到个人经历，生成三万字「脑页」。</li>\n  <li>AI掌握个人家庭、职业等背景信息，采用双栏对照版式，让书中理念对应个人境遇，如“无常”关联与创始人对话。</li>\n  <li>整套流程约40分钟，若换专业咨询师至少需40小时，且他们难以获取私人维度信息。</li>\n  <li>已用此方法处理20多本经典著作，阅读会层层迭代，越读越懂自己。</li>\n</ul>\n这种读书法高效且独特，借助AI将书籍与个人经历深度结合，能让阅读者不断沉淀认知，深入了解自我，为阅读和自我成长提供了新的思路和方法。 ",
+      "permissionInterceptType": null,
+      "isPinned": false,
+      "pinOrder": null,
+      "pinScenes": [],
+      "hasVideo": false
+    },
+    "topicUserDTO": {
+      "userId": 552158581144,
+      "unionUserId": 36389,
+      "groupNumber": 1,
+      "name": "亦仁",
+      "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fn3NQqCN8nuGF86yZPXSbEsl0mb3",
+      "createUserLevel": 50,
+      "isWhiteListUser": true,
+      "topicCreateUserStat": {
+        "userId": null,
+        "topicCount": 3888,
+        "topicDigesteCount": 765,
+        "sumCount": null,
+        "followerCount": 4523,
+        "currentUserHasFollow": false,
+        "userTag": "生财有术创始人"
+      }
+    },
+    "topicLikeDTOList": [
+      {
+        "userId": 418551211548448,
+        "groupNumber": 44646,
+        "name": "十二",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FstEKWt-ErgjmZ47-D1zwvizU8QB",
+        "createUserLevel": null
+      },
+      {
+        "userId": 184545421112522,
+        "groupNumber": 115201,
+        "name": "伍拾",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FlX9m4nSzKTi2rrbHHi8qcfyorm8",
+        "createUserLevel": null
+      },
+      {
+        "userId": 518241552144,
+        "groupNumber": 120075,
+        "name": "米亚可可",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrAoFYFVe0tpKa7Ws1O1JhOe9wXr",
+        "createUserLevel": null
+      },
+      {
+        "userId": 548214118888184,
+        "groupNumber": 149501,
+        "name": "Christina咲颜",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FrgaRjt_pXa1_P8W4OAJPaKZeUl5",
+        "createUserLevel": null
+      },
+      {
+        "userId": 51522115124144,
+        "groupNumber": 156423,
+        "name": "🌸花小芳",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fn_RdYoRe7-VfQrwKRYD0IHHSMUF",
+        "createUserLevel": null
+      },
+      {
+        "userId": 182282548552282,
+        "groupNumber": 180856,
+        "name": "骁山",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FiHAqR_SYcTdxCKoAq2gh4POxYbP",
+        "createUserLevel": null
+      },
+      {
+        "userId": 118825251254252,
+        "groupNumber": 191215,
+        "name": "启航",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FoBqJG3EwFxbzr2_aVI90P_boTYx",
+        "createUserLevel": null
+      },
+      {
+        "userId": 48418882455128,
+        "groupNumber": 201192,
+        "name": "鹰",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuDV5zXJpXz87m3tv61yMByE80vG",
+        "createUserLevel": null
+      },
+      {
+        "userId": 111815484455552,
+        "groupNumber": 203112,
+        "name": "宝玉",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/FuiHVRULDGPPJ3Kn03TlKS-_YtM8",
+        "createUserLevel": null
+      },
+      {
+        "userId": 215541248122111,
+        "groupNumber": 204853,
+        "name": "GES Solar LED lighting",
+        "avatar": "https://search01.shengcaiyoushu.com/upload/avatar/Fv85S2ZGYt3aKHqsN8Dz0LYjCDGq",
+        "createUserLevel": null
+      }
+    ],
+    "topicCommentDTOList": null,
+    "topicCoinStatDTO": null,
+    "detailUrl": null
+  }
+}

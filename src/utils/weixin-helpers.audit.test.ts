@@ -1,8 +1,17 @@
+// @vitest-environment happy-dom
+//
+// Turndown (used inside defuddle/full → createMarkdownContent) needs document
+// and DOMParser globals. In the default node vitest env it silently fails with
+// "Partial conversion completed with errors. Original HTML: ..." which leaks
+// raw HTML and makes audit assertions look like they passed when they did
+// not. happy-dom provides a real browser-like env so this audit truly mirrors
+// the extension runtime.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
 import { createMarkdownContent } from 'defuddle/full';
+import { postProcessExtractorMarkdown } from './markdown-post-process';
 import { extractWeChatPublishedFromRawHtml, normalizePreBlockLineBreaks } from './weixin-helpers';
 
 // End-to-end audit: feed real-world mp.weixin.qq.com HTML through the same
@@ -38,16 +47,38 @@ function simulateExtract(rawHtml: string): string | null {
 	return (articleClone as any).outerHTML;
 }
 
+// Mirror content.ts cleanedHtml computation (line 322-363) — parse the full
+// page, strip <script>/<style>/style attrs, return outerHTML.  This is what
+// content.ts actually passes as published-extraction input today; the test
+// proves that this path LOSES the ct field because the strip-script step
+// happens BEFORE published extraction.
+function simulateContentTsCleanedHtml(rawHtml: string): string {
+	const { document } = parseHTML(rawHtml);
+	document.querySelectorAll('script, style').forEach(el => el.remove());
+	document.querySelectorAll('*').forEach((el: any) => el.removeAttribute('style'));
+	return document.documentElement.outerHTML;
+}
+
 describe('weixin audit — mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA', () => {
 	const { html, source } = loadHtml();
 	const articleHtml = simulateExtract(html);
 	const markdown = articleHtml
-		? createMarkdownContent(articleHtml, 'https://mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA')
+		? postProcessExtractorMarkdown(createMarkdownContent(articleHtml, 'https://mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA'))
 		: '';
 
-	it('publish time resolves to 2026-04-14 from ct field', () => {
+	it('publish time resolves to 2026-04-14 from raw HTML (with script tags)', () => {
 		console.log(`[audit] HTML source: ${source} (${html.length} bytes)`);
 		expect(extractWeChatPublishedFromRawHtml(html)).toBe('2026-04-14');
+	});
+
+	it('publish time CANNOT be extracted from cleanedHtml (content.ts strips <script> before — regression sentinel)', () => {
+		// Reproduces the bug: content.ts feeds cleanedHtml (post strip-script)
+		// to extractWeChatPublishedFromRawHtml; ct lives in a <script> so it's
+		// gone by then. Required fix: feed raw document.documentElement.outerHTML
+		// instead.
+		const cleaned = simulateContentTsCleanedHtml(html);
+		expect(cleaned).not.toContain('ct = "');
+		expect(extractWeChatPublishedFromRawHtml(cleaned)).toBe('');
 	});
 
 	it('PARA directory tree renders as multi-line code block in markdown', () => {
@@ -78,5 +109,25 @@ describe('weixin audit — mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA', () => {
 		}
 
 		console.log('[audit] PARA markdown block:\n' + block);
+	});
+
+	it('every <pre> block emits as a clean fenced code block (no <span> leak, no \\` backslash escape)', () => {
+		// Whole-document scan — catches any pre block where Turndown emits
+		// backslash-escaped backticks (\\`\\`\\`) or leaked <span> tags.
+		// Required for backtick-bearing content (e.g. dataview ```dataview).
+		expect(markdown).not.toMatch(/<span/);
+		expect(markdown).not.toMatch(/\\`/);
+
+		// The "dashboard" pre block in this article embeds three inner
+		// ```dataview``` fences as literal markdown. Verify the outer fence
+		// is lengthened to at least 4 backticks so the inner triple-backticks
+		// render verbatim in Obsidian.
+		const dashIdx = markdown.indexOf('## 最近修改的笔记');
+		expect(dashIdx).toBeGreaterThan(-1);
+		const dashBlockStart = markdown.lastIndexOf('````', dashIdx);
+		expect(dashBlockStart).toBeGreaterThan(-1);
+		// Inner dataview fences appear verbatim with 3 backticks.
+		const between = markdown.slice(dashBlockStart, dashIdx);
+		expect(between).toMatch(/```dataview/);
 	});
 });

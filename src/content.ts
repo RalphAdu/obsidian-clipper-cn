@@ -364,8 +364,12 @@ declare global {
 				const weChatArticleContent = isWeChatArticleUrl(document.URL)
 					? extractWeChatArticleContent(doc)
 					: null;
+				// IMPORTANT: feed RAW document HTML, not cleanedHtml. cleanedHtml has
+				// <script> stripped (line 329), so the inline `ct = "<unix>"` source
+				// of publish time is gone. document.documentElement.outerHTML
+				// preserves the original <script> blocks intact.
 				const weChatPublished = isWeChatArticleUrl(document.URL)
-					? extractWeChatPublishedFromRawHtml(cleanedHtml)
+					? extractWeChatPublishedFromRawHtml(document.documentElement.outerHTML)
 					: '';
 
 				const response: ContentResponse = {

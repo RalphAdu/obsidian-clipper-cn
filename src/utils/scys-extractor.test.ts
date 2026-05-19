@@ -1713,3 +1713,39 @@ describe('extractScysArticleStandalone — image-only', () => {
 		expect(result!.attachments).toEqual([]);
 	});
 });
+
+describe('extractScysArticleStandalone — attachments rendering', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('appends ## 附件 section with PDF links and emits attachments[]', async () => {
+		const fetchMock = vi.fn().mockImplementation(async (url: string, init?: any) => {
+			if (url.includes('/topicDetail')) {
+				return { ok: true, json: async () => scysArticleAttachmentsDetail };
+			}
+			if (url.includes('/pageTopicComment')) {
+				return { ok: true, json: async () => ({ data: { items: [], total: 0 } }) };
+			}
+			// any other URL (e.g. image OSS) — return empty
+			return { ok: true, blob: async () => new Blob([], { type: 'image/png' }), json: async () => ({}) };
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const doc = { URL: 'https://scys.com/articleDetail/xq_topic/22255855424524441' } as Document;
+		const result = await extractScysStructuredContent(doc);
+
+		expect(result).not.toBeNull();
+		expect(result!.author).toBe('亦仁');
+		expect(result!.published).toBe(convertDate(new Date(1776341549 * 1000)));
+		expect(result!.attachments).toHaveLength(2);
+		expect(result!.attachments[0]).toEqual({
+			name: '一个人 + AI + 一群人：亦仁十周年直播分享整理笔记.pdf',
+			url: 'https://scys.com/shengcai-web/open/file/download?topicId=22255855424524441&fileId=212215841282121',
+			size: undefined,
+		});
+		expect(result!.content).toContain('<h2>附件</h2>');
+		expect(result!.content).toContain('<li>📎 <a href="https://scys.com/shengcai-web/open/file/download?topicId=22255855424524441&fileId=212215841282121">一个人 + AI + 一群人：亦仁十周年直播分享整理笔记.pdf</a></li>');
+		expect(result!.content).toContain('一个人 + AI + 一群人_直播版 PPT.pdf');
+	});
+});

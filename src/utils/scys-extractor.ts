@@ -933,6 +933,15 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 		commentsHtml = renderScysArticleComments(commentsResult.items, detail.commentsCount || commentsResult.total);
 	}
 
+	// Append PDF/file attachments as a body-tail section.
+	const attachments: Attachment[] = detail.attachments ?? [];
+	if (attachments.length > 0) {
+		const items = attachments
+			.map(a => `<li>📎 <a href="${a.url}">${a.name}</a></li>`)
+			.join('');
+		html += `\n<h2>附件</h2>\n<ul>${items}</ul>`;
+	}
+
 	// Resolve scys: image tokens (body + comment images) in one pass.
 	html = await resolveScysImages(html + commentsHtml);
 
@@ -946,7 +955,7 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 		content: html,
 		wordCount,
 		published,
-		attachments: detail.attachments ?? [],
+		attachments,
 	};
 }
 

@@ -698,8 +698,9 @@ export async function fetchScysArticleDetail(entityId: string, entityType: strin
 		}
 		const hasBlocks = Array.isArray(topic.docBlocks) && topic.docBlocks.length > 0;
 		const hasHtml = typeof topic.articleContent === 'string' && topic.articleContent.length > 0;
-		if (!hasBlocks && !hasHtml) {
-			logger.warn(`[article] neither docBlocks nor articleContent populated (entityId=${entityId})`);
+		const hasImageList = Array.isArray(topic.imageList) && topic.imageList.length > 0;
+		if (!hasBlocks && !hasHtml && !hasImageList) {
+			logger.warn(`[article] no docBlocks / articleContent / imageList (entityId=${entityId})`);
 			return null;
 		}
 		return {
@@ -708,11 +709,23 @@ export async function fetchScysArticleDetail(entityId: string, entityType: strin
 			showTitle: topic.showTitle ?? '',
 			docBlocks: hasBlocks ? (topic.docBlocks as ScysBlock[]) : undefined,
 			articleHtml: hasHtml ? (topic.articleContent as string) : undefined,
+			imageList: hasImageList ? (topic.imageList as string[]) : undefined,
 			gmtCreate: topic.gmtCreate ?? 0,
 			commentsCount: topic.commentsCount ?? 0,
 			likeCount: topic.likeCount ?? 0,
 			readingCount: topic.readingCount ?? 0,
 			authorName: d?.topicUserDTO?.name ?? '',
+			attachments: Array.isArray(topic.fileList) && topic.fileList.length > 0
+				? topic.fileList
+					.map((f: any) => ({
+						name: String(f.name ?? ''),
+						url: typeof f.url === 'string' && f.url.startsWith('http')
+							? f.url
+							: `https://scys.com${typeof f.url === 'string' ? f.url : ''}`,
+						size: typeof f.size === 'number' ? f.size : undefined,
+					}))
+					.filter((a: Attachment) => a.name && a.url && a.url !== 'https://scys.com')
+				: undefined,
 		};
 	} catch (err) {
 		logger.warn(`[article] fetch error: ${String(err)}`);

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { isScysCourseUrl, parseScysUrl } from './scys-extractor';
 import { autolinkBareUrls } from './feishu-extractor';
 
@@ -1242,6 +1242,8 @@ describe('fetchScysArticleComments', () => {
 
 import fixtureArticleDetail from './fixtures/scys-article-55188248-detail.json';
 import fixtureArticleComments from './fixtures/scys-article-55188248-comments.json';
+import scysArticleImageOnlyDetail from './fixtures/scys-article-45544824841421428-detail.json';
+import scysArticleAttachmentsDetail from './fixtures/scys-article-22255855424524441-detail.json';
 
 describe('scys article fixture — real 55188248 (zsxq topic mirror)', () => {
 	const topic = (fixtureArticleDetail as any).data.topicDTO;
@@ -1623,5 +1625,50 @@ describe('decodeScysWebEntities', () => {
 	it('passes through HTML with no <e> entities unchanged', () => {
 		const input = '<p>plain html</p>';
 		expect(decodeScysWebEntities(input)).toBe('<p>plain html</p>');
+	});
+});
+
+describe('fetchScysArticleDetail — image-only + attachments', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('returns detail for image-only article (docBlocks/articleContent empty, imageList non-empty)', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => scysArticleImageOnlyDetail,
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const result = await fetchScysArticleDetail('45544824841421428', 'xq_topic');
+
+		expect(result).not.toBeNull();
+		expect(result!.imageList).toHaveLength(1);
+		expect(result!.imageList![0]).toContain('sphere-sh.oss-cn-shanghai.aliyuncs.com');
+		expect(result!.docBlocks).toBeUndefined();
+		expect(result!.articleHtml).toBeUndefined();
+		expect(result!.attachments).toBeUndefined();
+		expect(result!.authorName).toBe('亦仁');
+		expect(result!.gmtCreate).toBe(1778307309);
+	});
+
+	it('returns detail with attachments for fileList article', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => scysArticleAttachmentsDetail,
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const result = await fetchScysArticleDetail('22255855424524441', 'xq_topic');
+
+		expect(result).not.toBeNull();
+		expect(result!.attachments).toHaveLength(2);
+		expect(result!.attachments![0]).toEqual({
+			name: '一个人 + AI + 一群人：亦仁十周年直播分享整理笔记.pdf',
+			url: 'https://scys.com/shengcai-web/open/file/download?topicId=22255855424524441&fileId=212215841282121',
+			size: undefined,
+		});
+		expect(result!.attachments![1].name).toBe('一个人 + AI + 一群人_直播版 PPT.pdf');
+		expect(result!.attachments![1].url).toBe('https://scys.com/shengcai-web/open/file/download?topicId=22255855424524441&fileId=415514845822448');
 	});
 });

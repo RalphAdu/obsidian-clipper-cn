@@ -1,5 +1,14 @@
 import { convertDate } from './date-utils';
 
+const CT_REGEX = /\bct\s*=\s*["'](\d+)["']/;
+
+function ctSecondsToDate(seconds: number): string {
+	if (!Number.isFinite(seconds)) return '';
+	const date = new Date(seconds * 1000);
+	if (Number.isNaN(date.getTime())) return '';
+	return convertDate(date);
+}
+
 /**
  * Extract WeChat MP article publish time from raw HTML.
  *
@@ -9,13 +18,30 @@ import { convertDate } from './date-utils';
  * from raw HTML for resilience to extractor-vs-JS race conditions.
  */
 export function extractWeChatPublishedFromRawHtml(rawHtml: string): string {
-	const m = rawHtml.match(/\bct\s*=\s*["'](\d+)["']/);
+	const m = rawHtml.match(CT_REGEX);
 	if (!m) return '';
-	const seconds = parseInt(m[1], 10);
-	if (!Number.isFinite(seconds)) return '';
-	const date = new Date(seconds * 1000);
-	if (Number.isNaN(date.getTime())) return '';
-	return convertDate(date);
+	return ctSecondsToDate(parseInt(m[1], 10));
+}
+
+/**
+ * Extract WeChat MP article publish time by walking every <script> node's
+ * textContent. Does NOT rely on documentElement.outerHTML serialization —
+ * which empirically can drop inline <script> bodies in browser runtime
+ * (CSP / nonce / serializer behavior varies). For browser callers this is
+ * the canonical path; the raw-HTML helper above is kept for fixture-driven
+ * unit tests where the entire page text is available as a string.
+ */
+export function extractWeChatPublishedFromDocument(doc: ParentNode): string {
+	const scripts = doc.querySelectorAll('script');
+	for (let i = 0; i < scripts.length; i++) {
+		const text = (scripts[i] as any).textContent || '';
+		const m = text.match(CT_REGEX);
+		if (m) {
+			const result = ctSecondsToDate(parseInt(m[1], 10));
+			if (result) return result;
+		}
+	}
+	return '';
 }
 
 /**

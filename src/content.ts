@@ -15,7 +15,7 @@ import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bi
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
 import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
-import { extractWeChatPublishedFromRawHtml, normalizePreBlockLineBreaks } from './utils/weixin-helpers';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks } from './utils/weixin-helpers';
 import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
 import type { Attachment } from './utils/attachment-types';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
@@ -364,12 +364,14 @@ declare global {
 				const weChatArticleContent = isWeChatArticleUrl(document.URL)
 					? extractWeChatArticleContent(doc)
 					: null;
-				// IMPORTANT: feed RAW document HTML, not cleanedHtml. cleanedHtml has
-				// <script> stripped (line 329), so the inline `ct = "<unix>"` source
-				// of publish time is gone. document.documentElement.outerHTML
-				// preserves the original <script> blocks intact.
+				// Walk live <script> nodes' textContent — do NOT route through
+				// documentElement.outerHTML. Empirical browser-runtime behavior:
+				// the outerHTML serializer can omit inline <script> bodies
+				// (CSP / nonce / Trusted Types vary), even though the script
+				// nodes themselves are alive in the DOM. Reading textContent
+				// directly is the canonical path.
 				const weChatPublished = isWeChatArticleUrl(document.URL)
-					? extractWeChatPublishedFromRawHtml(document.documentElement.outerHTML)
+					? extractWeChatPublishedFromDocument(document)
 					: '';
 
 				const response: ContentResponse = {

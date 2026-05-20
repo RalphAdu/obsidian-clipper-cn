@@ -13,7 +13,7 @@ import { parseHTML } from 'linkedom';
 import { createMarkdownContent } from 'defuddle/full';
 import { postProcessExtractorMarkdown } from './markdown-post-process';
 import { buildVariables } from './shared';
-import { extractWeChatPublishedFromRawHtml, normalizePreBlockLineBreaks } from './weixin-helpers';
+import { extractWeChatPublishedFromDocument, extractWeChatPublishedFromRawHtml, normalizePreBlockLineBreaks } from './weixin-helpers';
 
 // End-to-end audit: feed real-world mp.weixin.qq.com HTML through the same
 // transformation pipeline content.ts uses (extractWeChatArticleContent →
@@ -86,8 +86,9 @@ describe('REPORT — end-to-end obsidianNote dump (byte-equivalent to browser cl
 	normalizePreBlockLineBreaks(articleClone);
 	const weChatArticleContent = (articleClone as any).outerHTML;
 
-	// Step 4: weChatPublished from RAW doc HTML (post-fix path).
-	const weChatPublished = extractWeChatPublishedFromRawHtml((document as any).documentElement.outerHTML);
+	// Step 4: weChatPublished by walking <script> textContent — the
+	// post-fix path content.ts now uses. Does NOT rely on outerHTML.
+	const weChatPublished = extractWeChatPublishedFromDocument(document);
 
 	// Step 5: HTML → markdown via the same createMarkdownContent +
 	// postProcessExtractorMarkdown pipeline content-extractor.ts uses.

@@ -642,16 +642,17 @@ declare global {
 		const data = event.data;
 		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
 		const origin = location.hostname;
-		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$/.test(origin)) return;
+		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$|^mp\.weixin\.qq\.com$/.test(origin)) return;
 		const testId = data.testId;
 		const key = '__obsidianClipperTestResult__:' + testId;
 		try {
 			localStorage.setItem(key, JSON.stringify({ status: 'running' }));
 
 			// Route by URL: scys.com → scys-extractor; feishu/lark → feishu-extractor;
-			// wx.zsxq.com → zsxq-extractor.
-			let result: { title?: string; content?: string } | null = null;
-			let source: 'scys' | 'feishu' | 'zsxq' | null = null;
+			// wx.zsxq.com → zsxq-extractor; mp.weixin.qq.com → inline helpers (content.ts
+			// main path).
+			let result: { title?: string; content?: string; author?: string; published?: string } | null = null;
+			let source: 'scys' | 'feishu' | 'zsxq' | 'wechat' | null = null;
 			if (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL) || isScysArticleUrl(document.URL)) {
 				result = await extractScysStructuredContent(document);
 				source = 'scys';
@@ -661,6 +662,29 @@ declare global {
 			} else if (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL) || isZsxqArticlesHtmlUrl(document.URL)) {
 				result = await extractZsxqStructuredContent(document);
 				source = 'zsxq';
+			} else if (isWeChatArticleUrl(document.URL)) {
+				// mp.weixin uses inline helpers in main getPageContent path
+				// (not a dedicated extractor function). Replicate that path
+				// here so bridge produces equivalent result shape.
+				const article = document.querySelector('#js_content');
+				if (article) {
+					const articleClone = article.cloneNode(true) as HTMLElement;
+					normalizeImageSources(articleClone as unknown as Document);
+					articleClone.querySelectorAll('script, style').forEach(el => el.remove());
+					normalizePreBlockLineBreaks(articleClone);
+					const wxContent = articleClone.outerHTML;
+					const wxPublished = extractWeChatPublishedFromDocument(document);
+					const titleEl = document.querySelector('h2.rich_media_title, h1.rich_media_title, title');
+					const wxTitle = (titleEl?.textContent || '').trim().replace(/\s+/g, ' ');
+					const authorEl = document.querySelector('#js_name');
+					const wxAuthor = (authorEl?.textContent || '').trim();
+					result = { title: wxTitle, content: wxContent, author: wxAuthor, published: wxPublished };
+					source = 'wechat';
+				}
+				if (!result) {
+					localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'mp.weixin #js_content not found' }));
+					return;
+				}
 			} else {
 				localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'unsupported url for bridge' }));
 				return;

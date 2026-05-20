@@ -1,12 +1,22 @@
 import { convertDate } from './date-utils';
 
 const CT_REGEX = /\bct\s*=\s*["'](\d+)["']/;
+const CHINESE_DATE_REGEX = /(\d{4})年(\d{1,2})月(\d{1,2})日/;
 
 function ctSecondsToDate(seconds: number): string {
 	if (!Number.isFinite(seconds)) return '';
 	const date = new Date(seconds * 1000);
 	if (Number.isNaN(date.getTime())) return '';
 	return convertDate(date);
+}
+
+function parseChineseDate(text: string): string {
+	const m = text.match(CHINESE_DATE_REGEX);
+	if (!m) return '';
+	const y = m[1];
+	const mo = m[2].padStart(2, '0');
+	const d = m[3].padStart(2, '0');
+	return `${y}-${mo}-${d}`;
 }
 
 /**
@@ -24,14 +34,29 @@ export function extractWeChatPublishedFromRawHtml(rawHtml: string): string {
 }
 
 /**
- * Extract WeChat MP article publish time by walking every <script> node's
- * textContent. Does NOT rely on documentElement.outerHTML serialization —
- * which empirically can drop inline <script> bodies in browser runtime
- * (CSP / nonce / serializer behavior varies). For browser callers this is
- * the canonical path; the raw-HTML helper above is kept for fixture-driven
- * unit tests where the entire page text is available as a string.
+ * Extract WeChat MP article publish time from the live DOM.
+ *
+ * Resolution order, settling on the first non-empty result:
+ *   1. `#publish_time` element's textContent — mp.weixin's own JS populates
+ *      it after page load with the user-visible date like "2026年4月14日
+ *      00:30". This is the canonical browser-runtime source.
+ *   2. Walk every <script> node's textContent for `ct = "<unix>"`. This is
+ *      a fallback for cases where #publish_time hasn't yet been populated
+ *      (e.g. very-fast scripted clip) and the original server-side inline
+ *      ct script is still around.
+ *
+ * Both paths read DOM directly — does NOT depend on
+ * documentElement.outerHTML serialization, which empirically drops inline
+ * <script> bodies in browser runtime even though the nodes are live in
+ * the DOM. Returns '' if neither source resolves.
  */
 export function extractWeChatPublishedFromDocument(doc: ParentNode): string {
+	const publishTimeEl = doc.querySelector('#publish_time');
+	if (publishTimeEl) {
+		const text = ((publishTimeEl as any).textContent || '').trim();
+		const fromDom = parseChineseDate(text);
+		if (fromDom) return fromDom;
+	}
 	const scripts = doc.querySelectorAll('script');
 	for (let i = 0; i < scripts.length; i++) {
 		const text = (scripts[i] as any).textContent || '';

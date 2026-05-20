@@ -18,24 +18,43 @@ describe('extractWeChatPublishedFromRawHtml', () => {
 });
 
 describe('extractWeChatPublishedFromDocument', () => {
-	it('walks <script> textContent regardless of outerHTML serialization', () => {
+	it('reads #publish_time textContent (mp.weixin browser-runtime canonical source)', () => {
 		const { document: doc } = parseHTML(fixtureHtml);
 		expect(extractWeChatPublishedFromDocument(doc)).toBe('2026-04-14');
 	});
 
-	it('survives when outerHTML drops <script> bodies (regression test for browser runtime)', () => {
-		// Simulate the browser-CSP failure mode: a <script> node exists in the
-		// DOM with the right textContent, but documentElement.outerHTML serializer
-		// gave back empty bodies. extractWeChatPublishedFromDocument must still
-		// succeed because it reads textContent directly.
-		const { document: doc } = parseHTML('<html><head><script></script></head><body></body></html>');
-		const s = doc.querySelector('script')!;
-		(s as any).textContent = 'var ct = "1776097815";';
+	it('parses Chinese date format 2026年4月14日 from publish_time element', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><em id="publish_time">2026年4月14日 00:30</em></body></html>'
+		);
 		expect(extractWeChatPublishedFromDocument(doc)).toBe('2026-04-14');
 	});
 
-	it('returns empty string when no script has ct', () => {
-		const { document: doc } = parseHTML('<html><body><script>console.log("hi")</script></body></html>');
+	it('zero-pads single-digit month/day', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><em id="publish_time">2026年4月7日</em></body></html>'
+		);
+		expect(extractWeChatPublishedFromDocument(doc)).toBe('2026-04-07');
+	});
+
+	it('falls back to ct in <script> when #publish_time is missing', () => {
+		const { document: doc } = parseHTML(
+			'<html><head><script>var ct = "1776097815";</script></head><body></body></html>'
+		);
+		expect(extractWeChatPublishedFromDocument(doc)).toBe('2026-04-14');
+	});
+
+	it('falls back to ct when #publish_time exists but has no Chinese date (e.g. empty pre-JS)', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><em id="publish_time"></em><script>var ct = "1776097815";</script></body></html>'
+		);
+		expect(extractWeChatPublishedFromDocument(doc)).toBe('2026-04-14');
+	});
+
+	it('returns empty string when neither source resolves', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><em id="publish_time">几小时前</em></body></html>'
+		);
 		expect(extractWeChatPublishedFromDocument(doc)).toBe('');
 	});
 });

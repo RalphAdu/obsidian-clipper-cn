@@ -2,20 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { extractWeChatPublishedFromDocument, extractWeChatPublishedFromRawHtml, normalizePreBlockLineBreaks } from './weixin-helpers';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks } from './weixin-helpers';
 
 const fixturePath = join(__dirname, 'fixtures', 'weixin-SPLTD-hFAsyYAA7V1lU8OA.html');
 const fixtureHtml = readFileSync(fixturePath, 'utf-8');
-
-describe('extractWeChatPublishedFromRawHtml', () => {
-	it('extracts ct Unix seconds from fixture and formats as YYYY-MM-DD', () => {
-		expect(extractWeChatPublishedFromRawHtml(fixtureHtml)).toBe('2026-04-14');
-	});
-
-	it('returns empty string when ct is absent', () => {
-		expect(extractWeChatPublishedFromRawHtml('<html><body>no timestamp here</body></html>')).toBe('');
-	});
-});
 
 describe('extractWeChatPublishedFromDocument', () => {
 	it('reads #publish_time textContent (mp.weixin browser-runtime canonical source)', () => {

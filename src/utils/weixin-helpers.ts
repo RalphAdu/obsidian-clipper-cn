@@ -20,20 +20,6 @@ function parseChineseDate(text: string): string {
 }
 
 /**
- * Extract WeChat MP article publish time from raw HTML.
- *
- * mp.weixin.qq.com pages render <em id="publish_time"> as empty and
- * populate it via JS after load. The authoritative source is the inline
- * script variable `ct` (create time, Unix seconds). We parse it directly
- * from raw HTML for resilience to extractor-vs-JS race conditions.
- */
-export function extractWeChatPublishedFromRawHtml(rawHtml: string): string {
-	const m = rawHtml.match(CT_REGEX);
-	if (!m) return '';
-	return ctSecondsToDate(parseInt(m[1], 10));
-}
-
-/**
  * Extract WeChat MP article publish time from the live DOM.
  *
  * Resolution order, settling on the first non-empty result:

@@ -120,3 +120,38 @@ npm run add-locale      # 添加新语言
 - 使用 Vitest，`webextension-polyfill` 被 mock（见 `src/utils/__mocks__/`）
 - 过滤器测试在 `src/utils/filters/*.test.ts`
 - 夹具数据在 `src/utils/fixtures/`
+
+## Helper API 设计原则（2026-05-20 weixin 修复 4 轮验收失败后沉淀）
+
+凡是"从页面提取数据"的 helper 函数，签名必须是 `(doc: ParentNode)` 或 `(node: Element)` 等 DOM 类型，**禁止** `(html: string)` / `(rawHtml: string)`。
+
+**正例**：
+
+```ts
+export function extractPublishedFromDocument(doc: ParentNode): string {
+	const el = doc.querySelector('#publish_time');
+	return el?.textContent || '';
+}
+```
+
+**反例**：
+
+```ts
+// 错：依赖字符串 input 来源（curl raw HTML / browser outerHTML / fixture）
+// 引入歧义；这种签名是 2026-05-20 weixin 修复 4 轮验收失败的根因之一
+export function extractPublishedFromRawHtml(rawHtml: string): string {
+	return rawHtml.match(/ct = "(\d+)"/)?.[1] || '';
+}
+```
+
+**原因**：浏览器 runtime 的 DOM 经过 hydration 后跟服务端 raw HTML 结构差异巨大（详见 BACKLOG §2.18）。接受 `string` = 内部必然要 regex 一段 HTML 字符串，而这段 HTML 是从哪来的会引入歧义；接受 `doc` 用 DOM API（`querySelector` / `textContent`）则浏览器和测试都能直接喂自己环境的 DOM 对象，绕开"字符串到底是哪一刻快照"陷阱。
+
+**例外**：纯字符串处理 helper（如 `markdown-post-process.ts`、URL 解码、JSON parsing）不在此约束内——它们不"从页面提取数据"，input 字符串语义明确。
+
+**测试调用**：单测想直接喂字符串测正则，先 `parseHTML(str).document` 转 DOM 再调 helper：
+
+```ts
+import { parseHTML } from 'linkedom';
+const { document: doc } = parseHTML('<html><body><em id="publish_time">2026年4月14日</em></body></html>');
+expect(extractPublishedFromDocument(doc)).toBe('2026-04-14');
+```

@@ -644,6 +644,55 @@ Plan 原始 Task 5（image-only 渲染分支）和 Task 6（`ScysStructuredConte
 
 ---
 
+### 2.18 vitest audit 与浏览器 runtime 的等价性陷阱（weixin extractor 修复反思，2026-05-20）
+
+mp.weixin.qq.com 文章 clip 修复**连踩 4 轮验收**才修对（每轮我都报"测试通过"，每轮阿杜实测都不通过）。同一个 root cause 在不同层失败 5 次：**vitest audit 输出和浏览器 runtime 不等价**。每一层都看起来"模拟得很真"，实际偏离都足以让 bug 通过。沉淀下面 5 个 invariant，下次新接 audit 必查：
+
+#### A. audit 的 input 必须等于 pipeline 内 helper 实际收到的 input
+
+第 1 轮：`extractWeChatPublishedFromRawHtml(rawHtml)` audit PASS，但 `content.ts` 实际传的是 `cleanedHtml`（已 `script.remove()`），ct 早不在了。**helper 单测的 input 字符串必须模拟 pipeline 上游所有 transformation 后的产物，不是抽象的 raw 数据**。
+
+下次 checklist：新建 audit 前先 read pipeline，**手动追 helper 的 input 是哪个变量、那个变量经过了什么 transformation**——audit fixture 必须等于该 transformation 后的产物。
+
+#### B. vitest 默认 node env 跑 `createMarkdownContent` 会 silent fallback
+
+第 2 轮：audit 跑 `createMarkdownContent(html, url)` 看似 PASS，**实际 defuddle 内部 `ReferenceError: document is not defined`**，silently fallback 到 `"Partial conversion completed with errors. Original HTML: ..."` 直接吐 raw HTML 当 markdown。PARA 段经 normalize 后已是 plain text 形式，肉眼看像 markdown 多行，**实际是 raw HTML 字面**——侥幸过 assertion。
+
+下次 checklist：任何 audit 涉及 `createMarkdownContent` / turndown / DOM-touching 库 → **`// @vitest-environment happy-dom`** 必须加。stderr 一旦出现 `document is not defined` / `Partial conversion` / `ReferenceError` 当作硬 fail，不准放过。
+
+#### C. 全文穷举 — 不能只看一段就报 PASS
+
+第 2 轮：只断言 PARA 一段，没扫文章其他 23 个 `<pre>` 块；dashboard 段含 inner ` ``` ` 字面 backtick 的 case 完全漏掉。memory `reference_scys_visual_audit` 早写过"全文穷举对比"，被忽略。
+
+下次 checklist：audit 必须扫**所有同类元素**（每个 `<pre>` / 每个 `<table>` / 每个 `<blockquote>`）、断言通用约束（无 `<span>` 残留 / 无 `\`` escape / 无 raw HTML 残留）。**只挑一个代表段就报 PASS = 验收不通过**。
+
+#### D. 浏览器 runtime 的 `document.documentElement.outerHTML` 可能丢 inline `<script>` body
+
+第 3 轮：以为浏览器 outerHTML 序列化保留 script 内容（linkedom 的确这样），改用 `document.documentElement.outerHTML` 喂 raw-HTML helper——浏览器实测仍空。devtools console 直接 `[...document.querySelectorAll('script')].map(s => s.textContent).find(t => /\bct/.test(t))` 返回 `undefined`：**SPA hydration 后 mp.weixin 把原始 inline script 节点从 DOM 移除/清空**，只留 hashed external js bundles。
+
+下次 checklist：**任何依赖"raw HTML 字符串"的提取逻辑都不可靠**——浏览器 runtime 的 DOM 是 hydration 后的状态，可能跟服务端 HTML 字面差异巨大。Helper 应该接受 `doc: ParentNode` 然后用 DOM API 查询（`querySelectorAll` / `textContent`），**绝不依赖 `outerHTML` 序列化字符串**。
+
+#### E. fixture 必须模拟浏览器 fully-loaded 后的 DOM，不是 curl 拿到的服务端 HTML
+
+第 4 轮：fixture HTML 直接拷服务端响应（`<em id="publish_time"></em>` 空 em），audit PASS 因为 helper 走 fallback 拿 ct——但真浏览器里 ct script 没了 + em 已被 JS 填好，正确数据源应该是 `#publish_time` 的 textContent。fixture 状态错位 → audit 无法暴露这个 bug。
+
+下次 checklist：fixture 不只截服务端 raw HTML，**至少包含一个"hydration 后 DOM 状态"的 fixture**——把 mp.weixin / scys 等 SPA 站点关键 JS-populated 元素填上预期值，模拟用户实际点扩展时的 DOM。或者：spec 阶段就在浏览器 console 跑 `document.querySelector('#X')?.textContent` 一行，把返回值作为 fixture 设计的 ground truth。
+
+#### F. 不能让阿杜来回多次 console + tab refresh 试 — 自测先穷尽 console 验证再报验收
+
+第 3/4 轮 我都让阿杜跑 console snippet 帮我确诊（`document.getElementById('publish_time').textContent`）——本来这步应该是**我自测时主动去浏览器跑过一次**就发现的，而不是把 debug 工作推回去。本仓库已有 `chrome.alarms` hot-reload（§2.7） + page-world test bridge（§1.10） + Markdown 渲染自动化验收（§1.9）—— 这些基础设施能让 audit 真正跑在 chrome runtime 而不只 vitest，**下次 weixin / 类似 SPA 站点修复时必须先用这套**，不是 vitest happy-dom。
+
+#### 总结：audit 的 4 层模拟等价性
+
+| 层 | 这次踩坑 | 下次必查 |
+|---|---|---|
+| **input 字符串** | 喂 raw HTML，pipeline 传 cleanedHtml | 追 pipeline 找 helper 真实 input 源 |
+| **运行环境** | node env，defuddle silent fallback | happy-dom；stderr ReferenceError 硬 fail |
+| **覆盖面** | 只看 PARA 一段 | 全文同类元素穷举 |
+| **DOM 状态** | linkedom 序列化保 script，浏览器不保 | 不依赖 outerHTML，用 DOM API；fixture 反映 hydration 后状态 |
+
+---
+
 ## 3. 用户偏好 / 协作约定
 
 - **语言**：中文（包含技术解释、报告）
@@ -1195,6 +1244,56 @@ article 数据**特殊性**（与 course/docx 不同）：
 
 ---
 
+### 6.18 ~~mp.weixin.qq.com 文章 publish_time + mdnice 代码块修复~~（**已完成 2026-05-20**，commits `49dd596` → `e4a546f`）
+
+**两个用户报告的缺陷**（同一篇文章 `https://mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA`）：
+
+1. frontmatter `published` 字段为空
+2. PARA 文件夹结构代码块塌成一行；后续 dashboard 代码块（含 inner ` ```dataview ` 字面 backtick）输出 `\`\`\`\`\`` 反斜杠转义乱码
+
+**根因（4 个交叉踩坑，每个对应一次失败的验收轮次）**：
+
+| Bug | 根因 |
+|---|---|
+| 1. published 空 | `content.ts` 把 `cleanedHtml`（已 `<script>` strip）喂给 ct 提取 helper；后改用 `document.documentElement.outerHTML` 仍空（浏览器 SPA hydration 后服务端 inline `var ct = "..."` 不在 DOM 了）；最终改用 `#publish_time` 的 `textContent`（JS 填好的 `2026年4月14日 00:30`） |
+| 2a. PARA 塌一行 | mdnice 编辑器输出 `<pre><code><span>line</span><span><br/></span>...</code></pre>`，turndown 在 fenced code block 内丢 `<br>` |
+| 2b. dataview backtick escape | defuddle 的 `preformattedCode` turndown rule 硬编码 (a) 固定 3-backtick fence + (b) `replace(/\\\`/g, '\\\\\\\`')`——CommonMark 规定 fenced code block 内 backslash escape 无效，所以 `\\\`` 字面渲染 |
+| 2c. `<span>` 残留 + `&#160;` 字面 | turndown 把 `<pre><code>` 内嵌 `<span>` 当 raw HTML 吐出；NBSP 在 fenced code block 不解码 |
+
+**实施方案**：
+
+1. **新建** `src/utils/weixin-helpers.ts` 两个纯函数：
+   - `extractWeChatPublishedFromDocument(doc)` —— 优先读 `#publish_time` textContent 解析 `(\d{4})年(\d{1,2})月(\d{1,2})日`，fallback 走 `<script>` ct 遍历（不依赖 outerHTML 序列化）
+   - `normalizePreBlockLineBreaks(root)` —— 遍历每个 `<pre>` 子树：(a) `<br>→\n`、(b) collapse 整个 `<pre>` (或 `<pre><code>`) 为单一 text node、(c) NBSP→ASCII space
+   - 旧 `extractWeChatPublishedFromRawHtml(html)` 保留供 fixture 单测用（input 本来就是字符串）
+2. `src/content.ts`：
+   - `extractWeChatArticleContent` 在 `outerHTML` 之前调用 `normalizePreBlockLineBreaks(articleClone)`
+   - `weChatPublished = extractWeChatPublishedFromDocument(document)`（不是 cleanedHtml / 不是 outerHTML）
+   - `ContentResponse.published` 字段链增加 weChatPublished（在 `defuddled.published` 之前、其他 extractor 之后）
+3. `src/utils/markdown-post-process.ts`：新增 `fixFencedCodeBacktickEscapes`——识别每个 fenced code block，把内部 `\\\`` 还原为 ` ``` `，并按需把外层 fence 加长到 `longestInnerRun + 1`（CommonMark 标准做法）。全局生效，所有 site 都受益。
+
+**Fixture**：
+- `src/utils/fixtures/weixin-SPLTD-hFAsyYAA7V1lU8OA.html`（4MB 真实 HTML 截短为 ~3KB 关键片段；`#publish_time` em 含 `2026年4月14日 00:30` **模拟 hydration 后状态**，不是服务端 raw HTML）
+
+**测试覆盖**：
+- 10 个 `weixin-helpers` 单元测试（覆盖 ct 提取、Chinese date 解析、`<script>` outerHTML 丢 body 的回归 sentinel、empty `#publish_time` fallback、`几小时前` 模糊文本失败）
+- 9 个 audit 测试（happy-dom env 跑完整 createMarkdownContent + post-process，断言 PARA 多行 + dashboard 4-backtick outer fence + 全文无 `<span>` / `\\\`` / NBSP；同时 dump byte-equivalent obsidianNote .md 到 `/tmp/wx-clip-output.md` 方便人眼审 frontmatter + body）
+- 890/893 全量 PASS（3 pre-existing template-integration 时区无关）
+
+**关键选择**（YAGNI / 不做的事）：
+- 不抽 `weixin-extractor.ts` —— 继续 `content.ts` 内联，纯函数 helper 抽到 weixin-helpers.ts 即可
+- 不动 `<pre>` 之外的 `<br>`
+- 不在 `published` 输出 HH:MM（沿用其他 extractor YYYY-MM-DD 约定）
+- 不做时区调整（沿用 scys / zsxq / feishu 的 dayjs 本地时区约定）
+
+**反思沉淀到 §2.18**：vitest audit 与浏览器 runtime 的等价性陷阱（input 字符串 / 运行环境 / 覆盖面 / DOM 状态 4 层都得对齐）。这是连踩 4 轮验收才修对的修复——每一轮我都自测"PASS"，但浏览器实测都失败。教训沉淀到 §2.18 + 更新 `feedback_extractor_acceptance.md` memory。
+
+**spec / plan**：
+- `docs/superpowers/specs/2026-05-19-weixin-publish-time-and-pre-codeblock-fix-design.md`
+- `docs/superpowers/plans/2026-05-19-weixin-publish-time-and-pre-codeblock-fix.md`
+
+---
+
 ### 6.17 ~~scys article image-only 形态 + PDF 附件支持~~（**已完成 2026-05-19**，commits `767b9e4` → `78c56e0`）
 
 **两个用户报告的缺陷一次性修复**：
@@ -1291,6 +1390,9 @@ article 数据**特殊性**（与 course/docx 不同）：
 | `src/utils/zsxq-extractor.ts:extractZsxqStructuredContent` | `kind === 'article'`（`wx.zsxq.com/group/{gid}/article/{aid}`）当前 return null，退化到 Defuddle 兜底；专栏文章 URL 提取未实施 — 抓到一个真实 article URL 后再开 plan。注：`kind === 'articles-html'` (host=articles.zsxq.com) 已在 commit `c5efe22` 实施 | 低 |
 | `src/utils/zsxq-extractor.ts:fetchZsxqAllComments` | 评论 image 字段（fixture 都不含）若实际遇到，需要走 `resolveZsxqImages` pipeline；当前 `renderCommentBody` 已渲染 `<img>` 占位符，端到端未验证 | 低 |
 | `src/utils/zsxq-extractor.ts:fetchZsxqArticleHtml` + `background.ts:fetchZsxqArticleHtml` | 保留为未使用的 background handler（topic 路径已不再 fetch article HTML）；如 §6.14 提到的 `article` URL 提取启动可直接复用 | 极低（保留即可） |
+| `src/utils/markdown-post-process.ts:fixFencedCodeBacktickEscapes` | 当前 regex `^(```[A-Za-z0-9_\-]*)\n([\s\S]*?)\n(```)$` 用非贪婪截，遇到嵌套 fence 可能切错（但目前主要 caller defuddle preformattedCode rule 已固定 3-backtick fence，inner 都被 escape，正确识别）。未来 turndown / defuddle 行为改了要重测 | 低 |
+| `src/utils/weixin-helpers.ts:extractWeChatPublishedFromDocument` `#publish_time` 解析 | 当前只解析 `(\d{4})年(\d{1,2})月(\d{1,2})日`；若 mp.weixin 推 `2024-04-14` / 国际化日期 / `几小时前` 等其他格式，会失败 → 触发 `<script>` ct fallback（但 ct 已不在 SPA hydration 后 DOM，等于空）。如发现新格式，加 fixture + 加 regex 分支 | 中-低（实际看到 fallback 全空再处理） |
+| 未来 spec：spec/audit 阶段必须先走"chrome runtime console 验证一行" | weixin 修复教训（§2.18.F）：vitest happy-dom 模拟不等价于浏览器 runtime；audit fixture 必须基于真浏览器 `document.querySelector('#X').textContent` 实测值构造，而不是 curl 拿到的服务端 HTML。下次新接 SPA 站点 extractor 时**spec 阶段必须先用 console 验证关键数据源位置** | 中 |
 
 ---
 

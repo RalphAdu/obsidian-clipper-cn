@@ -155,3 +155,61 @@ import { parseHTML } from 'linkedom';
 const { document: doc } = parseHTML('<html><body><em id="publish_time">2026年4月14日</em></body></html>');
 expect(extractPublishedFromDocument(doc)).toBe('2026-04-14');
 ```
+
+## E2E 测试工具链（Playwright + 真 chrome 扩展，Spec B 引入）
+
+**目的**：测试产物 markdown 与浏览器手工裁剪 markdown byte-equivalent，消除 vitest 模拟环境跟真 chrome 不一致的盲区（详见 BACKLOG §2.18）。
+
+**跑法**：
+
+```bash
+# 跑单个 site 的 e2e（约 7-30s，含 chrome 启动）
+npx vitest run src/utils/weixin-extractor.e2e.test.ts
+
+# 跑普通 vitest 跳过 e2e（开发回归友好）
+SKIP_E2E=1 npm test
+```
+
+**前置**：
+
+- 首次：`npx playwright install chromium`（下载约 92MB chrome binary + headless-shell）
+- 需登录站点（scys/feishu/zsxq）：先在 macOS Chrome 浏览器登录目标站点，cookie 由 `scripts/read-chrome-cookies.py` 读取注入；mp.weixin 不需要登录
+
+**调试**：
+
+- 默认 headed mode（dev 直观看到 chrome 跑）；要 headless 加 `{ headed: false }`
+- timeout 不够：`{ timeout: 180_000 }`
+- 反爬被识别：检查 stealth plugin + 自定义 UA / userAgentData / 鼠标模拟是否生效
+
+**工作流**（自动化整合 BACKLOG §1.2 + §1.3 + §1.10）：
+
+```
+runRealClip(URL)
+  ↓
+1. spawn scripts/recv-server.py 起 localhost receiver（端口随机分配）
+2. Playwright launchPersistentContext + --load-extension=dist/
+3. 反爬规避：自定义 UA + viewport 1920x1080 + zh-CN locale + Asia/Shanghai
+   timezone + Accept-Language + addInitScript 改 navigator.userAgentData
+4. （可选）pycookiecheat 读 chrome cookie + addCookies 注入
+5. page.goto + waitForLoadState/Selector → waitForTimeout(1500ms 给
+   content script 注入时间) → 鼠标模拟微行为
+6. page.evaluate(window.postMessage({ type: '__obsidianClipperTestExtract__',
+   uploadUrl }, '*'))
+   ↓
+   content.ts bridge (line 641+) 跑：
+     - URL routing → 调对应 extractor (scys/feishu/zsxq/wechat)
+     - createMarkdownContent + postProcessExtractorMarkdown
+     - buildVariables + 拼 obsidianNote (frontmatter + body)
+     - POST 到 uploadUrl
+   ↓
+7. poll receiver 写到的临时 .md 文件
+8. 同时 page.evaluate(documentElement.outerHTML) 抓 hydration 后 DOM
+9. 返回 { markdown, hydratedHtml, durationMs }
+```
+
+**注意 — content script 跑在 isolated world**：`window.obsidianClipperGeneration` 等 content script 写的变量 page.evaluate 看不到（不同 world）。等 content script 注入用 fixed-timeout，**不要** `page.waitForFunction(() => window.X)`。
+
+**Spec / sub-spec 接力**：
+
+- Spec B: e2e 基础设施 + mp.weixin PoC（**本仓库已落地**）
+- Spec B1+: scys / feishu / zsxq topic / zsxq article / bilibili 各自 sub-spec 扩展 bridge + 写 e2e test

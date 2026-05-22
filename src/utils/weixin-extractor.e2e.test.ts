@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { runRealClip, type ClipResult } from '../../scripts/e2e-clip-runner';
+import { auditWeixinClip, formatReport } from '../../scripts/weixin-visual-audit';
 
 const URL = 'https://mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA';
 
@@ -51,5 +52,12 @@ describe('weixin e2e (real chrome + real extension)', () => {
 
 	it('no leftover <span> in markdown body', () => {
 		expect(clip.markdown).not.toMatch(/<span/);
+	});
+
+	it('full content audit: every visible block in #js_content appears in markdown (0 mismatch)', () => {
+		const report = auditWeixinClip(clip.hydratedHtml, clip.markdown);
+		console.log(formatReport(report));
+		expect(report.mismatches, `${report.mismatches.length} blocks from web source missing in markdown`).toHaveLength(0);
+		expect(report.totalBlocks, 'audit must scan a non-trivial number of blocks').toBeGreaterThan(100);
 	});
 });

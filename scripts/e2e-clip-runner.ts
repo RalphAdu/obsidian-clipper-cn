@@ -152,8 +152,12 @@ export async function runRealClip(url: string, opts: ClipOptions = {}): Promise<
 				await page.waitForLoadState('networkidle', { timeout: opts.timeout ?? 60_000 });
 			}
 
-			// 4. Wait for content script (poll window.obsidianClipperGeneration)
-			await page.waitForFunction(() => typeof (window as any).obsidianClipperGeneration === 'number', { timeout: 10_000 });
+			// 4. Wait for content script injection.
+			// Content scripts live in the extension's isolated world — their
+			// window.obsidianClipperGeneration is NOT visible to page.evaluate
+			// (which runs in page main world). Just wait a fixed budget for
+			// chrome to inject the content script after page load.
+			await page.waitForTimeout(1500);
 
 			// 4a. Anti-fingerprint: simulate small user activity before trigger.
 			// Pure-static pages with no mouse movement are a behavioral bot signal.

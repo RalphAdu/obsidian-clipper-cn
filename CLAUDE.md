@@ -160,15 +160,23 @@ expect(extractPublishedFromDocument(doc)).toBe('2026-04-14');
 
 **目的**：测试产物 markdown 与浏览器手工裁剪 markdown byte-equivalent，消除 vitest 模拟环境跟真 chrome 不一致的盲区（详见 BACKLOG §2.18）。
 
-**跑法**：
+**跑法**（npm scripts 物理拆分，**没有 SKIP 开关**——dev 默认快，ship 显式跑 e2e）：
 
 ```bash
-# 跑单个 site 的 e2e（约 7-30s，含 chrome 启动）
-npx vitest run src/utils/weixin-extractor.e2e.test.ts
+# dev 日常回归（fast — 不含 e2e；vitest.config.ts exclude '**/*.e2e.test.ts'）
+npm test
 
-# 跑普通 vitest 跳过 e2e（开发回归友好）
-SKIP_E2E=1 npm test
+# ship 必跑 e2e（约 7-30s，含 chrome 启动）— ship checklist T5-2 必须 paste 这个的输出尾
+npm run test:e2e
+
+# 想全跑（unit + e2e）
+npm run test:all
+
+# 跑单个 e2e 文件
+npx vitest run --config vitest.e2e.config.ts src/utils/weixin-extractor.e2e.test.ts
 ```
+
+**为什么不再有 SKIP_E2E**：早期设计是 `describe.skipIf(process.env.SKIP_E2E === '1')`，让 `npm test` 默认跑 e2e、dev 用 `SKIP_E2E=1` 跳过。这是 fail-closed 铁律漏洞——下次违规靠"我注意"。改成机制级拆分：`npm test` 文件层就不 include e2e，e2e 必须显式 `npm run test:e2e`，没有"看似跑了实际 skip"的中间态。
 
 **前置**：
 

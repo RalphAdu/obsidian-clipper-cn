@@ -4,8 +4,8 @@
 // extractor + real markdown generation. Asserts the produced .md matches
 // what hydration-time DOM ground truth implies.
 //
-// Skip when SKIP_E2E=1 (default for `npm test`; run explicitly via
-// `npx vitest run src/utils/weixin-extractor.e2e.test.ts`).
+// Excluded from `npm test` by vitest.config.ts (exclude: ['**/*.e2e.test.ts']).
+// Run via `npm run test:e2e` (ship gate) or `npx vitest run src/utils/weixin-extractor.e2e.test.ts`.
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { parseHTML } from 'linkedom';
@@ -13,7 +13,7 @@ import { runRealClip, type ClipResult } from '../../scripts/e2e-clip-runner';
 
 const URL = 'https://mp.weixin.qq.com/s/SPLTD-hFAsyYAA7V1lU8OA';
 
-describe.skipIf(process.env.SKIP_E2E === '1')('weixin e2e (real chrome + real extension)', () => {
+describe('weixin e2e (real chrome + real extension)', () => {
 	let clip: ClipResult;
 
 	beforeAll(async () => {

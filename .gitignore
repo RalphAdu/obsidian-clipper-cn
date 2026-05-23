@@ -35,6 +35,11 @@ keys/
 # Per-feature worktrees (superpowers workflow) — never tracked
 .claude/worktrees/
 
+# Playwright persistent profiles for sites that require interactive QR login
+# (scys-pw-profile is created by scripts/scys-login-persist.ts after a one-time
+# WeChat scan; subsequent e2e runs reuse it via runRealClip({ userDataDir }))
+.*-pw-profile/
+
 # Local Claude Code chat-history exports — never tracked
 .claude/chat-exports/
 

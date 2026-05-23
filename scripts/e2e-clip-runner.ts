@@ -30,8 +30,12 @@ export interface ClipResult {
 export interface ClipOptions {
 	cookies?: string;          // domain, triggers read-chrome-cookies.py
 	wait?: string;             // selector or 'networkidle'; default 'networkidle'
-	headed?: boolean;          // default true (dev-friendly)
+	headed?: boolean;          // default true (dev-friendly); MV3 extensions don't load in headless
 	timeout?: number;          // ms; default 60_000
+	userDataDir?: string;      // persistent profile dir (e.g. scys post-QR-login). When set,
+	                           // the dir is NOT removed on exit so subsequent runs reuse login.
+	offscreen?: boolean;       // default true: position window at -2400,-2400 so it doesn't
+	                           // steal focus while still being 'headed' (needed for extensions)
 }
 
 const SCRIPTS_DIR = __dirname;
@@ -100,10 +104,16 @@ export async function runRealClip(url: string, opts: ClipOptions = {}): Promise<
 			cookies = JSON.parse(result.stdout);
 		}
 
-		// 3. Launch chrome with extension + anti-fingerprint hardening
-		profileDir = mkdtempSync(join(tmpdir(), 'playwright-test-profile-'));
+		// 3. Launch chrome with extension + anti-fingerprint hardening.
+		// MV3 extensions don't load in headless mode; always run headed but move
+		// the window off-screen (offscreen=true, default) so it doesn't steal focus.
+		const usePersistent = !!opts.userDataDir;
+		profileDir = usePersistent ? opts.userDataDir! : mkdtempSync(join(tmpdir(), 'playwright-test-profile-'));
+		const offscreenArgs = opts.offscreen !== false
+			? ['--window-position=-2400,-2400', '--window-size=1920,1080']
+			: [];
 		const context = await chromiumExtra.launchPersistentContext(profileDir, {
-			headless: opts.headed === false,
+			headless: false,  // MV3 extensions need headed
 			userAgent: FAKE_UA,
 			viewport: { width: 1920, height: 1080 },
 			locale: 'zh-CN',
@@ -117,6 +127,7 @@ export async function runRealClip(url: string, opts: ClipOptions = {}): Promise<
 				`--load-extension=${DIST_DIR}`,
 				'--no-first-run',
 				'--no-default-browser-check',
+				...offscreenArgs,
 			],
 		});
 
@@ -192,7 +203,8 @@ export async function runRealClip(url: string, opts: ClipOptions = {}): Promise<
 	} finally {
 		// Clean up
 		recv.kill();
-		if (profileDir && existsSync(profileDir)) {
+		// Only remove ephemeral profile (mkdtempSync); preserve persistent userDataDir
+		if (!opts.userDataDir && profileDir && existsSync(profileDir)) {
 			rmSync(profileDir, { recursive: true, force: true });
 		}
 		if (existsSync(outputPath)) {

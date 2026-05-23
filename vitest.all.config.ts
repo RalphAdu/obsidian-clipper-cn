@@ -5,7 +5,7 @@ export default defineConfig({
 		DEBUG_MODE: false,
 	},
 	test: {
-		include: ['src/**/*.test.ts'],
+		include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
 		exclude: ['**/node_modules/**'],
 		globals: true,
 		alias: {

@@ -12,6 +12,8 @@
 import { parseHTML } from 'linkedom';
 
 export interface AuditMismatch {
+	// 'extra' reserved for future detection of markdown content not in HTML
+	// (currently runVisualAudit only emits 'missing')
 	kind: 'missing' | 'extra';
 	tag: string;
 	excerpt: string;
@@ -34,7 +36,7 @@ export interface AuditConfig {
 	normalizeText?: (s: string) => string;
 	/** 比对规范化：默认 — normalizeText + 剥 markdown emphasis markers + 剥所有 whitespace */
 	normalizeForCompare?: (s: string) => string;
-	/** image src 是否需特殊处理（默认 split('?')[0] 出现在 markdown）— 返回 null 表示 PASS */
+	/** image src 是否需特殊处理（默认 split('?')[0] 出现在 markdown）— 返回 true 表示 PASS */
 	imageAssert?: (src: string, markdown: string) => boolean;
 	/** 文本断言：默认 — fuzzy 前 40 字符 substring 出现在 normalized markdown */
 	textAssert?: (blockFuzzy: string, markdownFuzzy: string) => boolean;
@@ -59,7 +61,10 @@ export function defaultNormalizeForCompare(s: string): string {
 }
 
 export function defaultImageAssert(src: string, markdown: string): boolean {
-	if (src.startsWith('data:')) return true; // skip lazy-load spacers
+	// Guard for direct callers (tests / custom configs that compose this helper).
+	// runVisualAudit pre-filters data: URIs before calling imageAssert, so this
+	// branch is dead via the framework's normal path.
+	if (src.startsWith('data:')) return true;
 	const core = src.split('?')[0];
 	return markdown.includes(core) || markdown.includes(src);
 }
@@ -118,6 +123,10 @@ export function runVisualAudit(
 
 		const text = normalizeText(el.textContent || '');
 		if (!text) continue;
+		// Skip ultra-short strings (single chars, short labels) that are usually UI
+		// chrome or punctuation noise rather than article content. Threshold 6 inherited
+		// from weixin-visual-audit.ts; tune per-site via custom textAssert override if
+		// you need to audit shorter blocks.
 		if (text.length < 6) continue;
 
 		const fuzzy = normalizeForCompare(text);
@@ -153,7 +162,7 @@ export function formatReport(report: AuditReport): string {
 			byTag.set(m.tag, arr);
 		}
 		for (const [tag, arr] of byTag) {
-			lines.push(`\n--- ${arr.length} missing <${tag}>(${arr.length}) ---`);
+			lines.push(`\n--- ${arr.length} missing <${tag}> ---`);
 			for (const m of arr.slice(0, 20)) {
 				lines.push(`  [${m.tag}] ${m.excerpt}`);
 			}

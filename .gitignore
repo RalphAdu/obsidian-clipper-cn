@@ -38,6 +38,9 @@ keys/
 # Local Claude Code chat-history exports — never tracked
 .claude/chat-exports/
 
+# Serena MCP local project workspace (config + LSP symbol cache) — never tracked
+.serena/
+
 # Superpowers work area — entire dir is gitignored. spec/plan/BACKLOG/feishu
 # credentials all live here as local-only documents. The ONLY file promoted to
 # git is BACKLOG.md via explicit `git add -f docs/superpowers/BACKLOG.md` (it's

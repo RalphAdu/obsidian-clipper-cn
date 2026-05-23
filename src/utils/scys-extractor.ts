@@ -830,24 +830,46 @@ export function renderScysArticleComments(items: ScysArticleComment[], total: nu
 	return `<hr><h2>💬 评论（${total} 条）</h2>${bodies}`;
 }
 
-// Decode zsxq-style <e type="web" href="URL-encoded" title="URL-encoded" />
-// self-closing entities into clickable <a>. Shared by:
+// Decode scys/zsxq-style self-closing <e ... /> entities into proper HTML.
+// Without this, Defuddle/turndown drops the non-standard self-closing tag
+// and the embedded content disappears from the markdown output.
+//
+// Observed entity types in scys article payloads:
+//   - <e type="web" href="URL-encoded" title="URL-encoded" />
+//     → <a href="...">title</a>
+//   - <e type="text_bold" title="URL-encoded" />
+//     → <strong>title</strong>
+//     (used in plain-text articleContent for inline emphasis; URL 3
+//      "可以进生财有术视频号..." is this form)
+//
+// Attribute order is NOT fixed in source; we extract by named regex on the
+// attribute string rather than positional match.
+// Unknown entity types are left untouched (Defuddle will still drop them,
+// but at least we don't accidentally hide unknown payloads as plain text).
+//
+// Shared by:
 //   - preprocessScysEntityHtml (legacy plain-text articleContent path)
 //   - renderOneArticleCommentHtml (article comment server-HTML path)
-// Without this, Defuddle/turndown drops the non-standard self-closing tag
-// and the embedded URL disappears from the markdown output.
-// Only handles type="web"; other zsxq entities (mention/hashtag) not yet
-// observed in scys fixtures.
 export function decodeScysWebEntities(html: string): string {
 	const safeDecode = (s: string) => {
 		try { return decodeURIComponent(s); } catch { return s; }
 	};
 	return html.replace(
-		/<e\s+type="web"\s+href="([^"]*)"\s+title="([^"]*)"\s*\/?>/g,
-		(_m, hrefEnc, titleEnc) => {
-			const href = safeDecode(hrefEnc);
-			const title = safeDecode(titleEnc) || href;
-			return `<a href="${href}">${title}</a>`;
+		/<e\s+([^>]*?)\s*\/?>/g,
+		(match, attrs) => {
+			const typeM = /\btype="([^"]*)"/.exec(attrs);
+			const hrefM = /\bhref="([^"]*)"/.exec(attrs);
+			const titleM = /\btitle="([^"]*)"/.exec(attrs);
+			const type = typeM ? typeM[1] : '';
+			const href = hrefM ? safeDecode(hrefM[1]) : '';
+			const title = titleM ? safeDecode(titleM[1]) : '';
+			if (type === 'web' && href) {
+				return `<a href="${href}">${title || href}</a>`;
+			}
+			if (type === 'text_bold' && title) {
+				return `<strong>${title}</strong>`;
+			}
+			return match;
 		}
 	);
 }

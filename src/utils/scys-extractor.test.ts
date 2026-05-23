@@ -1622,6 +1622,20 @@ describe('decodeScysWebEntities', () => {
 		expect(decodeScysWebEntities(input)).toBe('<e type="mention" uid="1" title="@x" />');
 	});
 
+	it('decodes <e type="text_bold"> (title only, no href) → <strong>title</strong>', () => {
+		// scys article 纯文本 articleContent (URL 22255855424524441 形态): inline emphasis
+		// emitted as <e type="text_bold" title="URL-encoded" />. Pre-fix this was dropped
+		// by Defuddle since the regex required href + title in fixed order.
+		const input = '没来得及看直播的圈友，<e type="text_bold" title="%E5%8F%AF%E4%BB%A5%E8%BF%9B%E7%94%9F%E8%B4%A2%E6%9C%89%E6%9C%AF%E8%A7%86%E9%A2%91%E5%8F%B7" />，建议有时间';
+		expect(decodeScysWebEntities(input)).toBe('没来得及看直播的圈友，<strong>可以进生财有术视频号</strong>，建议有时间');
+	});
+
+	it('handles <e> with attribute order title-before-href for web type', () => {
+		// Attribute order is not fixed in source; verify named extraction works.
+		const input = '<e title="GitHub" type="web" href="https%3A%2F%2Fgh.com" />';
+		expect(decodeScysWebEntities(input)).toBe('<a href="https://gh.com">GitHub</a>');
+	});
+
 	it('passes through HTML with no <e> entities unchanged', () => {
 		const input = '<p>plain html</p>';
 		expect(decodeScysWebEntities(input)).toBe('<p>plain html</p>');

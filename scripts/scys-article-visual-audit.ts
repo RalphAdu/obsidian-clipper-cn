@@ -24,10 +24,31 @@
 import { readFileSync } from 'node:fs';
 import { runVisualAudit, formatReport, AuditConfig, AuditReport } from './visual-audit-framework';
 
+// Stricter textAssert: scys article markdown is image-dominant (base64 inlined,
+// ~10MB total of which text is <50KB). Default 40-char head match passes half-
+// markdown sanity check trivially because text clusters at the top. Add mid +
+// tail anchors for long blocks (.post-content fallback is 1KB+; long <p> in
+// docBlocks form is hundreds of chars).
+function strictTextAssert(blockFuzzy: string, mdFuzzy: string): boolean {
+	const head = blockFuzzy.slice(0, Math.min(40, blockFuzzy.length));
+	if (!mdFuzzy.includes(head)) return false;
+	if (blockFuzzy.length < 80) return true;
+	const mid = blockFuzzy.slice(Math.floor(blockFuzzy.length / 2) - 20, Math.floor(blockFuzzy.length / 2) + 20);
+	const tail = blockFuzzy.slice(-40);
+	return mdFuzzy.includes(mid) && mdFuzzy.includes(tail);
+}
+
 export const scysArticleAuditConfig: AuditConfig = {
 	rootSelector: '.content-container',
-	blockSelectors: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre', 'td', 'th', 'img', '.post-content'],
+	// .block-text covers article-A docBlocks form: feishu-docx is rendered as
+	// <div class="block-text">, not <p>. Without this, audit scans 0 non-image
+	// blocks for that URL and `e2e PASS` is trivially false (the actual 38KB
+	// of body text is never verified). .post-content covers the URL 3/4 plain-
+	// text/image-only forms where content sits as raw text directly under
+	// <div class="post-content">.
+	blockSelectors: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre', 'td', 'th', 'img', '.post-content', '.block-text'],
 	imageAssert: () => true,
+	textAssert: strictTextAssert,
 };
 
 export function auditScysArticle(hydratedHtml: string, markdown: string): AuditReport {

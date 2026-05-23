@@ -2,19 +2,32 @@
 //
 // Full-content audit for scys.com /articleDetail/<type>/<id> (4 forms:
 // docBlocks / Quill HTML / 纯文本+<e> / image-only). Thin wrapper around
-// visual-audit-framework with scys-article-specific rootSelector.
+// visual-audit-framework with scys-article-specific overrides.
 //
-// rootSelector='main': probe (scripts/find-scys-root-selector.ts) confirmed
-// 4/4 article URLs hit, blocks 8/49/254/275. `main` is the broadest cover
-// (includes title-line + content-container + label-box + interaction-zone);
-// Task 7 will decide whether to narrow to `.content-container` if comment
-// section blocks cause irreducible mismatches.
+// rootSelector='.content-container': narrows from `main` to exclude
+// .article-interaction-zone (comments) which would otherwise pull in
+// avatar imgs + reply <p> as false-positive mismatches.
+//
+// blockSelectors adds `.post-content`: URL 3/4 (纯文本+<e> / image-only)
+// have content directly inside `<div class="post-content">` with no
+// <p>/<h>/<li>/<img> children, so the default BLOCK_SELECTORS would
+// trivially scan 0 blocks (false PASS). `.post-content` block-level catches
+// these as a single textContent assertion; URL 2 (Quill HTML) has both
+// `<p>` blocks AND `.post-content` ancestor (extra block harmless).
+//
+// imageAssert=() => true: scys-extractor inlines images as base64 data URIs
+// into markdown (for Obsidian offline use), so hydration's `/doc/<token>`
+// or `https://search01.../upload/...` URLs can never match. Image fidelity
+// is checked separately by the e2e test asserting markdown.match(/!\[\]/g)
+// count >= hydration img count.
 
 import { readFileSync } from 'node:fs';
 import { runVisualAudit, formatReport, AuditConfig, AuditReport } from './visual-audit-framework';
 
 export const scysArticleAuditConfig: AuditConfig = {
-	rootSelector: 'main',
+	rootSelector: '.content-container',
+	blockSelectors: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre', 'td', 'th', 'img', '.post-content'],
+	imageAssert: () => true,
 };
 
 export function auditScysArticle(hydratedHtml: string, markdown: string): AuditReport {

@@ -77,15 +77,12 @@ else
 	[ -n "$PROFILE" ] && PROFILE_ARG=(--profile "$PROFILE")
 	SCROLL_ARG=()
 	[ -n "$SCROLL_SEL" ] && SCROLL_ARG=(--scroll-selector "$SCROLL_SEL")
-	if ! BROWSER_OUT_DIR=$(mktemp -d /tmp/browser-scroll-XXXXXX); then
-		echo "[FATAL] mktemp failed" >&2; exit 3
-	fi
-	# browser-scroll-capture 自己生成 /tmp/browser-scroll-<ts>/，我们之后 mv 过来
-	npx tsx scripts/browser-scroll-capture.ts "$URL" "${PROFILE_ARG[@]}" "${SCROLL_ARG[@]}" 2>&1 | tee /tmp/audit-${RUN_ID}-browser.log
+	# browser-scroll-capture 自己生成 /tmp/browser-scroll-<ts>/，我们之后 cp 过来
+	npx tsx scripts/browser-scroll-capture.ts "$URL" "${PROFILE_ARG[@]}" "${SCROLL_ARG[@]}" 2>&1 | tee "/tmp/audit-${RUN_ID}-browser.log"
 	# 找最新的 /tmp/browser-scroll-* 目录
 	LATEST=$(ls -td /tmp/browser-scroll-* 2>/dev/null | head -1)
 	[ -d "$LATEST" ] || { echo "[FATAL] browser-scroll-capture didn't produce output dir" >&2; exit 3; }
-	cp "$LATEST"/*.png "$BROWSER_DIR/"
+	cp "$LATEST"/*.png "$BROWSER_DIR/" 2>/dev/null || { echo "[FATAL] browser-scroll-capture produced no PNGs in $LATEST" >&2; exit 3; }
 fi
 
 # Step 2: obsidian capture（idempotent）
@@ -98,7 +95,7 @@ else
 	N_PAGES=$(( (MD_LINES + 39) / 40 ))
 	[ $N_PAGES -lt 5 ] && N_PAGES=5
 	[ $N_PAGES -gt 60 ] && N_PAGES=60
-	scripts/obsidian-scroll-capture.sh "$VAULT" "$MD_REL" "$N_PAGES" 2>&1 | tee /tmp/audit-${RUN_ID}-obsidian.log
+	scripts/obsidian-scroll-capture.sh "$VAULT" "$MD_REL" "$N_PAGES" 2>&1 | tee "/tmp/audit-${RUN_ID}-obsidian.log"
 	LATEST=$(ls -td /tmp/obsidian-scroll-* 2>/dev/null | head -1)
 	[ -d "$LATEST" ] || { echo "[FATAL] obsidian-scroll-capture didn't produce output dir" >&2; exit 4; }
 	cp "$LATEST"/*.png "$OBSIDIAN_DIR/" 2>/dev/null || { echo "[FATAL] obsidian-scroll-capture produced no PNGs" >&2; exit 4; }

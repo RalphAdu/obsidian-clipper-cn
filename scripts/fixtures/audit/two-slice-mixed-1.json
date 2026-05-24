@@ -1,0 +1,20 @@
+{
+  "url": "https://example.com/article/2",
+  "slice": "1-of-2",
+  "grid_range": [1, 5],
+  "status": "PASS",
+  "checklist": {
+    "frontmatter": "pass",
+    "heading": "pass",
+    "list": "pass",
+    "table": "na",
+    "code": "pass",
+    "bold_italic": "pass",
+    "image": "pass",
+    "quote": "na",
+    "link": "pass",
+    "comment": "na"
+  },
+  "diffs": [],
+  "notes": ""
+}

@@ -58,3 +58,57 @@ export function parseSlice(raw: string): SliceReport {
 	}
 	return obj as SliceReport;
 }
+
+export interface UrlReport {
+	url: string;
+	sliceCount: number;
+	gridCount: number;
+	status: SliceStatus;
+	checklist: Checklist;
+	diffs: Diff[];
+}
+
+function aggregateChecklistKey(values: CheckStatus[]): CheckStatus {
+	if (values.some(v => v === 'fail')) return 'fail';
+	if (values.some(v => v === 'unknown')) return 'unknown';
+	if (values.some(v => v === 'pass')) return 'pass';
+	return 'na';
+}
+
+function deriveUrlStatus(checklist: Checklist): SliceStatus {
+	const vals = Object.values(checklist);
+	if (vals.some(v => v === 'fail')) return 'FAIL';
+	if (vals.some(v => v === 'unknown')) return 'NEEDS_REVIEW';
+	return 'PASS';
+}
+
+export function aggregateByUrl(slices: SliceReport[]): UrlReport[] {
+	const byUrl = new Map<string, SliceReport[]>();
+	for (const s of slices) {
+		const arr = byUrl.get(s.url) ?? [];
+		arr.push(s);
+		byUrl.set(s.url, arr);
+	}
+
+	const reports: UrlReport[] = [];
+	for (const [url, urlSlices] of byUrl) {
+		const checklist = {} as Checklist;
+		for (const k of CHECKLIST_KEYS) {
+			checklist[k] = aggregateChecklistKey(urlSlices.map(s => s.checklist[k]));
+		}
+		const diffs: Diff[] = urlSlices.flatMap(s => s.diffs);
+		const gridCount = urlSlices.reduce(
+			(sum, s) => sum + (s.grid_range[1] - s.grid_range[0] + 1),
+			0,
+		);
+		reports.push({
+			url,
+			sliceCount: urlSlices.length,
+			gridCount,
+			status: deriveUrlStatus(checklist),
+			checklist,
+			diffs,
+		});
+	}
+	return reports;
+}

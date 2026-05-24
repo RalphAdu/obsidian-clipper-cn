@@ -112,3 +112,96 @@ export function aggregateByUrl(slices: SliceReport[]): UrlReport[] {
 	}
 	return reports;
 }
+
+const STATUS_BADGE: Record<CheckStatus, string> = {
+	pass: '✅ pass',
+	fail: '❌ fail',
+	na: '⚪ na',
+	unknown: '⚠️ unknown',
+};
+
+function renderUrlSection(r: UrlReport, idx: number): string {
+	const lines: string[] = [];
+	lines.push(`### URL ${idx + 1}: ${r.url}`);
+	const gridRange = r.diffs.length > 0
+		? `grids 1-${r.gridCount}`
+		: `grids 1-${r.gridCount}`;
+	lines.push(`- URL: \`${r.url}\``);
+	lines.push(`- Subagents: ${r.sliceCount} (${gridRange})`);
+	const statusBadge = r.status === 'PASS' ? '✅ PASS'
+		: r.status === 'FAIL' ? `❗ FAIL (${r.diffs.filter(d => d.severity === 'blocker').length} blocker / ${r.diffs.filter(d => d.severity === 'warn').length} warn)`
+		: '⚠️ NEEDS REVIEW';
+	lines.push(`- Status: ${statusBadge}`);
+	lines.push('');
+	lines.push('| 检查项 | 状态 | 备注 |');
+	lines.push('|---|---|---|');
+	for (const k of CHECKLIST_KEYS) {
+		const st = r.checklist[k];
+		let note = '—';
+		if (st === 'na') note = `本 URL 无 ${k}`;
+		else if (st === 'fail') {
+			const failed = r.diffs.filter(d => d.category === k);
+			note = failed.map(d => `${d.grid} ${d.location}（详见 diffs）`).join('；') || '—';
+		} else if (st === 'unknown') {
+			note = '看不清，建议主 session 复核';
+		}
+		lines.push(`| ${k} | ${STATUS_BADGE[st]} | ${note} |`);
+	}
+	if (r.diffs.length > 0) {
+		lines.push('');
+		lines.push('**Diffs**:');
+		lines.push('');
+		r.diffs.forEach((d, i) => {
+			lines.push(`${i + 1}. **[${d.severity}] ${d.category} — ${d.grid}** (${d.location})`);
+			lines.push(`   - ${d.desc}`);
+		});
+	}
+	return lines.join('\n');
+}
+
+export function renderMarkdown(reports: UrlReport[], runId: string): string {
+	const total = reports.length;
+	const failCount = reports.filter(r => r.status === 'FAIL').length;
+	const reviewCount = reports.filter(r => r.status === 'NEEDS_REVIEW').length;
+	const overallBadge = failCount > 0 || reviewCount > 0
+		? `❗ FAIL (${failCount} URL fail / ${reviewCount} URL needs review)`
+		: '✅ PASS';
+	const subagentTotal = reports.reduce((s, r) => s + r.sliceCount, 0);
+
+	const out: string[] = [];
+	out.push('## T5-2 视觉 audit 报告（audit-via-subagents v1）');
+	out.push('');
+	out.push(`**Run ID**: ${runId}`);
+	out.push(`**URLs 总数**: ${total}`);
+	out.push(`**Subagent 总数**: ${subagentTotal}`);
+	out.push(`**整体状态**: ${overallBadge}`);
+	out.push('');
+	out.push('---');
+	out.push('');
+	reports.forEach((r, i) => {
+		out.push(renderUrlSection(r, i));
+		out.push('');
+		out.push('---');
+		out.push('');
+	});
+
+	const reviewItems: string[] = [];
+	for (const r of reports) {
+		for (const d of r.diffs) {
+			reviewItems.push(`- ${d.grid}（${r.url}）— ${d.severity}/${d.category}`);
+		}
+		for (const k of CHECKLIST_KEYS) {
+			if (r.checklist[k] === 'unknown') {
+				reviewItems.push(`- ${r.url} — ${k} 标记 unknown，建议 Read 全部 slice 的 grid`);
+			}
+		}
+	}
+	if (reviewItems.length > 0) {
+		out.push('## 整体复核清单（如有 fail / unknown）');
+		out.push('');
+		out.push('需主 session Read 的 grid（共 ' + reviewItems.length + ' 项）:');
+		reviewItems.forEach(line => out.push(line));
+	}
+
+	return out.join('\n');
+}

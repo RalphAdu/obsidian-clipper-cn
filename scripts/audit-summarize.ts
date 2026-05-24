@@ -126,9 +126,7 @@ const STATUS_BADGE: Record<CheckStatus, string> = {
 function renderUrlSection(r: UrlReport, idx: number): string {
 	const lines: string[] = [];
 	lines.push(`### URL ${idx + 1}: ${r.url}`);
-	const gridRange = r.diffs.length > 0
-		? `grids 1-${r.gridCount}`
-		: `grids 1-${r.gridCount}`;
+	const gridRange = `grids 1-${r.gridCount}`;
 	lines.push(`- URL: \`${r.url}\``);
 	lines.push(`- Subagents: ${r.sliceCount} (${gridRange})`);
 	const statusBadge = r.status === 'PASS' ? '✅ PASS'

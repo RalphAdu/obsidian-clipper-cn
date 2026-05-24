@@ -141,7 +141,7 @@ status 派生：
 所有 subagent 完成后：
 
 ```bash
-scripts/audit-summarize.ts --run-id "$RUN_ID" \
+npx tsx scripts/audit-summarize.ts --run-id "$RUN_ID" \
   --run-dir "/tmp/audit-${RUN_ID}" \
   --out "/tmp/audit-${RUN_ID}/REPORT.md"
 echo "Summarize exit: $?"

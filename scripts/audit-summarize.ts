@@ -4,6 +4,9 @@
 // markdown block. See spec §6 for the output format and §5 for slice
 // schema.
 
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+
 export type CheckStatus = 'pass' | 'fail' | 'na' | 'unknown';
 
 export type SliceStatus = 'PASS' | 'FAIL' | 'NEEDS_REVIEW' | 'ERROR';
@@ -204,4 +207,58 @@ export function renderMarkdown(reports: UrlReport[], runId: string): string {
 	}
 
 	return out.join('\n');
+}
+
+function findSliceJsons(runDir: string): string[] {
+	const out: string[] = [];
+	for (const urlDir of readdirSync(runDir)) {
+		const urlPath = join(runDir, urlDir);
+		if (!statSync(urlPath).isDirectory()) continue;
+		for (const f of readdirSync(urlPath)) {
+			if (f.startsWith('slice-') && f.endsWith('.json')) {
+				out.push(join(urlPath, f));
+			}
+		}
+	}
+	return out;
+}
+
+function main() {
+	const args = process.argv.slice(2);
+	let runId: string | undefined;
+	let runDir: string | undefined;
+	let outPath: string | undefined;
+	for (let i = 0; i < args.length; i++) {
+		if (args[i] === '--run-id') runId = args[++i];
+		else if (args[i] === '--run-dir') runDir = args[++i];
+		else if (args[i] === '--out') outPath = args[++i];
+	}
+	if (!runId || !runDir || !outPath) {
+		console.error('Usage: audit-summarize.ts --run-id <id> --run-dir <dir> --out <path>');
+		console.error('  --run-dir typically /tmp/audit-<id>/');
+		process.exit(2);
+	}
+	const sliceFiles = findSliceJsons(runDir);
+	if (sliceFiles.length === 0) {
+		console.error(`[FATAL] no slice-*.json files under ${runDir}`);
+		process.exit(2);
+	}
+	const slices = sliceFiles.map(f => {
+		try {
+			return parseSlice(readFileSync(f, 'utf8'));
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			throw new Error(`${f}: ${msg}`);
+		}
+	});
+	const reports = aggregateByUrl(slices);
+	const md = renderMarkdown(reports, runId);
+	writeFileSync(outPath, md);
+	console.log(`[OK] wrote ${outPath} (${slices.length} slices, ${reports.length} URLs)`);
+	const anyFail = reports.some(r => r.status === 'FAIL' || r.status === 'NEEDS_REVIEW');
+	process.exit(anyFail ? 1 : 0);
+}
+
+if (require.main === module) {
+	main();
 }

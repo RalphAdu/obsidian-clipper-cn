@@ -1,0 +1,28 @@
+{
+	"url": "https://scys.com/course/detail/172?chapterId=11408",
+	"slice": "2-of-2",
+	"grid_range": [8, 13],
+	"status": "FAIL",
+	"checklist": {
+		"frontmatter": "na",
+		"heading": "pass",
+		"list": "pass",
+		"table": "fail",
+		"code": "pass",
+		"bold_italic": "pass",
+		"image": "pass",
+		"quote": "na",
+		"link": "pass",
+		"comment": "na"
+	},
+	"diffs": [
+		{
+			"grid": "sbs-09.png",
+			"location": "右半 obsidian 中段 / 表格第 3 行",
+			"category": "table",
+			"severity": "blocker",
+			"desc": "browser 显示 4 列表格，obsidian 只有 3 列；md 行 245 表格头缺第 4 列"
+		}
+	],
+	"notes": "末段含 4 列对比表格，extractor 漏抓最后一列"
+}

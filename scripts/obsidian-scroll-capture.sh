@@ -165,8 +165,13 @@ echo "==> 4. Switch to Reading View"
 osascript -e 'tell application "System Events" to tell process "Obsidian" to click menu item "阅读视图" of menu "View" of menu bar 1' >/dev/null 2>&1 || \
 	echo "[WARN] Could not click 阅读视图 menu — Obsidian menu locale may differ. Mode unchanged." >&2
 sleep 2
-# Cmd+Home — scroll to top of note
+# Scroll to top of note. Cmd+Home (key code 115) works in Editing View but
+# Reading View ignores it (discovered during v3 Task 6 — Obsidian restored
+# mid-article scroll position, frame 001 captured middle of article instead
+# of the start). Add Cmd+UpArrow (key code 126) which Reading View honors.
 osascript -e 'tell application "System Events" to key code 115 using {command down}' 2>/dev/null || true
+sleep 0.3
+osascript -e 'tell application "System Events" to key code 126 using {command down}' 2>/dev/null || true
 sleep 1
 
 OUT_DIR="/tmp/obsidian-scroll-$(date +%s)"

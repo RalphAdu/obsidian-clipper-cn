@@ -13,8 +13,22 @@ guard CommandLine.arguments.count == 2 else {
 let path = CommandLine.arguments[1]
 let url = URL(fileURLWithPath: path)
 guard let img = NSImage(contentsOf: url),
-      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+      let fullCg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
     FileHandle.standardError.write("Failed to load image: \(path)\n".data(using: .utf8)!)
+    exit(3)
+}
+
+// Crop left 25% to exclude Obsidian's icon sidebar + file tree which
+// otherwise dominate OCR output with noise (icons mis-recognized as 白/Q/仨/口
+// etc.). Obsidian default left sidebar is ~15-20% of window width; 25% gives
+// safe margin while preserving the note content pane on the right.
+// audit-via-subagents v3 — fix discovered during 5125541 Task 6 validation
+// when obsidian frame .txt files were dominated by sidebar icon noise instead
+// of article text.
+let leftSkip = Int(Double(fullCg.width) * 0.25)
+let cropRect = CGRect(x: leftSkip, y: 0, width: fullCg.width - leftSkip, height: fullCg.height)
+guard let cg = fullCg.cropping(to: cropRect) else {
+    FileHandle.standardError.write("Failed to crop image\n".data(using: .utf8)!)
     exit(3)
 }
 

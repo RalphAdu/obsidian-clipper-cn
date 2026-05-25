@@ -93,6 +93,29 @@ const HEADING_FIELDS: Record<number, string> = {
 	9: 'heading7', 10: 'heading8', 11: 'heading9',
 };
 
+// Dynamic heading rewrite table for article: scan blocks, find used heading
+// types, sort ascending, map first → H2, next → H3, ... cap at H6. Replaces
+// hardcoded HEADING_REWRITE_ARTICLE because real articles use varying heading
+// type sets — 5125541 uses {3,4,5,6,7}; URL A (55188248) uses {3,5,6,7,8,9}
+// (sparse with gap at type=4).
+export function computeDynamicHeadingRewrite(
+	blocks: ScysBlock[]
+): Record<number, { newType: number; newField: string }> {
+	const headingTypes = new Set<number>();
+	for (const b of blocks) {
+		if (b.block_type >= 3 && b.block_type <= 11) headingTypes.add(b.block_type);
+	}
+	const sorted = Array.from(headingTypes).sort((a, b) => a - b);
+	const rewrite: Record<number, { newType: number; newField: string }> = {};
+	for (let i = 0; i < sorted.length; i++) {
+		const sourceType = sorted[i];
+		const newType = Math.min(4 + i, 8); // cap at heading6
+		const newField = HEADING_FIELDS[newType];
+		rewrite[sourceType] = { newType, newField };
+	}
+	return rewrite;
+}
+
 // scys article authors abuse the "heading" button as a bold-paragraph styler.
 // Per-type cutoffs balance "keep real chapter titles as headings" against
 // "demote prose paragraphs masquerading as headings". DEFAULT (course/docx):

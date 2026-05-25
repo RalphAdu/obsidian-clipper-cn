@@ -1810,3 +1810,53 @@ describe('extractScysArticleStandalone — image-only + attachments coexistence'
 		expect(result!.wordCount).toBe(0);
 	});
 });
+
+import { computeDynamicHeadingRewrite } from './scys-extractor';
+
+describe('computeDynamicHeadingRewrite (article heading demote table by used types)', () => {
+	const mk = (types: number[]) => types.map(t => ({ block_type: t }) as any);
+
+	it('5125541 形态：用 {3,4,5,6,7} → {3:H2, 4:H3, 5:H4, 6:H5, 7:H6}', () => {
+		const out = computeDynamicHeadingRewrite(mk([3, 4, 5, 6, 7]));
+		expect(out[3]).toEqual({ newType: 4, newField: 'heading2' });
+		expect(out[4]).toEqual({ newType: 5, newField: 'heading3' });
+		expect(out[5]).toEqual({ newType: 6, newField: 'heading4' });
+		expect(out[6]).toEqual({ newType: 7, newField: 'heading5' });
+		expect(out[7]).toEqual({ newType: 8, newField: 'heading6' });
+	});
+
+	it('URL A 形态：用 {3,5,6,7,8,9} → 第 6 种 type=9 cap 到 H6', () => {
+		const out = computeDynamicHeadingRewrite(mk([3, 5, 6, 7, 8, 9]));
+		expect(out[3]).toEqual({ newType: 4, newField: 'heading2' });
+		expect(out[5]).toEqual({ newType: 5, newField: 'heading3' });
+		expect(out[6]).toEqual({ newType: 6, newField: 'heading4' });
+		expect(out[7]).toEqual({ newType: 7, newField: 'heading5' });
+		expect(out[8]).toEqual({ newType: 8, newField: 'heading6' });
+		expect(out[9]).toEqual({ newType: 8, newField: 'heading6' });
+	});
+
+	it('传统 article 形态：只用 {5,6,7} → {5:H2, 6:H3, 7:H4}（等价原硬码表）', () => {
+		const out = computeDynamicHeadingRewrite(mk([5, 6, 7]));
+		expect(out[5]).toEqual({ newType: 4, newField: 'heading2' });
+		expect(out[6]).toEqual({ newType: 5, newField: 'heading3' });
+		expect(out[7]).toEqual({ newType: 6, newField: 'heading4' });
+	});
+
+	it('无 heading article：[] → {}', () => {
+		const out = computeDynamicHeadingRewrite([]);
+		expect(out).toEqual({});
+	});
+
+	it('夹杂非 heading block：{type=2 paragraphs + type=5 + type=6} → {5,6} only', () => {
+		const out = computeDynamicHeadingRewrite(mk([2, 5, 2, 6, 2]));
+		expect(Object.keys(out).sort()).toEqual(['5', '6']);
+		expect(out[5]).toEqual({ newType: 4, newField: 'heading2' });
+		expect(out[6]).toEqual({ newType: 5, newField: 'heading3' });
+	});
+
+	it('重复 type 去重：{5,5,5,6,6} → {5,6}', () => {
+		const out = computeDynamicHeadingRewrite(mk([5, 5, 5, 6, 6]));
+		expect(out[5]).toEqual({ newType: 4, newField: 'heading2' });
+		expect(out[6]).toEqual({ newType: 5, newField: 'heading3' });
+	});
+});

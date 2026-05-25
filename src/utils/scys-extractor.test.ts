@@ -1858,3 +1858,91 @@ describe('computeDynamicHeadingRewrite (article heading demote table by used typ
 		expect(out[6]).toEqual({ newType: 5, newField: 'heading3' });
 	});
 });
+
+describe('flattenScysBlocks: callout/grid children_blocks 递归 (defensive regression)', () => {
+	it('callout (type=19) 内嵌的 image (type=27) 通过 children_blocks 仍被 emit', () => {
+		const blocks: any[] = [
+			{
+				block_type: 19,
+				block_id: 'callout-1',
+				callout: { elements: [{ text_run: { content: 'callout text' } }] },
+				children_blocks: [
+					{ block_type: 27, block_id: 'img-1', file_url: 'https://example.com/x.png' },
+					{ block_type: 2, block_id: 'text-1', text: { elements: [{ text_run: { content: 'inside callout' } }] } },
+				],
+			},
+		];
+		const flat = flattenScysBlocks(blocks);
+		const types = flat.map(b => b.block_type);
+		expect(types).toContain(19);
+		expect(types).toContain(27);
+		expect(types).toContain(2);
+	});
+
+	it('grid (type=24) 内嵌 children 按顺序展开', () => {
+		const blocks: any[] = [
+			{
+				block_type: 24,
+				block_id: 'grid-1',
+				grid: { column_size: 2 },
+				children_blocks: [
+					{ block_type: 2, block_id: 'p-1', text: { elements: [{ text_run: { content: 'col 1' } }] } },
+					{ block_type: 2, block_id: 'p-2', text: { elements: [{ text_run: { content: 'col 2' } }] } },
+				],
+			},
+		];
+		const flat = flattenScysBlocks(blocks);
+		const idx24 = flat.findIndex(b => b.block_type === 24);
+		const idxP1 = flat.findIndex(b => b.block_type === 2 && JSON.stringify(b).includes('col 1'));
+		const idxP2 = flat.findIndex(b => b.block_type === 2 && JSON.stringify(b).includes('col 2'));
+		expect(idx24).toBeGreaterThanOrEqual(0);
+		expect(idxP1).toBeGreaterThan(idx24);
+		expect(idxP2).toBeGreaterThan(idxP1);
+	});
+
+	it('grid_column (type=25) 内含 image — 双层递归（5125541 形态）', () => {
+		const blocks: any[] = [
+			{
+				block_type: 24,
+				block_id: 'grid-1',
+				grid: { column_size: 2 },
+				children_blocks: [
+					{
+						block_type: 25,
+						block_id: 'col-1',
+						children_blocks: [
+							{ block_type: 27, block_id: 'img-a', file_url: 'https://x.com/a.png' },
+						],
+					},
+					{
+						block_type: 25,
+						block_id: 'col-2',
+						children_blocks: [
+							{ block_type: 27, block_id: 'img-b', file_url: 'https://x.com/b.png' },
+						],
+					},
+				],
+			},
+		];
+		const flat = flattenScysBlocks(blocks);
+		const imgs = flat.filter(b => b.block_type === 27);
+		expect(imgs.length).toBe(2);  // 两个 column 各 1 张图都被 emit
+	});
+
+	it('深度嵌套不抛错 + dedup（同一 block_id 不重复 emit）', () => {
+		const blocks: any[] = [
+			{
+				block_type: 19,
+				block_id: 'callout-1',
+				callout: { elements: [] },
+				children_blocks: [
+					{ block_type: 27, block_id: 'img-shared', file_url: 'https://x.com/shared.png' },
+				],
+			},
+		];
+		// 单测期望：img-shared 只 emit 1 次（一次通过 callout children 递归）
+		const flat = flattenScysBlocks(blocks);
+		const sharedImgs = flat.filter(b => b.block_type === 27 && JSON.stringify(b).includes('img-shared'));
+		expect(sharedImgs.length).toBe(1);
+	});
+});

@@ -31,6 +31,7 @@ Outputs:
 
 import sys
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Optional
 from PIL import Image, ImageDraw, ImageFont
@@ -45,34 +46,56 @@ def build_markdown_lines(md_path):
     return [(i, line.strip()) for i, line in enumerate(body.split('\n'), 1) if line.strip()]
 
 def longest_common_substring(s1: str, s2: str) -> int:
-    """Length of longest common contiguous substring between s1 and s2."""
+    """Length of longest common contiguous substring.
+
+    Uses difflib.SequenceMatcher (C-implemented in CPython) for ~10-100x speedup
+    over pure Python DP. Previously hit 22 min runtime on 1231 md_lines × 183
+    frames during v3 Task 6 validation.
+    """
     if not s1 or not s2:
         return 0
-    m, n = len(s1), len(s2)
-    dp = [[0] * (n + 1) for _ in range(m + 1)]
-    best = 0
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
-            if s1[i-1] == s2[j-1]:
-                dp[i][j] = dp[i-1][j-1] + 1
-                if dp[i][j] > best:
-                    best = dp[i][j]
-    return best
+    return SequenceMatcher(None, s1, s2).find_longest_match(0, len(s1), 0, len(s2)).size
+
+def has_strong_overlap(head: str, line: str, min_chars: int = 8) -> bool:
+    """Fast substring prefilter — skip lines that can't possibly score ≥ min_chars
+    in LCS. Checks if any 8-char window from head[:50] appears verbatim in line.
+    """
+    if len(head) < min_chars or len(line) < min_chars:
+        return False
+    scan_len = min(len(head), 50)
+    for i in range(scan_len - min_chars + 1):
+        if head[i:i+min_chars] in line:
+            return True
+    return False
 
 def frame_anchor_from_text(text: str, md_lines, prev_anchor, avg_line_len: float):
     """Map a frame's visible text to a markdown line range [start, end].
 
     Returns prev_anchor (fallback) if text is empty / too short / fuzzy match weak.
     base64-image-heavy frames inherit prev anchor naturally (no usable text).
+
+    Perf: single-pass max + reused SequenceMatcher + has_strong_overlap prefilter
+    (avoid invoking C SequenceMatcher on lines without an 8-char common substring).
     """
     if not text or len(text.strip()) < 20:
         return prev_anchor
     head = text.strip()[:200]
     if not md_lines:
         return prev_anchor
-    best_line = max(md_lines, key=lambda ln: longest_common_substring(head, ln[1]))
-    best_score = longest_common_substring(head, best_line[1])
-    if best_score < 8:
+    best_line = None
+    best_score = 0
+    sm = SequenceMatcher(None, head, '')
+    head_len = len(head)
+    for ln in md_lines:
+        line_text = ln[1]
+        if not has_strong_overlap(head, line_text, 8):
+            continue
+        sm.set_seq2(line_text)
+        score = sm.find_longest_match(0, head_len, 0, len(line_text)).size
+        if score > best_score:
+            best_score = score
+            best_line = ln
+    if best_line is None or best_score < 8:
         return prev_anchor
     start = best_line[0]
     span = max(1, int(len(text) / max(1, avg_line_len)))

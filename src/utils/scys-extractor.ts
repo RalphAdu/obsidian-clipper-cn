@@ -75,17 +75,6 @@ const HEADING_REWRITE_DEFAULT: Record<number, { newType: number; newField: strin
 	8: { newType: 6, newField: 'heading4' },
 };
 
-// Article (xq_topic) mapping: scys article uses one heading level higher than
-// course/docx. The browser renders block_type=5 (HEADING3) as 18px/600
-// (chapter level), block_type=6 as 16px/600 (subsection), etc. — so demote
-// each level by one in markdown to match Obsidian's visual hierarchy.
-const HEADING_REWRITE_ARTICLE: Record<number, { newType: number; newField: string }> = {
-	5: { newType: 4, newField: 'heading2' },
-	6: { newType: 5, newField: 'heading3' },
-	7: { newType: 6, newField: 'heading4' },
-	8: { newType: 7, newField: 'heading5' },
-};
-
 // Map of feishu HEADING block types to their body field name.
 const HEADING_FIELDS: Record<number, string> = {
 	3: 'heading1', 4: 'heading2', 5: 'heading3',
@@ -931,10 +920,11 @@ async function extractScysArticleStandalone(doc: Document): Promise<ScysStructur
 
 	if (detail.docBlocks && detail.docBlocks.length > 0) {
 		// Modern path: feishu block tree (2024+ posts).
-		// Article-specific HEADING mapping: scys article renders one level deeper
-		// than course/docx (browser block5-class is 18px H3, block6 is 16px H4).
+		// Heading demote: per-article dynamic mapping (computeDynamicHeadingRewrite)
+		// — first used heading type → H2, next → H3, ... cap at H6. Each article
+		// chooses its own heading_type set so a fixed table can't fit all.
 		const articleOptions: FlattenOptions = {
-			headingRewrite: HEADING_REWRITE_ARTICLE,
+			headingRewrite: computeDynamicHeadingRewrite(detail.docBlocks),
 			headingParagraphCutoff: HEADING_PARAGRAPH_LEN_THRESHOLD_ARTICLE,
 			forceBoldOnDemote: true,
 		};

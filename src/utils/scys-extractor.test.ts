@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { isScysCourseUrl, parseScysUrl } from './scys-extractor';
+import { isScysCourseUrl, parseScysUrl, computeDynamicHeadingRewrite } from './scys-extractor';
 import { autolinkBareUrls } from './feishu-extractor';
 
 describe('autolinkBareUrls (bare URL → clickable anchor; scys puts URLs in plain content)', () => {
@@ -1810,8 +1810,6 @@ describe('extractScysArticleStandalone — image-only + attachments coexistence'
 		expect(result!.wordCount).toBe(0);
 	});
 });
-
-import { computeDynamicHeadingRewrite } from './scys-extractor';
 
 describe('computeDynamicHeadingRewrite (article heading demote table by used types)', () => {
 	const mk = (types: number[]) => types.map(t => ({ block_type: t }) as any);

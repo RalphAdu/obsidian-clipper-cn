@@ -9,20 +9,20 @@ screenshots, right column = Obsidian rendering screenshots. Used to manually
 verify that Obsidian markdown rendering covers all content from the original page
 (content coverage + ordering + visual fidelity for bold/quote/list/table).
 
-Two columns are aligned by **content progress** (not by frame index). Browser
-viewport (1920×1080) and Obsidian viewport (usually narrower) consume the same
-article in different number of PageDown frames; with index alignment, the
-shorter side runs out and gets padded with "(no more)" placeholders for the
-trailing half. Proportional alignment maps row i to:
-  longer_idx  = i
-  shorter_idx = floor(i * len(shorter) / len(longer))
-so the shorter side repeats some frames to stay in sync with the longer side
-(both sides finish at the same content position).
+Two columns are aligned by **markdown-line anchor** (audit-via-subagents v3):
+each frame's sibling .txt (visible textContent / OCR transcript) is fuzzy-matched
+to a markdown line via longest-common-substring (threshold 8 chars) to obtain a
+[start, end] line range. Grid row i maps to md line
+  target = (i + 0.5) / total_rows × total_md_lines
+and both sides pick the frame whose anchor brackets that line. base64-image-
+heavy frames (no usable text) inherit the previous anchor naturally — this
+replaces the old frame-index proportional alignment which drifted L↔R
+systematically on image-dense articles.
 
 Also emits a separate scaled `browser-fullpage.png` for end-to-end visual scan.
 
 Usage:
-  build-side-by-side-grid.py <browser-dir> <obsidian-dir> <out-prefix>
+  build-side-by-side-grid.py <browser-dir> <obsidian-dir> <out-prefix> <md-path>
 
 Outputs:
   <out-prefix>.png           — the side-by-side grid (or grid-01/02/... when paginated)
@@ -38,13 +38,126 @@ from PIL import Image, ImageDraw, ImageFont
 # default decompression-bomb safety check. We trust our own files; raise the limit.
 Image.MAX_IMAGE_PIXELS = 500_000_000
 
-if len(sys.argv) != 4:
-    print("Usage: build-side-by-side-grid.py <browser-dir> <obsidian-dir> <out-prefix>", file=sys.stderr)
+
+def build_markdown_lines(md_path):
+    """Read md, strip frontmatter, return [(line_no, text), ...] for non-empty lines."""
+    body = re.sub(r'^---\n.*?\n---\n', '', open(md_path).read(), flags=re.DOTALL)
+    return [(i, line.strip()) for i, line in enumerate(body.split('\n'), 1) if line.strip()]
+
+def longest_common_substring(s1: str, s2: str) -> int:
+    """Length of longest common contiguous substring between s1 and s2."""
+    if not s1 or not s2:
+        return 0
+    m, n = len(s1), len(s2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    best = 0
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if s1[i-1] == s2[j-1]:
+                dp[i][j] = dp[i-1][j-1] + 1
+                if dp[i][j] > best:
+                    best = dp[i][j]
+    return best
+
+def frame_anchor_from_text(text: str, md_lines, prev_anchor, avg_line_len: float):
+    """Map a frame's visible text to a markdown line range [start, end].
+
+    Returns prev_anchor (fallback) if text is empty / too short / fuzzy match weak.
+    base64-image-heavy frames inherit prev anchor naturally (no usable text).
+    """
+    if not text or len(text.strip()) < 20:
+        return prev_anchor
+    head = text.strip()[:200]
+    if not md_lines:
+        return prev_anchor
+    best_line = max(md_lines, key=lambda ln: longest_common_substring(head, ln[1]))
+    best_score = longest_common_substring(head, best_line[1])
+    if best_score < 8:
+        return prev_anchor
+    start = best_line[0]
+    span = max(1, int(len(text) / max(1, avg_line_len)))
+    return (start, start + span)
+
+def frame_anchor(frame_txt_path, md_lines, prev_anchor, avg_line_len: float):
+    """File wrapper around frame_anchor_from_text. Missing/unreadable file → fallback."""
+    if not frame_txt_path.exists():
+        return prev_anchor
+    try:
+        text = frame_txt_path.read_text(encoding='utf-8')
+    except Exception:
+        return prev_anchor
+    return frame_anchor_from_text(text, md_lines, prev_anchor, avg_line_len)
+
+def compute_anchors(frames, md_lines, avg_line_len: float):
+    """For each frame path, compute its md anchor (inheriting prev for fallback)."""
+    anchors = []
+    prev = (1, 1)
+    for f in frames:
+        txt = f.with_suffix('.txt')
+        anchor = frame_anchor(txt, md_lines, prev, avg_line_len)
+        anchors.append(anchor)
+        prev = anchor
+    return anchors
+
+def find_frame_at_line(anchors, target_line: int) -> int:
+    """Find frame index whose [start, end] anchor brackets target_line.
+
+    If no exact bracket, return the frame whose anchor.start is closest to target.
+    """
+    for i, (s, e) in enumerate(anchors):
+        if s <= target_line <= e:
+            return i
+    return min(range(len(anchors)), key=lambda i: abs(anchors[i][0] - target_line))
+
+
+if '--self-test' in sys.argv:
+    md_lines_fx = [
+        (1, '做个自我介绍'),
+        (2, '大家好我是天堂地狱'),
+        (3, '加入生财 8 年'),
+        (4, '前言'),
+        (5, '这个月借用了一次微咨询的机会咨询了下亦仁'),
+    ]
+    avg = sum(len(l[1]) for l in md_lines_fx) / len(md_lines_fx)
+    # case 1: frame head 含 md line 2 → anchor 落 (2, 2+span)
+    # 文本须 ≥ 20 char 才过 short-text 闸口 (frame_anchor_from_text 的 noise guard)
+    a = frame_anchor_from_text('大家好我是天堂地狱，生财编号 677，今天给大家分享一下', md_lines_fx, (1, 1), avg)
+    assert a[0] == 2, f'case1 expected anchor start=2, got {a}'
+    # case 2: 空 / 短文本 → inherit prev
+    assert frame_anchor_from_text('', md_lines_fx, (3, 5), avg) == (3, 5), 'case2 empty failed'
+    assert frame_anchor_from_text('xx', md_lines_fx, (3, 5), avg) == (3, 5), 'case2 short failed'
+    # case 3: 弱 match (< 8 字符共同) → inherit
+    assert frame_anchor_from_text('abcdefg short text here', md_lines_fx, (3, 5), avg) == (3, 5), 'case3 weak match failed'
+    # case 4: span 估算合理性 — 长 text 应给出 span > 1
+    # 用 md_line 5 的文本作 head（必命中），后接长尾使 len(text) 远超 avg_line_len → span 必 > 1
+    long_text = '这个月借用了一次微咨询的机会咨询了下亦仁' + '后续内容补充延伸说明各种各样的话题' * 10
+    span_anchor = frame_anchor_from_text(long_text, md_lines_fx, (1, 1), avg)
+    assert span_anchor[1] > span_anchor[0], f'case4 span empty: {span_anchor}'
+    # case 5: find_frame_at_line 找正确 frame
+    anchors_fx = [(1, 2), (3, 5), (6, 8)]
+    assert find_frame_at_line(anchors_fx, 4) == 1, 'case5 mid-anchor failed'
+    assert find_frame_at_line(anchors_fx, 7) == 2, 'case5 last anchor failed'
+    # case 6: target 超出最后 anchor → 取最近
+    assert find_frame_at_line(anchors_fx, 100) in (0, 1, 2), 'case6 fallback failed'
+    # case 7: longest_common_substring 基础正确性
+    assert longest_common_substring('abcde', 'xbcdy') == 3, 'case7 LCS failed'
+    assert longest_common_substring('我是天堂地狱', '我是天堂地狱生财编号') == 6, 'case7 中文 LCS failed'
+    print('self-test PASS (7 cases)')
+    sys.exit(0)
+
+if len(sys.argv) != 5:
+    print("Usage: build-side-by-side-grid.py <browser-dir> <obsidian-dir> <out-prefix> <md-path>", file=sys.stderr)
     sys.exit(2)
 
 browser_dir = Path(sys.argv[1])
 obsidian_dir = Path(sys.argv[2])
 out_prefix = Path(sys.argv[3])
+md_path = Path(sys.argv[4])
+
+# Build md line index + cumulative anchor data
+md_lines = build_markdown_lines(md_path)
+avg_line_len = sum(len(l[1]) for l in md_lines) / max(1, len(md_lines))
+print(f"[grid] md lines: {len(md_lines)} (avg {avg_line_len:.1f} chars/line)")
 
 # Each cell: 1120w × 630h (16:9 ratio at 2x size), 24px label band on top.
 # Bigger cells → text in screenshots stays readable when Claude vision rescales
@@ -98,6 +211,14 @@ def make_header(text: str, w: int) -> Image.Image:
 # Paginate rows
 num_grids = (total_rows + MAX_ROWS_PER_GRID - 1) // MAX_ROWS_PER_GRID
 
+# Compute md-line anchors per frame (sibling .txt fuzzy match) — once for all grid pages.
+browser_anchors = compute_anchors(browser_frames, md_lines, avg_line_len)
+obsidian_anchors = compute_anchors(obsidian_frames, md_lines, avg_line_len)
+total_md_lines = len(md_lines)
+b_anchored = sum(1 for a in browser_anchors if a != (1, 1))
+o_anchored = sum(1 for a in obsidian_anchors if a != (1, 1))
+print(f"[grid] anchored frames: browser={b_anchored}/{len(browser_anchors)}, obsidian={o_anchored}/{len(obsidian_anchors)}")
+
 for grid_idx in range(num_grids):
     start = grid_idx * MAX_ROWS_PER_GRID
     end = min(start + MAX_ROWS_PER_GRID, total_rows)
@@ -110,20 +231,22 @@ for grid_idx in range(num_grids):
     grid.paste(make_header('🌐 Browser (ground truth)', CELL_W), (PAD, PAD))
     grid.paste(make_header('📝 Obsidian rendering', CELL_W), (PAD + CELL_W + GAP, PAD))
 
-    # Proportional alignment: longer side is 1:1 (every frame appears once),
-    # shorter side reuses frames so both sides finish at the same content
-    # position. Without this, the shorter side's tail is filled with
-    # "(no more)" placeholders and the lower half of the grid is useless.
+    # Markdown-line-anchored alignment: each row i maps to a target md line
+    # (i+0.5)/total_rows * total_md_lines; both sides pick the frame whose
+    # anchor [start,end] brackets that line. base64-image-heavy frames (no
+    # usable text) inherit prev anchor naturally — no more L↔R systematic
+    # drift on image-dense articles.
     n_browser = len(browser_frames)
     n_obsidian = len(obsidian_frames)
     for row in range(rows_this):
         i = start + row
         y = PAD + header_h + row * (LABEL_H + CELL_H + GAP)
-        if total_rows == 0:
+        if total_rows == 0 or total_md_lines == 0:
             b_idx = o_idx = 0
         else:
-            b_idx = i if n_browser == total_rows else i * n_browser // total_rows
-            o_idx = i if n_obsidian == total_rows else i * n_obsidian // total_rows
+            target_line = int((i + 0.5) / total_rows * total_md_lines)
+            b_idx = find_frame_at_line(browser_anchors, target_line) if browser_anchors else 0
+            o_idx = find_frame_at_line(obsidian_anchors, target_line) if obsidian_anchors else 0
         browser_img = browser_frames[b_idx] if b_idx < n_browser else None
         obsidian_img = obsidian_frames[o_idx] if o_idx < n_obsidian else None
         b_label = f'browser scroll-{b_idx+1:03d}' if browser_img else f'browser  (none)'

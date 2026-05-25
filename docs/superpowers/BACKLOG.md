@@ -1678,6 +1678,44 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 
 **测试报告**：`docs/superpowers/test-reports/2026-05-23-spec-b1.md`（local-only）含 8 task 实施 + L3 fix re-audit 章节
 
+### 6.22 ~~scys article 5125541 渲染修复（heading dynamic rewrite + 防御性单测）~~（**已完成 2026-05-25**，commits `78f70b2..dc08877`，6 commits on `worktree-scys-5125541-fix`）
+
+**触发**：阿杜报"https://scys.com/articleDetail/xq_topic/5125541242454854 裁剪结果不符合预期"。spec-b1 ship 后第一个 follow-up bug。
+
+**根因**：5125541 是 docBlocks 形态 article 但**同时使用了 type=3/4/5/6/7 五级 heading**（前几个 article 多用 type=5/6/7 三级）。spec-b1 的 `HEADING_REWRITE_ARTICLE` 硬码表只处理 type=5/6/7/8，type=3/4 直接原样输出 → markdown 文档体内出现 3 个 H1 + 8 个错位的 H2。
+
+**修复（4 个核心 commits）**：
+
+| Commit | 内容 |
+|---|---|
+| `78f70b2` feat | `computeDynamicHeadingRewrite(blocks)` — 按 article 实际使用的 heading types sorted ascending, first→H2, next→H3, ... cap at H6。6 个单测覆盖 5125541 ({3,4,5,6,7}) + URL A ({3,5,6,7,8,9} cap) + 传统 ({5,6,7}) + 空 + 夹杂 + 重复 |
+| `b8bac1a` feat | `extractScysArticleStandalone` docBlocks 分支切换 dynamic + 删除硬码 `HEADING_REWRITE_ARTICLE`。175 现有测试 0 regression（fixture 都走 articleContent fallback 不经 docBlocks 分支） |
+| `3af417a` test | 4 个防御性单测 — `flattenScysBlocks` callout/grid children_blocks 递归（原 spec hypothesis 错以为 `children_blocks: string[]` ref；实际是 `ScysBlock[]` inline 对象 + 递归已实现）。锁住将来不被改坏 |
+| `0844fb3` test | e2e 5125541 加入 `ARTICLE_CASES` + 专项 it 数学校验：H1=0, H2=4, H3=8, H4=14, H5=12, H6=3 + image=23。URL A audit 框架兼容自动复用 |
+
+**B3 (26 vs 23 张 image) 是 false alarm**：我早期 audit script 把 `.feishu-doc-content img` 全算（含 UI / 头像 / cover），实际 article body 真有 23 张 = docBlocks 递归 23 张 = markdown 23 张，完全一致。
+
+**B4 (GRID block) 已经 work**：`flattenScysBlocks` 现有递归正确处理 `ScysBlock[]` 子块；GRID column children 在 markdown 中按顺序展开（Obsidian 无 column primitives，flatten 是唯一表达），内容不丢。
+
+**Dev infra 副产品（2 commits）**：
+
+- `08341b7` feat(scripts): `dump-clip.ts` 加 `--profile <dir>` 支持持久化 profile + 自动跳过 weixin 专用 `#publish_time` selector（scys/zsxq/feishu sites 不存在该 selector）
+- `dc08877` docs(scripts): `obsidian-scroll-capture.sh` 注释 `阅读视图` click 的 caller 假设（vault default=Reading 时脚本 toggle 切到 Editing → audit 全 Editing 截图）
+
+**Workflow 反思（1 commit）**：
+
+- `eda1edb` docs(BACKLOG §2.22): 抢焦点 ≠ 需用户介入 — ship 时把 T5-3 obsidian-scroll-capture 推给阿杜决策违反 user_collab_norms"能自动的先自动做完"。memory `user_collab_norms` 新增章节字段收紧
+
+**已知限制 / Follow-up**：
+
+- ⚠️ **视觉 sbs grid L↔R alignment 在 base64-image-heavy article 失效**（详见 `docs/superpowers/specs/2026-05-25-audit-infra-v3-need.md`）。两轮 PoC（file size 阈值 / perceptual hash diff）都没改善。真正修需要 **OCR/textContent anchor per frame**，是 audit infra 大改造（推荐方案 A or B 各 2-5h）
+- spec-b1 历史 4 URL audit 通过**可能也有同类 alignment 盲区**，audit-via-subagents v3 修好后**回头重审历史 4 URL** 才算真正干净
+- D1 base64 image → 附件文件（动到 attachment 目录）— 跨 extractor 大改造，单独 Spec Y brainstorm
+
+**ship gate 接受路径**：5125541 fix 凭 e2e `auditScysArticle` textContent prefix audit 5 URL 全 0 mismatch + unit/e2e 全 PASS + 主 session 抽 4 张 grid 复核 Obsidian Reading View 渲染正确 ship。视觉严格 L↔R 对齐 due to audit infra 缺陷暂不可得，作为 follow-up 留 v3 修。
+
+**测试报告**：`docs/superpowers/test-reports/2026-05-25-scys-article-5125541-fix.md`（local-only）
+
 ---
 
 ## 7. 代码内 TODO 注释

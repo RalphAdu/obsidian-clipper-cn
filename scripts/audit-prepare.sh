@@ -90,6 +90,10 @@ else
 	LATEST=$(ls -td /tmp/browser-scroll-* 2>/dev/null | head -1)
 	[ -d "$LATEST" ] || { echo "[FATAL] browser-scroll-capture didn't produce output dir" >&2; exit 3; }
 	cp "$LATEST"/*.png "$BROWSER_DIR/" 2>/dev/null || { echo "[FATAL] browser-scroll-capture produced no PNGs in $LATEST" >&2; exit 3; }
+	# Copy .txt sidecars too (Task 2 — textContent anchors for grid alignment).
+	# Without these, build-side-by-side-grid falls back to frame-index proportional
+	# alignment and the v3 markdown-line-anchored layout never materializes.
+	cp "$LATEST"/*.txt "$BROWSER_DIR/" 2>/dev/null || echo "[WARN] no .txt sidecars in $LATEST (Task 2 may not have produced them)"
 fi
 
 # Step 2: obsidian capture（idempotent）
@@ -104,6 +108,9 @@ else
 	LATEST=$(ls -td /tmp/obsidian-scroll-* 2>/dev/null | head -1)
 	[ -d "$LATEST" ] || { echo "[FATAL] obsidian-scroll-capture didn't produce output dir" >&2; exit 4; }
 	cp "$LATEST"/*.png "$OBSIDIAN_DIR/" 2>/dev/null || { echo "[FATAL] obsidian-scroll-capture produced no PNGs" >&2; exit 4; }
+	# Copy OCR .txt sidecars (Task 3 — Vision Framework OCR for Reading View
+	# alignment anchors). Same rationale as browser step.
+	cp "$LATEST"/*.txt "$OBSIDIAN_DIR/" 2>/dev/null || echo "[WARN] no .txt sidecars in $LATEST (Task 3 OCR may have failed)"
 fi
 
 # Step 3: sbs grid build（idempotent）

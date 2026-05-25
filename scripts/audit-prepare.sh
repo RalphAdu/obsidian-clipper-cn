@@ -91,11 +91,9 @@ if ls "$OBSIDIAN_DIR"/scroll-*.png >/dev/null 2>&1; then
 else
 	echo "==> obsidian-scroll-capture $VAULT $MD_REL → $OBSIDIAN_DIR"
 	# obsidian-scroll-capture 默认输出 /tmp/obsidian-scroll-<ts>/
-	# N_PAGES heuristic：md 每 40 行截一张
-	N_PAGES=$(( (MD_LINES + 39) / 40 ))
-	[ $N_PAGES -lt 5 ] && N_PAGES=5
-	[ $N_PAGES -gt 60 ] && N_PAGES=60
-	scripts/obsidian-scroll-capture.sh "$VAULT" "$MD_REL" "$N_PAGES" 2>&1 | tee "/tmp/audit-${RUN_ID}-obsidian.log"
+	# 新版自动触底（BOTTOM_RUN 3 frame 连续相同），给个高 MAX_PAGES cap 防失控
+	MAX_PAGES=1000
+	scripts/obsidian-scroll-capture.sh "$VAULT" "$MD_REL" "$MAX_PAGES" 2>&1 | tee "/tmp/audit-${RUN_ID}-obsidian.log"
 	LATEST=$(ls -td /tmp/obsidian-scroll-* 2>/dev/null | head -1)
 	[ -d "$LATEST" ] || { echo "[FATAL] obsidian-scroll-capture didn't produce output dir" >&2; exit 4; }
 	cp "$LATEST"/*.png "$OBSIDIAN_DIR/" 2>/dev/null || { echo "[FATAL] obsidian-scroll-capture produced no PNGs" >&2; exit 4; }

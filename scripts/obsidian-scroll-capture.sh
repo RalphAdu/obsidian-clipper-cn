@@ -58,6 +58,22 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VISION_OCR_BIN="$SCRIPT_DIR/macos-vision-ocr"
+VISION_OCR_SRC="$SCRIPT_DIR/macos-vision-ocr.swift"
+
+# Idempotent swiftc build — first invocation takes ~5s, subsequent runs no-op.
+# audit-via-subagents v3: every frame needs OCR → sibling .txt for grid
+# alignment (Obsidian Reading View has no DOM access, so we OCR the
+# viewport screenshot).
+if [ ! -x "$VISION_OCR_BIN" ]; then
+	echo "==> building macos-vision-ocr binary (one-time, ~5s)..."
+	swiftc -O "$VISION_OCR_SRC" -o "$VISION_OCR_BIN" || {
+		echo "[FAIL] swiftc 编译 vision-ocr 失败 — 检查 xcode-select --install" >&2
+		exit 7
+	}
+fi
+
 VAULT="${1:?usage: $0 <vault-name> <relative-path> [max-pages]}"
 FILE_PATH="${2:?usage: $0 <vault-name> <relative-path> [max-pages]}"
 MAX_PAGES="${3:-1000}"
@@ -182,6 +198,14 @@ while [ "$i" -le "$MAX_PAGES" ]; do
 	if [ "$i" -eq 1 ]; then
 		FIRST_SIZE=$SIZE
 	fi
+	# 抽 viewport 文字到 sibling .txt（Vision Framework，~150ms/frame）。
+	# 用于 audit-via-subagents v3 build-side-by-side-grid 对齐 anchor。
+	# 失败时写空 .txt 触发 grid 的 fallback inherit prev anchor，不让整个 run 死掉。
+	TXT_FILE="$OUT_DIR/scroll-${IDX}.txt"
+	"$VISION_OCR_BIN" "$SHOT" > "$TXT_FILE" 2>/dev/null || {
+		echo "  ${IDX}. [WARN] vision-ocr failed (image content may be inscrutable)" >&2
+		: > "$TXT_FILE"
+	}
 	# Bottom detection: identical to previous? Bump RUN; otherwise reset.
 	if [ -n "$PREV" ] && cmp -s "$PREV" "$SHOT"; then
 		RUN=$((RUN + 1))

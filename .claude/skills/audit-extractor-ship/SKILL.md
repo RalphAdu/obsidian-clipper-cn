@@ -123,6 +123,18 @@ scripts/audit-prepare.sh "<vault>" "<md-rel-path>" "<url>" --run-id "$RUN_ID" \
   "notes": "(可选)"
 }
 
+**diffs[] 字段严约束**：每个 diff 必须严格使用 `grid` / `location` / `category` / `severity` / `desc` 这 5 个字段，**不要发明新字段**（例如 `type` / `where` / `detail` 都是错的，audit-summarize 读不到会渲染成 `undefined`）。
+
+✅ 正确 diff：
+```json
+{"grid": "sbs-09.png", "location": "右半中段表格第 3 行", "category": "table", "severity": "warn", "desc": "obsidian 表格列对齐错位"}
+```
+
+❌ 错误 diff（自创字段）：
+```json
+{"type": "table_misalign", "where": "sbs-09 right", "detail": "column shift"}
+```
+
 status 派生：
 - 任一 checklist = fail → FAIL
 - 任一 unknown（且无 fail）→ NEEDS_REVIEW
@@ -133,6 +145,7 @@ status 派生：
 - 不要 Read 范围外的 grid（爆 context）
 - 不要分析 git / 改代码 / 跑测试
 - 不确定就标 unknown，不要静默标 pass
+- diffs[] 严格用 `grid / location / category / severity / desc` 5 字段，不发明新字段
 - 写完 JSON 文件后简短确认（一行）即可
 ```
 

@@ -112,15 +112,88 @@ def frame_anchor(frame_txt_path, md_lines, prev_anchor, avg_line_len: float):
     return frame_anchor_from_text(text, md_lines, prev_anchor, avg_line_len)
 
 def compute_anchors(frames, md_lines, avg_line_len: float):
-    """For each frame path, compute its md anchor (inheriting prev for fallback)."""
-    anchors = []
-    prev = (1, 1)
+    """For each frame path, compute its md anchor.
+
+    Two-pass: (1) raw anchor per frame (None for unanchored), (2) linearly
+    interpolate unanchored frames between bracketing anchored neighbors.
+
+    Why interpolate: Obsidian Reading View frames rendering base64 images
+    yield noisy OCR (e.g. "永⋯ 呈成⋯ sCy$") that fails fuzzy match → many
+    consecutive frames inherit prev anchor. Without interpolation, find_frame
+    _at_line returns the first frame in a stuck-anchor run, misaligning L↔R.
+    With interpolation, anchor smoothly advances across noisy gaps, matching
+    the actual article scroll progress.
+    """
+    raw = []  # list of (anchor_or_None, span)
     for f in frames:
         txt = f.with_suffix('.txt')
-        anchor = frame_anchor(txt, md_lines, prev, avg_line_len)
-        anchors.append(anchor)
-        prev = anchor
-    return anchors
+        anchor_or_none = _frame_anchor_or_none(txt, md_lines, avg_line_len)
+        raw.append(anchor_or_none)
+    # Interpolation pass: fill None gaps between anchored neighbors
+    n = len(raw)
+    anchored_idx = [i for i, a in enumerate(raw) if a is not None]
+    result = [None] * n
+    for i, a in enumerate(raw):
+        if a is not None:
+            result[i] = a
+    if not anchored_idx:
+        # No frames anchored anywhere — fallback to (1, 1) all
+        return [(1, 1)] * n
+    # Frames before first anchored: inherit (1, 1)
+    for i in range(anchored_idx[0]):
+        result[i] = (1, 1)
+    # Frames between consecutive anchored: interpolate
+    for k in range(len(anchored_idx) - 1):
+        i0, i1 = anchored_idx[k], anchored_idx[k + 1]
+        s0, e0 = raw[i0]
+        s1, _ = raw[i1]
+        span = e0 - s0
+        for i in range(i0 + 1, i1):
+            t = (i - i0) / (i1 - i0)
+            new_start = int(s0 + (s1 - s0) * t)
+            result[i] = (new_start, new_start + span)
+    # Frames after last anchored: inherit last anchor (no extrapolation)
+    last_anchor = raw[anchored_idx[-1]]
+    for i in range(anchored_idx[-1] + 1, n):
+        result[i] = last_anchor
+    return result
+
+def _frame_anchor_or_none(frame_txt_path, md_lines, avg_line_len: float):
+    """Return (start, end) tuple if frame text fuzzy-matches md, else None.
+
+    Wrapper used by compute_anchors. compute_anchors then interpolates None
+    gaps between bracketing anchored neighbors. Distinct from frame_anchor()
+    which falls back to prev anchor (loses anchored vs inherited signal).
+    """
+    if not frame_txt_path.exists():
+        return None
+    try:
+        text = frame_txt_path.read_text(encoding='utf-8')
+    except Exception:
+        return None
+    if not text or len(text.strip()) < 20:
+        return None
+    head = text.strip()[:200]
+    if not md_lines:
+        return None
+    best_line = None
+    best_score = 0
+    sm = SequenceMatcher(None, head, '')
+    head_len = len(head)
+    for ln in md_lines:
+        line_text = ln[1]
+        if not has_strong_overlap(head, line_text, 8):
+            continue
+        sm.set_seq2(line_text)
+        score = sm.find_longest_match(0, head_len, 0, len(line_text)).size
+        if score > best_score:
+            best_score = score
+            best_line = ln
+    if best_line is None or best_score < 8:
+        return None
+    start = best_line[0]
+    span = max(1, int(len(text) / max(1, avg_line_len)))
+    return (start, start + span)
 
 def find_frame_at_line(anchors, target_line: int) -> int:
     """Find frame index whose [start, end] anchor brackets target_line.

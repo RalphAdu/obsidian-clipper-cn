@@ -807,6 +807,36 @@ o_idx = i if n_obsidian == total_rows else i * n_obsidian // total_rows
 
 下次任何 site 接入 visual audit（feishu / zsxq / bilibili），直接复用 audit-extractor-ship SKILL + audit-prepare.sh + audit-summarize 工具链，**不要重新发明轮子**。
 
+### 2.21 image inline 三层 fallback (L1/L2/L3) 必须整组移植 — 漏 L3 导致 raw token 留在 markdown（scys L3 fix 反思，2026-05-25）
+
+scys-extractor 的 `resolveScysImages` 当初是从 zsxq-extractor 的 `resolveZsxqImages` 同名同结构 helper 抄/启发的。当时只 carry 了 L1（same-origin fetch）+ L2（background MAIN-world fetch），**漏掉了 L3 raw URL degrade**。L1/L2 都失败时（典型场景：跨域 CDN 防盗链 / CORS 拒绝 / 远端 404），token `feishu-image://scys:URL` 留在最终 markdown 字符串里，Obsidian 不识别此协议 → `![]()` 空图位。spec-b1 ship 前 audit-extractor-ship 跑 B URL（含 docimg3.docs.qq.com 截图）才暴露，sept 1 个 commit 补齐。
+
+#### 教训：跨 extractor 移植 image inline helper 必须 carry **整组 fallback layer**
+
+| 层 | 含义 | 失败场景 | 不能省 |
+|---|---|---|---|
+| L1 | content-script 同 origin fetch | 大部分 site 内嵌图 | — |
+| L2 | background MAIN-world fetch | 跨域但 CORS 兼容 / 用户登录态可复用 | — |
+| **L3** | 把 `feishu-image://<prefix>:URL` token 替换为 raw decoded URL | 跨域 CDN 防盗链 / 远端不存在 / CORS 死磕拒绝 | **绝对不能省** — markdown 至少 valid，Obsidian 还会尝试加载，最坏破图但不破 markdown 结构 |
+
+**unit test 必须显式覆盖 L3**：每个 `resolve<Site>Images` helper 至少一条 test "degrades to raw URL when L1+L2 fail"。zsxq-extractor.test.ts:602 就是模板。这次 fix 加的 test 也是 mirror 它。
+
+**下次任何新 site 加 image inline helper 必须 carry L3**：写 plan 阶段把"L1 + L2 + L3 + 对应 unit test"作为必含 checklist 项，不允许只写 L1/L2。
+
+**回归保护**：所有 `resolve<Site>Images` 同名 helper（zsxq / scys / 未来 feishu / bilibili）的 L3 部分 grep 一下：
+
+```bash
+grep -rn "stillUnresolved\|L3.*raw URL\|L3.*degrade" src/utils/ scripts/
+```
+
+如果加新 site image inline helper 后这条 grep 没出现新条目 → spec gate 不通过。
+
+#### 为什么这次能被 audit 抓到（机制有效性证明）
+
+audit-extractor-ship SKILL 的 checklist 第 7 项 image 不是只看"图片数量对吗"，而是要求 "browser ↔ obsidian ↔ markdown 三方一致"。L3 漏移植 → markdown 含 raw token，token 跟 browser 截图（实际 img）和 obsidian 渲染（空图位）都不一致 → subagent 标 unknown 触发 NEEDS_REVIEW → 主 session 复核 → 发现根因。
+
+如果只跑 unit test 或 e2e mismatch audit（textContent prefix 匹配），这种"图片渲染破图但 markdown 字符串无变化"的 issue 看不见。**视觉 audit 是必要的 ship gate，不是可选**——再次印证 §2.20 v2 + audit-extractor-ship 的工具链价值。
+
 ---
 
 ## 3. 用户偏好 / 协作约定
@@ -1586,6 +1616,34 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 **接力**：本次只在 scys-A URL 跑通。后续 feishu / zsxq / bilibili / weixin 接入 audit 直接复用这套工具链——只需提供 `<vault, md-path, url>` 三元组。BACKLOG §6 后续 feature 验收都可以走这条路径。
 
 **测试报告**：本次 audit-via-subagents v2 跑通 == 测试报告（无独立 `<worktree>/test-report-*.md`，因为本身就是 audit 工具链而不是 site extractor）
+
+### 6.21 ~~Spec B1：scys e2e + 4 article 形态 + docx + course 全 ship~~（**已完成 2026-05-25**，commits `1d45249..aea8996`，11 commits on `spec-b1-scys-e2e` worktree）
+
+**接续** §6.19（spec-b e2e + mp.weixin PoC）：在 mp.weixin e2e infra 基础上，对 scys 全形态 (4 article 形态 + docx + course) 写 e2e + 视觉 audit + ship gate。
+
+**实施分三段**：
+
+**第 1 段：基础 e2e 框架（7 commits, 1d45249..ddb44a9）**
+- `scripts/visual-audit-framework.ts` — 通用 audit framework（normalize/assert/rootSelector 都给默认值）+ `weixin-visual-audit` 改造为 wrapper（DRY）
+- `scripts/scys-{article,docx,course}-visual-audit.ts` — 三个 audit 配置（site-specific override：rootSelector、imageAssert）
+- `scripts/scys-login-persist.ts` + `runRealClip({ userDataDir, offscreen })` — scys 扫码登录持久化（pycookiecheat 无法读 HTTP-only cookie，必须 playwright persistent profile）
+
+**第 2 段：6 URL e2e + 1 bug fix（3 commits, 76c467a..1307785）**
+- `src/utils/scys-extractor.e2e.test.ts` — 6 it 覆盖 article 4 形态 + docx + course，each `full content audit 0 mismatch`
+- commit `0c05ea9` 修 `decodeScysWebEntities` — 旧 regex 只处理 `<e type="web" href="..." title="..." />`（要求 href + title + 固定顺序），漏 `<e type="text_bold" title="..." />`（粗体文本 inline，无 href）→ URL 22255 e2e 失败根因
+- audit task 7+8：strictTextAssert + .block-text + mutation sanity
+
+**第 3 段：L3 fix（1 commit, aea8996）**— 见 §2.21
+- `resolveScysImages` 加 L3 raw URL fallback：跨域 CDN（docimg3.docs.qq.com）L1/L2 fetch 都失败时不再留 raw `feishu-image://scys:URL` token，degrade 为 raw https URL（zsxq-extractor 同名 helper 已有 L3，本 fix 镜像之）
+- 触发：spec-b1 ship 阶段 audit-extractor-ship 跑 B URL 时 image checklist 项 unknown，主 session 复核发现 md 含 raw token；scys-extractor 缺 L3 layer
+- 测试：169/169 PASS（更新 2 个 pre-existing test：从断言 "token form present" 改为 "no-token + raw URL/data URL present"）
+
+**Ship 时使用的 audit 工具链**：本是 §6.20 audit-via-subagents 工具链第一个跨 site feature 验收用户。流程：
+1. `scripts/audit-prepare.sh` 串行采集 5 URL grid（A 引用 audit-via-subagents v2 结果）
+2. 主 session 派 7 个 subagent 并行 audit（每 ≤6 grid，控 vision token）
+3. `scripts/audit-summarize.ts` 聚合 → REPORT.md exit 0 = 全 PASS
+
+**测试报告**：`docs/superpowers/test-reports/2026-05-23-spec-b1.md`（local-only）含 8 task 实施 + L3 fix re-audit 章节
 
 ---
 

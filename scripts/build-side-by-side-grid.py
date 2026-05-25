@@ -9,9 +9,15 @@ screenshots, right column = Obsidian rendering screenshots. Used to manually
 verify that Obsidian markdown rendering covers all content from the original page
 (content coverage + ordering + visual fidelity for bold/quote/list/table).
 
-Two columns of frames are aligned by index. When one side has more frames (it
-usually does — browser viewport vs Obsidian viewport scale to different page
-counts), the shorter side is padded with a gray "(no more)" placeholder.
+Two columns are aligned by **content progress** (not by frame index). Browser
+viewport (1920×1080) and Obsidian viewport (usually narrower) consume the same
+article in different number of PageDown frames; with index alignment, the
+shorter side runs out and gets padded with "(no more)" placeholders for the
+trailing half. Proportional alignment maps row i to:
+  longer_idx  = i
+  shorter_idx = floor(i * len(shorter) / len(longer))
+so the shorter side repeats some frames to stay in sync with the longer side
+(both sides finish at the same content position).
 
 Also emits a separate scaled `browser-fullpage.png` for end-to-end visual scan.
 
@@ -40,13 +46,17 @@ browser_dir = Path(sys.argv[1])
 obsidian_dir = Path(sys.argv[2])
 out_prefix = Path(sys.argv[3])
 
-# Each cell: 560w × 315h (16:9 ratio at small size), 20px label band on top
-CELL_W = 560
-CELL_H = 315
+# Each cell: 1120w × 630h (16:9 ratio at 2x size), 24px label band on top.
+# Bigger cells → text in screenshots stays readable when Claude vision rescales
+# the whole grid to its 1568×1568 token budget. At 560×315 (the previous size)
+# single-character heights collapsed to ~5px which made bold/italic/alt
+# verification impossible — see audit-via-subagents v1 retrospective.
+CELL_W = 1120
+CELL_H = 630
 LABEL_H = 24
 GAP = 8
 PAD = 20
-MAX_ROWS_PER_GRID = 12   # tall pages → split into multiple grid images for easier review
+MAX_ROWS_PER_GRID = 6   # halved from 12 to keep grid total height ~unchanged after the 2x cell bump
 
 def natural_key(p: Path):
     nums = re.findall(r'\d+', p.name)
@@ -100,13 +110,24 @@ for grid_idx in range(num_grids):
     grid.paste(make_header('🌐 Browser (ground truth)', CELL_W), (PAD, PAD))
     grid.paste(make_header('📝 Obsidian rendering', CELL_W), (PAD + CELL_W + GAP, PAD))
 
+    # Proportional alignment: longer side is 1:1 (every frame appears once),
+    # shorter side reuses frames so both sides finish at the same content
+    # position. Without this, the shorter side's tail is filled with
+    # "(no more)" placeholders and the lower half of the grid is useless.
+    n_browser = len(browser_frames)
+    n_obsidian = len(obsidian_frames)
     for row in range(rows_this):
         i = start + row
         y = PAD + header_h + row * (LABEL_H + CELL_H + GAP)
-        browser_img = browser_frames[i] if i < len(browser_frames) else None
-        obsidian_img = obsidian_frames[i] if i < len(obsidian_frames) else None
-        b_label = f'browser scroll-{i+1:03d}' if browser_img else f'browser scroll-{i+1:03d}  (none)'
-        o_label = f'obsidian scroll-{i+1:03d}' if obsidian_img else f'obsidian scroll-{i+1:03d}  (none)'
+        if total_rows == 0:
+            b_idx = o_idx = 0
+        else:
+            b_idx = i if n_browser == total_rows else i * n_browser // total_rows
+            o_idx = i if n_obsidian == total_rows else i * n_obsidian // total_rows
+        browser_img = browser_frames[b_idx] if b_idx < n_browser else None
+        obsidian_img = obsidian_frames[o_idx] if o_idx < n_obsidian else None
+        b_label = f'browser scroll-{b_idx+1:03d}' if browser_img else f'browser  (none)'
+        o_label = f'obsidian scroll-{o_idx+1:03d}' if obsidian_img else f'obsidian  (none)'
         grid.paste(make_cell(browser_img, b_label), (PAD, y))
         grid.paste(make_cell(obsidian_img, o_label), (PAD + CELL_W + GAP, y))
 

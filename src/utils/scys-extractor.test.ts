@@ -485,14 +485,16 @@ describe('resolveScysImages (L1 same-origin fetch)', () => {
 		expect(resolved).not.toContain('feishu-image://scys:');
 	});
 
-	it('leaves token in place if fetch fails', async () => {
+	it('degrades to raw URL when L1+L2 fail (L3 fallback)', async () => {
 		global.fetch = vi.fn().mockResolvedValue({ ok: false } as any);
-		const html = '<img src="feishu-image://scys:https%3A%2F%2Fexample.com%2Fa.png">';
+		const url = 'https://example.com/a.png';
+		const html = `<img src="feishu-image://scys:${encodeURIComponent(url)}">`;
 		const resolved = await resolveScysImages(html);
-		expect(resolved).toContain('feishu-image://scys:');
+		expect(resolved).not.toContain('feishu-image://scys:');
+		expect(resolved).toContain(`src="${url}"`);
 	});
 
-	it('handles multiple images independently (mixed success/failure)', async () => {
+	it('handles multiple images independently (mixed success/L3-degrade)', async () => {
 		// URL-specific mock — avoids depending on fetch call ordering through Set iteration.
 		global.fetch = vi.fn().mockImplementation((url: any) => {
 			// fileUrl is decoded before fetch, so url here is "https://a" / "https://b".
@@ -507,10 +509,10 @@ describe('resolveScysImages (L1 same-origin fetch)', () => {
 			'<img src="feishu-image://scys:https%3A%2F%2Fa">' +
 			'<img src="feishu-image://scys:https%3A%2F%2Fb">';
 		const resolved = await resolveScysImages(html);
-		// a/ succeeded → data URL present; b/ failed → placeholder retained.
+		// a/ succeeded → data URL present; b/ failed → L3 raw URL degradation.
 		expect(resolved).toMatch(/<img src="data:image\/png;base64,/);
-		expect(resolved).toContain('feishu-image://scys:https%3A%2F%2Fb');
-		expect(resolved).not.toContain('feishu-image://scys:https%3A%2F%2Fa');
+		expect(resolved).toContain('src="https://b"');
+		expect(resolved).not.toContain('feishu-image://scys:');
 	});
 
 	it('is a no-op for HTML with no scys tokens', async () => {
@@ -1525,9 +1527,11 @@ describe('extractScysStructuredContent — article route', () => {
 		expect(r?.content).toContain('<li>');
 		// Bold (Quill <strong>) survived
 		expect(r?.content).toContain('<strong>');
-		// Image src rewritten to scys: token form (resolver will inline base64)
-		const imgTokens = r?.content.match(/feishu-image:\/\/scys:/g) || [];
-		expect(imgTokens.length).toBeGreaterThanOrEqual(5);
+		// resolveScysImages clears all scys: tokens (L1 inline / L3 raw URL degrade).
+		expect(r?.content).not.toContain('feishu-image://scys:');
+		// ≥5 <img> tags preserved from articleContent (article-images + docimg3 sources)
+		const imgTags = r?.content.match(/<img\s/g) || [];
+		expect(imgTags.length).toBeGreaterThanOrEqual(5);
 		// Wrapper stripped
 		expect(r?.content).not.toContain('ql-editor');
 		// Word count is non-trivial
@@ -1561,8 +1565,9 @@ describe('extractScysStructuredContent — article route', () => {
 		expect(r?.content).toContain('每年会有大量的高考同学需要填报志愿');
 		expect(r?.content).toContain('<li>第一</li>');
 		expect(r?.content).toContain('<li>第二</li>');
-		// img src rewritten to feishu-image://scys:… token form for resolver
-		expect(r?.content).toMatch(/feishu-image:\/\/scys:https%3A%2F%2Farticle-images\.zsxq\.com/);
+		// scys: token resolved (no L1 mock → L3 degrades back to raw URL)
+		expect(r?.content).not.toContain('feishu-image://scys:');
+		expect(r?.content).toContain('https://article-images.zsxq.com/xxx');
 		// Outer .ql-editor wrapper stripped
 		expect(r?.content).not.toContain('ql-editor');
 	});

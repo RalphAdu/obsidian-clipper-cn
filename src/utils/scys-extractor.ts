@@ -320,6 +320,14 @@ export async function resolveScysImages(html: string): Promise<string> {
 	for (const [token, dataUrl] of replacements) {
 		resolved = resolved.split(`feishu-image://${token}`).join(dataUrl);
 	}
+	// L3: any remaining `feishu-image://scys:…` tokens degrade to raw URL so
+	// the rendered markdown at least shows the image while the source CDN is
+	// still reachable (mirrors zsxq-extractor resolveZsxqImages L3).
+	const stillUnresolved = Array.from(tokens).filter(t => !replacements.has(t));
+	for (const token of stillUnresolved) {
+		const rawUrl = decodeURIComponent(token.replace(/^scys:/, ''));
+		resolved = resolved.split(`feishu-image://${token}`).join(rawUrl);
+	}
 	return resolved;
 }
 

@@ -138,7 +138,14 @@ fi
 sleep 0.4
 
 echo "==> 4. Switch to Reading View"
-# Toggle "Reading View" — see header comment for the assumption about vault default.
+# Toggle "Reading View" by clicking the View → 阅读视图 menu item.
+# Cmd+E was tried as a "safer keyboard shortcut" but on adu's vault (vim mode
+# enabled) Cmd+E toggles Source/Live-Preview (within Editing View) instead of
+# Reading↔Editing — verified 2026-05-25 with side-by-side screenshots.
+# Caller must ensure Obsidian is in **Editing View** before invoking this
+# script (vault default may be Reading; if so, click 阅读视图 once before run
+# to flip to Editing). Toggle then flips Editing→Reading and screenshots show
+# rendered images. Restore step at end toggles back.
 osascript -e 'tell application "System Events" to tell process "Obsidian" to click menu item "阅读视图" of menu "View" of menu bar 1' >/dev/null 2>&1 || \
 	echo "[WARN] Could not click 阅读视图 menu — Obsidian menu locale may differ. Mode unchanged." >&2
 sleep 2
@@ -207,10 +214,9 @@ if [ "$FIRST_SIZE" -lt 150000 ]; then
 	echo "[WARN] Re-toggle manually (Cmd+E) and re-run, or change vault default view to Editing." >&2
 fi
 
-# Restore mode: toggle the "阅读视图" menu one more time. If we entered
-# Reading View at the start (by toggling from Editing View), this brings
-# us back to Editing View so the next invocation starts from the same
-# known state.
+# Restore mode: toggle the "阅读视图" menu one more time to flip back to
+# Editing View (assuming we entered Reading View at start by toggling from
+# Editing View, this brings us back to Editing View).
 osascript -e 'tell application "System Events" to tell process "Obsidian" to click menu item "阅读视图" of menu "View" of menu bar 1' >/dev/null 2>&1 || true
 
 if [ "$HIT_BOTTOM" -eq 1 ]; then

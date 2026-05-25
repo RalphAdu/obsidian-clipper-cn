@@ -103,8 +103,8 @@ fi
 if ls "$GRIDS_DIR"/sbs-*.png >/dev/null 2>&1; then
 	echo "[skip] grids/ already populated ($(ls "$GRIDS_DIR"/sbs-*.png 2>/dev/null | grep -v fullpage | wc -l | tr -d ' ') grids)"
 else
-	echo "==> build-side-by-side-grid $BROWSER_DIR $OBSIDIAN_DIR $GRIDS_DIR/sbs"
-	scripts/build-side-by-side-grid.py "$BROWSER_DIR" "$OBSIDIAN_DIR" "$GRIDS_DIR/sbs" 2>&1 || { echo "[FATAL] grid build failed" >&2; exit 5; }
+	echo "==> build-side-by-side-grid $BROWSER_DIR $OBSIDIAN_DIR $GRIDS_DIR/sbs $MD_FULL"
+	scripts/build-side-by-side-grid.py "$BROWSER_DIR" "$OBSIDIAN_DIR" "$GRIDS_DIR/sbs" "$MD_FULL" 2>&1 || { echo "[FATAL] grid build failed" >&2; exit 5; }
 fi
 
 N_GRIDS=$(ls "$GRIDS_DIR"/sbs-*.png 2>/dev/null | grep -v fullpage | wc -l | tr -d ' ')

@@ -6,17 +6,36 @@
 // Used during weixin-visual-audit dev to inspect raw clip outputs.
 
 import { runRealClip } from './e2e-clip-runner';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 async function main() {
-	const url = process.argv[2];
+	const args = process.argv.slice(2);
+	const url = args.find((a) => !a.startsWith('--'));
+	const profileIdx = args.indexOf('--profile');
+	const profileArg = profileIdx >= 0 ? args[profileIdx + 1] : undefined;
+
 	if (!url) {
-		console.error('Usage: dump-clip.ts <URL>');
+		console.error('Usage: dump-clip.ts <URL> [--profile <dir>]');
 		process.exit(2);
 	}
 
+	let userDataDir: string | undefined;
+	if (profileArg) {
+		userDataDir = resolve(process.cwd(), profileArg);
+		if (!existsSync(userDataDir)) {
+			console.error(`[dump] profile not found: ${userDataDir}`);
+			process.exit(2);
+		}
+		console.log(`[dump] using persistent profile: ${userDataDir}`);
+	}
+
+	// If a profile is supplied (scys/zsxq/feishu) skip the weixin-specific
+	// '#publish_time' wait — those sites don't have that selector.
+	const wait = userDataDir ? undefined : '#publish_time';
+
 	console.log(`[dump] clipping ${url} ...`);
-	const clip = await runRealClip(url, { wait: '#publish_time', timeout: 90_000 });
+	const clip = await runRealClip(url, { wait, timeout: 90_000, userDataDir });
 
 	writeFileSync('/tmp/clip-md.txt', clip.markdown, 'utf-8');
 	writeFileSync('/tmp/clip-html.txt', clip.hydratedHtml, 'utf-8');

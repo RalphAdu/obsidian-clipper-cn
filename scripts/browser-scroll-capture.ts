@@ -13,7 +13,7 @@
 // "blank viewport" false positives during initial hydration.
 //
 // Usage:
-//   npx tsx scripts/browser-scroll-capture.ts <url> [--profile <dir>] [--max <n>] [--scroll-selector <css>]
+//   npx tsx scripts/browser-scroll-capture.ts <url> [--profile <dir>] [--max <n>] [--scroll-selector <css>] [--content-selector <css>]
 //
 // --profile <dir>          persistent-context dir (e.g. .scys-pw-profile/ for
 //                          scys login state). Required for any URL that needs
@@ -27,9 +27,18 @@
 //                          element's scrollTop instead. Also makes scrollIntoView
 //                          on the element + screenshots the element bounds for
 //                          the fullPage substitute.
+// --content-selector <css> CSS selector that bounds the article-body container
+//                          from which each frame extracts visible textContent
+//                          → sibling scroll-NNN.txt. Used downstream by
+//                          build-side-by-side-grid.py for L↔R alignment via
+//                          fuzzy match to markdown lines. Distinct from
+//                          --scroll-selector (which picks the SCROLLABLE
+//                          element); content-selector limits text extraction
+//                          scope to avoid picking up site nav / sidebar UI.
+//                          Default = document.body if omitted.
 
 import { chromium } from 'playwright';
-import { mkdirSync, statSync, readFileSync } from 'node:fs';
+import { mkdirSync, statSync, readFileSync, promises as fsPromises } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 
@@ -41,12 +50,14 @@ let url = '';
 let profileDir: string | undefined;
 let maxPages = 1000;
 let scrollSelector: string | undefined;
+let contentSelector: string | null = null;
 
 for (let i = 0; i < args.length; i++) {
 	const a = args[i];
 	if (a === '--profile') profileDir = resolve(args[++i]);
 	else if (a === '--max') maxPages = Number(args[++i]);
 	else if (a === '--scroll-selector') scrollSelector = args[++i];
+	else if (a === '--content-selector') contentSelector = args[++i];
 	else if (!url) url = a;
 }
 
@@ -158,6 +169,29 @@ console.log(`==> Output dir: ${outDir}`);
 		const idx = String(i).padStart(3, '0');
 		const path = join(outDir, `scroll-${idx}.png`);
 		await page.screenshot({ path, fullPage: false });
+
+		// Extract visible textContent from viewport → sibling scroll-NNN.txt.
+		// Used by build-side-by-side-grid.py for L↔R alignment (fuzzy match
+		// to markdown lines). content-selector bounds the search to the article
+		// container so site nav / sidebar UI doesn't leak into the fuzzy match.
+		const visibleText = await page.evaluate((selector) => {
+			const root = selector ? document.querySelector(selector) : document.body;
+			if (!root) return '';
+			const blockSel = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, td, pre, span';
+			const nodes = Array.from(root.querySelectorAll(blockSel));
+			const visible = nodes.filter((el) => {
+				const r = (el as HTMLElement).getBoundingClientRect();
+				return r.top >= 0 && r.bottom <= window.innerHeight && r.height > 0;
+			});
+			return visible
+				.map((el) => (el.textContent || '').trim())
+				.filter((t) => t.length > 0)
+				.join('\n')
+				.slice(0, 1500);
+		}, contentSelector);
+		const txtPath = path.replace(/\.png$/, '.txt');
+		await fsPromises.writeFile(txtPath, visibleText, 'utf-8');
+
 		const buf = readFileSync(path);
 		const hash = createHash('md5').update(buf).digest('hex');
 		const sz = buf.length;

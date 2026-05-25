@@ -77,8 +77,15 @@ else
 	[ -n "$PROFILE" ] && PROFILE_ARG=(--profile "$PROFILE")
 	SCROLL_ARG=()
 	[ -n "$SCROLL_SEL" ] && SCROLL_ARG=(--scroll-selector "$SCROLL_SEL")
+	# Per-host content-selector routing — bounds textContent extraction to
+	# article body so .txt sidecars don't include nav/sidebar noise (v3).
+	CONTENT_ARG=()
+	case "$URL" in
+		*scys.com*)            CONTENT_ARG=(--content-selector ".feishu-doc-content") ;;
+		*mp.weixin.qq.com*)    CONTENT_ARG=(--content-selector "#js_content") ;;
+	esac
 	# browser-scroll-capture 自己生成 /tmp/browser-scroll-<ts>/，我们之后 cp 过来
-	npx tsx scripts/browser-scroll-capture.ts "$URL" ${PROFILE_ARG[@]+"${PROFILE_ARG[@]}"} ${SCROLL_ARG[@]+"${SCROLL_ARG[@]}"} 2>&1 | tee "/tmp/audit-${RUN_ID}-browser.log"
+	npx tsx scripts/browser-scroll-capture.ts "$URL" ${PROFILE_ARG[@]+"${PROFILE_ARG[@]}"} ${SCROLL_ARG[@]+"${SCROLL_ARG[@]}"} ${CONTENT_ARG[@]+"${CONTENT_ARG[@]}"} 2>&1 | tee "/tmp/audit-${RUN_ID}-browser.log"
 	# 找最新的 /tmp/browser-scroll-* 目录
 	LATEST=$(ls -td /tmp/browser-scroll-* 2>/dev/null | head -1)
 	[ -d "$LATEST" ] || { echo "[FATAL] browser-scroll-capture didn't produce output dir" >&2; exit 3; }

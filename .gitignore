@@ -56,3 +56,6 @@ keys/
 #   such rules — removed 2026-05-19 as they were dead code that misled readers.
 # - To intentionally track another file under this dir, must use `git add -f`.
 docs/superpowers/
+
+# macOS Vision OCR compiled binary (build with `swiftc -O scripts/macos-vision-ocr.swift -o scripts/macos-vision-ocr`)
+scripts/macos-vision-ocr

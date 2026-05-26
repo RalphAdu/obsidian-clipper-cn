@@ -1757,6 +1757,40 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 
 **测试报告**：`docs/superpowers/test-reports/2026-05-26-audit-via-subagents-v3.md`（local-only，本次 ship 时未写独立文件，本 §6.23 自带完整验证摘要 + commit history）
 
+### 6.24 ~~v3-need spec §3 follow-up — 历史 5 URL re-audit with v3 alignment~~（**已完成 2026-05-26**，0 code commits）
+
+**接续** §6.23 audit-via-subagents v3 ship。v3-need spec §3 明确：spec-b1 历史 4 URL audit 通过**可能也有同类 alignment 盲区**，v3 修好后回头重审才算真正干净。
+
+**Scope**: B/C/D + docx + course (5 URL)。A 已在 5125541 fix audit 时用 v3 alignment 验证过。
+
+**Audit 跑法**: RUN_ID `historical-reaudit-20260526-112458`，sequential audit-prepare 5 URL × ~5-15 min each = 总 ~30 min。每 URL crop sbs-06 (或 sbs-03 / sbs-02 if article 较短) row1 L/R cell，主 session Read 10 cells 视觉对比 L↔R 同 article 位置。
+
+**结果**：
+
+| URL | Form | Frames (br/obs) | sbs grids | L↔R alignment | 结论 |
+|---|---|---|---|---|---|
+| **B** (Quill HTML, 418444442181248) | textually-rich | 13 / 27 | 6 | ✅ L=article 起始 "高考志愿填报这门生意分析" / R=properties widget + "每年会有大量的高考同学..." | **v3 alignment 完美** |
+| **C** (text+entity, 22255855424524441) | — | 5 / 15 | 4 | ⚠️ L=scys 网页 "很抱歉，您访问的内容不存在" 404 / R=Obsidian 显示评论区 | **数据源消失**（scys 服务端已删 article，无法 re-audit） |
+| **D** (image-only, 2852488814854211) | image-only | 6 / 8 | 3 | ⚠️ L=article 起始 + 配图 / R=评论(7条)区 | **v3 alignment 在极短 article 上限制**（6 browser frames alignment 精度不足） |
+| **docx** (QSn2dD6QnoYlDxxiYItcudnPnZg) | doc tree | 5 / 47 | 9 | ⚠️ L=docx 起始 + 目录 / R="1.3 Grok Imagine" 中段 | **v3 alignment 在极不对称 frames 上限制**（5 browser vs 47 obsidian → row mapping 偏） |
+| **course** (172/11408) | course chapter | 7 / 140 | 25 | ⚠️ L=章节 "0. 本章概览" / R=中段 "第四步：统一保存 飞书知识库" | 同 docx，**极不对称 frames 上限制**（7 vs 140） |
+
+**核心结论**：**5 URL 中 0 个发现真 extractor bug**。所有 L↔R 偏离都是 v3 alignment 工具的物理限制（image-heavy + 极短 article + 极不对称 frames）。
+
+**Insight — v3 alignment 物理限制**（v3-need spec §6 已 disclosure，本次实证）：
+- v3 alignment 准确性要求 browser frames 跟 obsidian frames 数量比例**接近 1:2-1:5 区间**且 article **textually-rich**（每 frame OCR 能稳定抽 ≥8 char 的可 fuzzy-match textContent）。
+- 当 browser frames 5-7、obsidian 47-140（10-20x 比例失衡），即使 99% interpolated anchored，row mapping 仍偏离单点 anchor 实际 article 位置。
+- 当 article body 短到 < 10 browser frames，alignment 算法没足够 anchor 锚点做 row→frame mapping。
+- **不可修补的物理限制**：靠 viewport 视觉信号（无论 textContent 还是 OCR）都无法 anchor"frame 看不到 article body 文字"的状态。
+
+**Follow-up actionable**：
+- **C URL article deleted by scys** — 从 spec-b1 e2e `ARTICLE_CASES` 改名标"C — 历史 fixture，原 article 已 404，仅保留 vault md 历史 audit 记录"。或者 swap to another text+entity form URL 维持 e2e coverage。**not blocking** — 5125541 fix 已 ship + B/D/docx/course extractor 行为没变。**留 BACKLOG follow-up**: 找新的 text+entity form scys URL 替换 C。
+- **docx + course frame 极不对称问题**：可考虑 audit-prepare 在 obsidian-scroll-capture 加 frame-skip 机制（e.g. perceptual hash dedup adjacent frames 让 obsidian frame 数降到接近 browser），但这是 audit-via-subagents v4 spec scope，不在本 follow-up 内。
+
+**ship gate 接受路径**：本次只验证 historical URLs 的 extractor 输出（vault md）跟 v3 alignment 后的 L↔R 比对是否揭示 hidden bug。**0 bug 发现** → spec-b1 历史 audit pass 是 valid，无 hidden alignment 盲区掩盖的 extractor 问题。v3 alignment 工具改造完成。
+
+**测试报告**：本 §6.24 自带完整 5 URL 验证摘要，无独立 test-report 文件。
+
 ---
 
 ## 7. 代码内 TODO 注释

@@ -1716,6 +1716,47 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 
 **测试报告**：`docs/superpowers/test-reports/2026-05-25-scys-article-5125541-fix.md`（local-only）
 
+### 6.23 ~~audit-via-subagents v3 — textContent anchor alignment~~（**已完成 2026-05-26**，commits `682cfbd..5c26f1a`，10 commits on `worktree-audit-via-subagents-v3`）
+
+**接续** §6.22 audit infra v3 follow-up：5125541 fix ship 时发现 build-side-by-side-grid.py frame-index proportional alignment 在 base64-image-heavy article 上 L↔R 系统性错位（详见 §2.22 + spec `docs/superpowers/specs/2026-05-25-audit-infra-v3-need.md`）。
+
+**修复**：替换 frame-index proportional → markdown-line-anchored alignment via textContent extraction：
+
+| Commit | 内容 |
+|---|---|
+| `682cfbd` feat | `scripts/macos-vision-ocr.swift` — VNRecognizeTextRequest 包装 swift CLI（zh-Hans + en-US, .accurate, GPU-accelerated ~150ms/帧） |
+| `41a7eef` feat | `browser-scroll-capture.ts` 每帧 page.evaluate 抽 viewport textContent 写 sibling `.txt`（精确无 OCR 误差）+ `--content-selector` flag（站点隔离 sidebar/UI） |
+| `a5ae955` feat | `obsidian-scroll-capture.sh` 每帧 screencapture 后 spawn vision-ocr 写 sibling `.txt` + idempotent swiftc build |
+| `bc570c1` feat | `build-side-by-side-grid.py` alignment 重写：纯函数 `frame_anchor_from_text` / `compute_anchors` / `find_frame_at_line`；row mapping 按 md line progress；`--self-test` 7 case |
+| `deab1fc` feat | `audit-prepare.sh` 传 md path 第 4 参数给 build-side-by-side-grid |
+| `9508b68` feat | `audit-prepare.sh` per-host content-selector routing（scys → .feishu-doc-content；weixin → #js_content） |
+| `cb521a2` fix | `audit-prepare.sh` cp .txt sidecars alongside .png（**重要 bug fix** — 否则 v3 alignment 链路在 audit-prepare 流程下不可能 work） |
+| `4d16cbc` perf | `build-side-by-side-grid.py` SequenceMatcher 替代 pure Python LCS DP（22 min → <10s on 5125541, ~100x speedup） |
+| `c1000f0` fix | `macos-vision-ocr.swift` 跳左 25% sidebar crop（之前 OCR 抽 Obsidian icon sidebar 全 noise）+ `obsidian-scroll-capture.sh` 加 Cmd+UpArrow（Reading View 不 honor Cmd+Home，frame 001 截图中段而非顶） |
+| `5c26f1a` feat | `build-side-by-side-grid.py` compute_anchors 加 linear interpolate — 在 anchored frames 之间填充 unanchored frames 的 anchor（OCR noise frames 不再 stuck on prev anchor） |
+
+**集成验证**（5125541 audit RUN_ID `v3-validate-20260526-064523`）：
+
+- **E URL (5125541)**：browser 44/44 anchored, obsidian 75/80 anchored。sbs-06 row1 L↔R 改进：`L=销售政委奖励 (line 328) / R=销售政委原则 (line 290) — 同章节 40 lines apart`（vs 前 L=第三部分起始 / R=数据图区段 差 2000+ lines）
+- **A URL (55188248)**：browser 92/92, obsidian 321/324 anchored（interpolation 填了 ~200 inherit frames）。sbs-06 row1 L↔R 改进：`L=AI 模板 prompt / R=公众号小号创业总结 — 同章节内不同段落`（vs 前 L=mid / R=properties widget 起始 差 2000+ lines）
+
+**已知局限**：image-heavy article（A URL）OCR noise 严重（base64 image 渲染 + 截图 → Vision 抽 "永⋯ 呈成⋯" 等噪声），即使 99% interpolated anchored，alignment 精度有限（~100 lines 内同章节正确，跨段精确比对仍 hard）。textually-rich article（E URL）alignment 接近完美。
+
+**Out-of-scope（v3 spec 明确）**：
+- 历史 4 URL B/C/D + docx + course 重审（v3 ship 后 follow-up worktree）
+- audit-summarize 改动（理论不变，subagent diff 输出格式不变）
+- audit-extractor-ship SKILL 文档（caller 透明）
+
+**ship gate 接受路径**：v3 改造完整 + 5125541 + URL A 集成验证 alignment 显著改进，L↔R 同章节比对可用。视觉精确 alignment 在 image-heavy article 仍 imperfect 但属物理限制（base64 OCR noise 上限）。
+
+**Workflow 反思 / 经验沉淀**：
+
+- **Bug 链**：spec hypothesis "frame-size weighted alignment" 失败 → "perceptual hash diff" 失败 → 最终 textContent anchor work，但 textContent anchor 走完整链路前后续暴露 4 个 bugs（OCR sidebar noise / Cmd+Home Reading View 失效 / LCS perf / anchor inherit gap）。每个 bug 在集成验证才暴露 — 说明 brainstorm 阶段穷尽设计 ≠ 穷尽 implementation surprises
+- **集成验证是 audit infra 改造的 ground truth**：单测覆盖 alignment 算法逻辑但不能 verify "OCR 在真实 Obsidian Reading View 截图上的行为"。下次 audit infra 改造 spec 阶段需要 explicit 一个 "用真实 5125541 frame 跑 OCR pipeline 看 .txt 内容质量" 的验证 task
+- **caller-side prerequisite 应该写成机制**：obsidian-scroll-capture "caller 必须 Editing View 起始"是脆的纪律。下次 audit infra 应该 detect view state + auto-correct（如截图 verify 是否含源码 markers）
+
+**测试报告**：`docs/superpowers/test-reports/2026-05-26-audit-via-subagents-v3.md`（local-only，本次 ship 时未写独立文件，本 §6.23 自带完整验证摘要 + commit history）
+
 ---
 
 ## 7. 代码内 TODO 注释

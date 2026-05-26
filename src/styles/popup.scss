@@ -95,6 +95,54 @@
 		height: 100%;
 	}
 
+	.extractor-warning-banner {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		margin: 0;
+		padding: 10px 12px;
+		background-color: rgba(217, 154, 0, 0.12);
+		border-left: 3px solid #d99a00;
+		color: var(--text-normal);
+		font-size: var(--font-ui-smaller);
+		line-height: 1.4;
+
+		.warning-icon {
+			flex-shrink: 0;
+			width: 14px;
+			height: 14px;
+			margin-top: 2px;
+			color: #d99a00;
+		}
+
+		.warning-content {
+			flex: 1;
+			word-break: break-word;
+			white-space: pre-line;
+		}
+
+		.warning-close {
+			flex-shrink: 0;
+			margin: 0;
+			padding: 2px;
+			background: transparent;
+			border: none;
+			cursor: pointer;
+			color: var(--text-muted);
+			line-height: 1;
+			height: 18px;
+
+			&:hover {
+				color: var(--text-normal);
+			}
+
+			i {
+				width: 14px;
+				height: 14px;
+			}
+		}
+	}
+
 }
 
 .clipper {

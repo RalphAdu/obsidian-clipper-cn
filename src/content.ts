@@ -153,6 +153,7 @@ declare global {
 		language: string;
 		metaTags: { name?: string | null; property?: string | null; content: string | null }[];
 		attachments: Attachment[];
+		extractorWarnings?: string[];
 	}
 
 	browser.runtime.onMessage.addListener((request: any, sender, sendResponse) => {
@@ -267,30 +268,45 @@ declare global {
 				);
 				const defuddled = await Promise.race([defuddle.parseAsync(), parseTimeout])
 					.catch(() => defuddle.parse());
+			const extractorWarnings: string[] = [];
 			const bilibiliContent = isBilibiliVideoUrl(document.URL)
 				? await extractBilibiliStructuredContent(document).catch((error) => {
-					contentLogger.warn('Failed to extract Bilibili structured content', { error: String(error) });
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract Bilibili structured content', { error: msg });
+					extractorWarnings.push(`Bilibili: ${msg}`);
 					return null;
 				})
 				: null;
 			const feishuContent = isFeishuDocUrl(document.URL)
 				? await extractFeishuStructuredContent(document).catch((error) => {
-					contentLogger.warn('Failed to extract Feishu structured content', { error: String(error) });
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract Feishu structured content', { error: msg });
+					extractorWarnings.push(`Feishu: ${msg}`);
 					return null;
 				})
 				: null;
 			const scysContent = (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL) || isScysArticleUrl(document.URL))
 				? await extractScysStructuredContent(document).catch((error) => {
-					contentLogger.warn('Failed to extract scys structured content', { error: String(error) });
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract scys structured content', { error: msg });
+					extractorWarnings.push(`scys: ${msg}`);
 					return null;
 				})
 				: null;
 			const zsxqContent = (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL) || isZsxqArticlesHtmlUrl(document.URL))
 				? await extractZsxqStructuredContent(document).catch((error) => {
-					contentLogger.warn('Failed to extract zsxq structured content', { error: String(error) });
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract zsxq structured content', { error: msg });
+					extractorWarnings.push(`zsxq: ${msg}`);
 					return null;
 				})
 				: null;
+			// Site extractor matched URL but returned null (silently — e.g. scys
+			// extractScysArticleStandalone returns null on 401 instead of throwing,
+			// so the .catch above doesn't fire). Surface to user explicitly.
+			if (isScysArticleUrl(document.URL) && !scysContent) {
+				extractorWarnings.push('scys article: extractor returned null (likely session expired — try logging in again)');
+			}
 			const extractedContent: { [key: string]: string } = {
 				...defuddled.variables,
 			};
@@ -393,7 +409,8 @@ declare global {
 					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : defuddled.site,
 					title: bilibiliContent?.title || feishuContent?.title || scysContent?.title || zsxqContent?.title || defuddled.title,
 					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || zsxqContent?.wordCount || defuddled.wordCount,
-					metaTags: defuddled.metaTags || []
+					metaTags: defuddled.metaTags || [],
+					extractorWarnings: extractorWarnings.length > 0 ? extractorWarnings : undefined,
 				};
 				if (response.title) {
 					highlighter.setPageTitle(response.title);

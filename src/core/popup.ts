@@ -629,6 +629,26 @@ function clearError(): void {
 	}
 }
 
+function showExtractorWarnings(warnings: string[]): void {
+	const banner = document.querySelector('.extractor-warning-banner') as HTMLElement;
+	if (!banner) return;
+	const contentEl = banner.querySelector('.warning-content') as HTMLElement;
+	const closeBtn = banner.querySelector('.warning-close') as HTMLElement;
+	if (!contentEl) return;
+	const lead = getMessage('extractorFailedFallback');
+	contentEl.textContent = `${lead}\n${warnings.join('\n')}`;
+	banner.style.display = 'flex';
+	if (closeBtn && !(closeBtn as any)._wcWired) {
+		closeBtn.addEventListener('click', () => { banner.style.display = 'none'; });
+		(closeBtn as any)._wcWired = true;
+	}
+}
+
+function clearExtractorWarnings(): void {
+	const banner = document.querySelector('.extractor-warning-banner') as HTMLElement;
+	if (banner) banner.style.display = 'none';
+}
+
 function logError(message: string, error?: any): void {
 	console.error(message, error);
 	showError(message);
@@ -700,6 +720,11 @@ async function refreshFields(tabId: number, { checkTemplateTriggers = true, rebu
 
 		const extractedData = await extractionPromise;
 		if (extractedData) {
+			if (extractedData.extractorWarnings && extractedData.extractorWarnings.length > 0) {
+				showExtractorWarnings(extractedData.extractorWarnings);
+			} else {
+				clearExtractorWarnings();
+			}
 			const currentUrl = tab.url;
 
 			const initializedContent = await initializePageContent(

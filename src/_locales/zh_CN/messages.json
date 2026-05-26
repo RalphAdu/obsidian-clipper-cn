@@ -288,6 +288,9 @@
 	"extensionName": {
 		"message": "Obsidian 网页剪藏器"
 	},
+	"extractorFailedFallback": {
+		"message": "站点专项 extractor 失败 — 已退回默认提取，结果可能不完整："
+	},
 	"failedToCopyText": {
 		"message": "复制文本失败"
 	},

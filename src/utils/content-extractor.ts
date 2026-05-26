@@ -65,6 +65,7 @@ interface ContentResponse {
 	language: string;
 	metaTags: { name?: string | null; property?: string | null; content: string | null }[];
 	attachments: Attachment[];
+	extractorWarnings?: string[];
 }
 
 async function sendExtractRequest(tabId: number): Promise<ContentResponse> {

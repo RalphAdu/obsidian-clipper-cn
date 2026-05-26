@@ -288,6 +288,9 @@
 	"extensionName": {
 		"message": "Obsidian Web Clipper"
 	},
+	"extractorFailedFallback": {
+		"message": "Site extractor failed — fell back to default extraction; result may be incomplete:"
+	},
 	"failedToCopyText": {
 		"message": "텍스트를 복사하지 못했습니다"
 	},

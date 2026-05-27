@@ -86,35 +86,35 @@ describe('normalizePreBlockLineBreaks', () => {
 });
 
 describe('normalizeMdniceJavascriptLinks', () => {
-  it('replaces <a href="javascript:;"> with its text content', () => {
-    const { document: doc } = parseHTML(
-      '<html><body><p>before <a href="javascript:;">公众号监控脚本</a> after</p></body></html>'
-    );
-    normalizeMdniceJavascriptLinks(doc);
-    expect(doc.body.innerHTML).toBe('<p>before 公众号监控脚本 after</p>');
-  });
+	it('replaces <a href="javascript:;"> with its text content', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><p>before <a href="javascript:;">公众号监控脚本</a> after</p></body></html>'
+		);
+		normalizeMdniceJavascriptLinks(doc);
+		expect(doc.body.innerHTML).toBe('<p>before 公众号监控脚本 after</p>');
+	});
 
-  it('also matches javascript:void(0) and other javascript: hrefs', () => {
-    const { document: doc } = parseHTML(
-      '<html><body><a href="javascript:void(0)">x</a></body></html>'
-    );
-    normalizeMdniceJavascriptLinks(doc);
-    expect(doc.body.innerHTML).toBe('x');
-  });
+	it('also matches javascript:void(0) and other javascript: hrefs', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><a href="javascript:void(0)">x</a></body></html>'
+		);
+		normalizeMdniceJavascriptLinks(doc);
+		expect(doc.body.innerHTML).toBe('x');
+	});
 
-  it('does not touch normal http(s) links', () => {
-    const { document: doc } = parseHTML(
-      '<html><body><a href="https://example.com">link</a></body></html>'
-    );
-    normalizeMdniceJavascriptLinks(doc);
-    expect(doc.querySelector('a')).not.toBeNull();
-    expect(doc.querySelector('a')!.getAttribute('href')).toBe('https://example.com');
-  });
+	it('does not touch normal http(s) links', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><a href="https://example.com">link</a></body></html>'
+		);
+		normalizeMdniceJavascriptLinks(doc);
+		expect(doc.querySelector('a')).not.toBeNull();
+		expect(doc.querySelector('a')!.getAttribute('href')).toBe('https://example.com');
+	});
 });
 
 describe('normalizeMdniceSectionCards', () => {
-  it('removes Reading Time meta card at article top', () => {
-    const { document: doc } = parseHTML(`
+	it('removes Reading Time meta card at article top', () => {
+		const { document: doc } = parseHTML(`
       <html><body>
         <section style="padding: 10px 12px; background-color: rgb(244, 244, 240); text-align: center;">
           <span><span>干货分享</span></span>
@@ -123,14 +123,14 @@ describe('normalizeMdniceSectionCards', () => {
         <p>正文开始</p>
       </body></html>
     `);
-    normalizeMdniceSectionCards(doc);
-    expect(doc.querySelectorAll('section').length).toBe(0);
-    expect(doc.body.textContent).not.toContain('Reading Time');
-    expect(doc.body.textContent).toContain('正文开始');
-  });
+		normalizeMdniceSectionCards(doc);
+		expect(doc.querySelectorAll('section').length).toBe(0);
+		expect(doc.body.textContent).not.toContain('Reading Time');
+		expect(doc.body.textContent).toContain('正文开始');
+	});
 
-  it('removes uppercase anchor section (WECHAT_MONITOR / EXPORT_AND_SKILL pattern)', () => {
-    const { document: doc } = parseHTML(`
+	it('removes uppercase anchor section (WECHAT_MONITOR / EXPORT_AND_SKILL pattern)', () => {
+		const { document: doc } = parseHTML(`
       <html><body>
         <section>
           <span style="background-color:#ab59ff"></span>
@@ -139,50 +139,50 @@ describe('normalizeMdniceSectionCards', () => {
         <p>下一段</p>
       </body></html>
     `);
-    normalizeMdniceSectionCards(doc);
-    expect(doc.querySelectorAll('section').length).toBe(0);
-    expect(doc.body.textContent).not.toContain('WECHAT_MONITOR');
-  });
+		normalizeMdniceSectionCards(doc);
+		expect(doc.querySelectorAll('section').length).toBe(0);
+		expect(doc.body.textContent).not.toContain('WECHAT_MONITOR');
+	});
 
-  it('does not touch normal sections without mdnice signatures', () => {
-    const { document: doc } = parseHTML(`
+	it('does not touch normal sections without mdnice signatures', () => {
+		const { document: doc } = parseHTML(`
       <html><body>
         <section><p>普通段落 in section</p></section>
       </body></html>
     `);
-    normalizeMdniceSectionCards(doc);
-    expect(doc.querySelectorAll('section').length).toBe(1);
-  });
+		normalizeMdniceSectionCards(doc);
+		expect(doc.querySelectorAll('section').length).toBe(1);
+	});
 });
 
 describe('normalizeMdniceSmallHeadings', () => {
-  it('promotes mdnice small heading <p> to <h3>', () => {
-    const { document: doc } = parseHTML(`
+	it('promotes mdnice small heading <p> to <h3>', () => {
+		const { document: doc } = parseHTML(`
       <html><body>
         <p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#ab59ff;font-weight:700">流程闭环</p>
         <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#ab59ff;font-weight:700">Sources</p>
       </body></html>
     `);
-    normalizeMdniceSmallHeadings(doc);
-    const h3s = Array.from(doc.querySelectorAll('h3')).map(h => h.textContent);
-    expect(h3s).toEqual(['流程闭环', 'Sources']);
-    expect(doc.querySelectorAll('p').length).toBe(0);
-  });
+		normalizeMdniceSmallHeadings(doc);
+		const h3s = Array.from(doc.querySelectorAll('h3')).map(h => h.textContent);
+		expect(h3s).toEqual(['流程闭环', 'Sources']);
+		expect(doc.querySelectorAll('p').length).toBe(0);
+	});
 
-  it('does not touch ordinary <p> elements', () => {
-    const { document: doc } = parseHTML(
-      '<html><body><p style="font-size:16px;color:#1b1c1a">正文段落</p></body></html>'
-    );
-    normalizeMdniceSmallHeadings(doc);
-    expect(doc.querySelectorAll('h3').length).toBe(0);
-    expect(doc.querySelectorAll('p').length).toBe(1);
-  });
+	it('does not touch ordinary <p> elements', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><p style="font-size:16px;color:#1b1c1a">正文段落</p></body></html>'
+		);
+		normalizeMdniceSmallHeadings(doc);
+		expect(doc.querySelectorAll('h3').length).toBe(0);
+		expect(doc.querySelectorAll('p').length).toBe(1);
+	});
 
-  it('requires all 5 signature properties (font-size + letter-spacing + uppercase + purple + bold)', () => {
-    const { document: doc } = parseHTML(
-      '<html><body><p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;font-weight:700">noColor</p></body></html>'
-    );
-    normalizeMdniceSmallHeadings(doc);
-    expect(doc.querySelectorAll('h3').length).toBe(0);
-  });
+	it('requires all 5 signature properties (font-size + letter-spacing + uppercase + purple + bold)', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;font-weight:700">noColor</p></body></html>'
+		);
+		normalizeMdniceSmallHeadings(doc);
+		expect(doc.querySelectorAll('h3').length).toBe(0);
+	});
 });

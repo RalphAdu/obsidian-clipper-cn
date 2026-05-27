@@ -1,4 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Top-level vi.mock is hoisted before any import, so it applies to the
+// static `import mammothStatic from 'mammoth'` in docs-qq-extractor.ts.
+// Per-test vi.doMock + vi.resetModules() + re-import overrides this for
+// convertDocxToHtml-specific tests. The default mock here satisfies the
+// orchestration test which uses the top-level imported extractDocsQQContent.
+vi.mock('mammoth', () => ({
+  default: {
+    convertToHtml: vi.fn().mockResolvedValue({ value: '<p>MockedBody</p>', messages: [] }),
+    images: {
+      imgElement: (_handler: unknown) => 'IMG_HANDLER_TOKEN',
+    },
+  },
+  // Also provide top-level exports (CJS interop)
+  convertToHtml: vi.fn().mockResolvedValue({ value: '<p>MockedBody</p>', messages: [] }),
+  images: {
+    imgElement: (_handler: unknown) => 'IMG_HANDLER_TOKEN',
+  },
+}));
+
 import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata, requestExportTask, pollExportStatus, fetchDocxFile, convertDocxToHtml, postProcessHtml, extractDocsQQContent } from './docs-qq-extractor';
 import {
   DocsQQAuthError,
@@ -78,8 +98,8 @@ describe('Error classes', () => {
 describe('fetchDocMetadata', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    // mock document.cookie for xsrf via vi.stubGlobal (node env has no document)
-    vi.stubGlobal('document', { cookie: 'xsrf=2f43999878bb37d0; other=foo' });
+    // mock document.cookie with TOK (= xsrf token) via vi.stubGlobal (node env has no document)
+    vi.stubGlobal('document', { cookie: 'TOK=2f43999878bb37d0; other=foo' });
   });
 
   it('returns parsed metadata on 200', async () => {
@@ -128,7 +148,7 @@ describe('fetchDocMetadata', () => {
     await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQTransientError);
   });
 
-  it('throws DocsQQAuthError if no xsrf cookie', async () => {
+  it('throws DocsQQAuthError if neither TOK nor xsrf cookie', async () => {
     vi.stubGlobal('document', { cookie: 'other=foo' });
     await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQAuthError);
   });
@@ -274,7 +294,13 @@ describe('fetchDocxFile', () => {
 });
 
 describe('convertDocxToHtml', () => {
-  beforeEach(() => { vi.restoreAllMocks(); vi.resetModules(); });
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    // Always unregister mocks to avoid cross-test contamination when a test crashes
+    vi.doUnmock('mammoth');
+    vi.doUnmock('mathml-to-latex');
+  });
 
   it('returns HTML string from valid docx ArrayBuffer (mocked mammoth)', async () => {
     vi.doMock('mammoth', () => ({
@@ -311,20 +337,18 @@ describe('convertDocxToHtml', () => {
     vi.doUnmock('mammoth');
   });
 
-  it('throws DocsQQConvertError when import("mammoth") fails', async () => {
-    vi.doMock('mammoth', () => { throw new Error('module load failed'); });
-
-    const { convertDocxToHtml: fn, DocsQQConvertError: Err } = await import('./docs-qq-extractor');
-    await expect(fn(new ArrayBuffer(8))).rejects.toBeInstanceOf(Err);
-
-    vi.doUnmock('mammoth');
-  });
+  // NOTE: The "throws when import('mammoth') fails" test was removed.
+  // mammoth is now statically imported (bundled into content.js) so dynamic
+  // import failure is no longer a valid code path.
 });
 
 describe('postProcessHtml', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.resetModules();
+    // Always unregister mocks to avoid cross-test contamination when a test crashes
+    vi.doUnmock('mammoth');
+    vi.doUnmock('mathml-to-latex');
   });
 
   it('converts inline MathML to $latex$', async () => {
@@ -381,7 +405,7 @@ describe('postProcessHtml', () => {
 describe('extractDocsQQContent (orchestration)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.stubGlobal('document', { cookie: 'xsrf=2f43999878bb37d0' });
+    vi.stubGlobal('document', { cookie: 'TOK=2f43999878bb37d0' });
   });
 
   it('runs full pipeline: meta → export → poll → download → mammoth → postProcess', async () => {
@@ -415,13 +439,7 @@ describe('extractDocsQQContent (orchestration)', () => {
     // 5. fetchDocxFile
     spy.mockResolvedValueOnce(new Response(new ArrayBuffer(64), { status: 200 }));
 
-    vi.doMock('mammoth', () => ({
-      default: {
-        convertToHtml: vi.fn().mockResolvedValue({ value: '<p>Body</p>', messages: [] }),
-        images: { imgElement: (_h: unknown) => 'X' },
-      },
-    }));
-
+    // mammoth is mocked via top-level vi.mock() — returns '<p>MockedBody</p>'
     const result = await extractDocsQQContent({
       token: 'DQmZvdEFOR0RFWU9t',
       url: 'https://docs.qq.com/doc/DQmZvdEFOR0RFWU9t',
@@ -431,10 +449,8 @@ describe('extractDocsQQContent (orchestration)', () => {
     expect(result.title).toBe('My Doc');
     expect(result.author).toBe('');
     expect(result.published).toBe('');
-    expect(result.content).toContain('<p>Body</p>');
+    expect(result.content).toContain('<p>MockedBody</p>');
     expect(typeof result.wordCount).toBe('number');
-
-    vi.doUnmock('mammoth');
   });
 
   it('propagates DocsQQAuthError from first fetch', async () => {

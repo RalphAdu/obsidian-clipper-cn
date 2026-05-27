@@ -1,3 +1,9 @@
+// Static imports so mammoth + mathml-to-latex are bundled directly into the
+// content script chunk. Dynamic imports create async split-chunks that content
+// scripts cannot load via <script> injection (web_accessible_resources issue).
+import mammothStatic from 'mammoth';
+import mathmlToLatexMod from 'mathml-to-latex';
+
 export interface DocsQQParsedUrl {
   type: 'doc';
   token: string;
@@ -66,9 +72,15 @@ export class DocsQQConvertError extends Error {
 const FETCH_TIMEOUT_MS = 10_000;
 
 function getXsrfFromCookies(): string {
-	const m = document.cookie.match(/(?:^|;\s*)xsrf=([^;]+)/);
-	if (!m) throw new DocsQQAuthError('cookie 缺 xsrf token，请先登录腾讯文档');
-	return m[1];
+	// docs.qq.com uses the TOK cookie as the xsrf/CSRF token value.
+	// The page JS reads TOK and passes it as ?xsrf= query param to all API requests.
+	// (Reconnaissance confirmed: xsrf value === TOK value in all observed requests.)
+	// Fallback to a literal 'xsrf' cookie for forward-compatibility.
+	const tok = document.cookie.match(/(?:^|;\s*)TOK=([^;]+)/);
+	if (tok) return tok[1];
+	const xsrf = document.cookie.match(/(?:^|;\s*)xsrf=([^;]+)/);
+	if (xsrf) return xsrf[1];
+	throw new DocsQQAuthError('cookie 缺 TOK/xsrf token，请先登录腾讯文档');
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
@@ -265,24 +277,18 @@ export async function fetchDocxFile(fileUrl: string): Promise<ArrayBuffer> {
 }
 
 // ============================================
-// docx → HTML (mammoth, 动态 import)
+// docx → HTML (mammoth, 静态 import 内联到 bundle)
 // ============================================
 
 export async function convertDocxToHtml(arrayBuffer: ArrayBuffer): Promise<string> {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let mod: any;
-	try {
-		mod = await import('mammoth');
-	} catch (e) {
-		throw new DocsQQConvertError(`无法加载 mammoth 模块: ${(e as Error).message}`);
-	}
-
+	// Use the statically imported mammoth (bundled directly into this chunk,
+	// avoiding the async split-chunk that content scripts cannot load).
 	// CJS interop: real mammoth exposes convertToHtml directly on namespace;
-	// ESM-style mocks (vitest vi.doMock) wrap in .default
+	// ESM-style mocks (vitest vi.doMock) wrap in .default.
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const mammoth: any = (mod.default && typeof mod.default.convertToHtml === 'function')
-		? mod.default
-		: mod;
+	const mammoth: any = (mammothStatic && typeof (mammothStatic as any).convertToHtml === 'function')
+		? mammothStatic
+		: (mammothStatic as any)?.default ?? mammothStatic;
 
 	try {
 		const result = await mammoth.convertToHtml(
@@ -306,20 +312,24 @@ export async function convertDocxToHtml(arrayBuffer: ArrayBuffer): Promise<strin
 // ============================================
 
 export async function postProcessHtml(rawHtml: string): Promise<string> {
-	// linkedom 兼容 vitest node 环境 + browser runtime (DOMParser-shape API)
-	const { parseHTML } = await import('linkedom');
-	const { document } = parseHTML(`<!DOCTYPE html><html><body>${rawHtml}</body></html>`);
+	// Use native DOMParser (available in browser + extension content scripts).
+	// Fallback to linkedom for vitest (node environment, no DOMParser).
+	let docNode: Document;
+	if (typeof DOMParser !== 'undefined') {
+		docNode = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${rawHtml}</body></html>`, 'text/html');
+	} else {
+		// vitest / node environment
+		const { parseHTML } = await import('linkedom');
+		const parsed = parseHTML(`<!DOCTYPE html><html><body>${rawHtml}</body></html>`);
+		docNode = parsed.document as unknown as Document;
+	}
+	const document = docNode;
 
 	// 1. MathML → LaTeX
 	if (document.querySelector('math')) {
+		// Use statically-imported mathml-to-latex (bundled into content chunk).
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		let mathmlToLatex: ((xml: string) => string) | null = null;
-		try {
-			const mod = await import('mathml-to-latex');
-			mathmlToLatex = ((mod as unknown as { default?: (xml: string) => string }).default || mod) as unknown as (xml: string) => string;
-		} catch {
-			// 模块加载失败，跳过公式转换
-		}
+		const mathmlToLatex = ((mathmlToLatexMod as unknown as { default?: (xml: string) => string }).default || mathmlToLatexMod) as unknown as ((xml: string) => string) | null;
 
 		if (mathmlToLatex) {
 			for (const math of Array.from(document.querySelectorAll('math'))) {

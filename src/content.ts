@@ -681,7 +681,7 @@ declare global {
 		const data = event.data;
 		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
 		const origin = location.hostname;
-		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$|^mp\.weixin\.qq\.com$/.test(origin)) return;
+		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$|^mp\.weixin\.qq\.com$|docs\.qq\.com$/.test(origin)) return;
 		const testId = data.testId;
 		const key = '__obsidianClipperTestResult__:' + testId;
 		try {
@@ -701,6 +701,14 @@ declare global {
 			} else if (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL) || isZsxqArticlesHtmlUrl(document.URL)) {
 				result = await extractZsxqStructuredContent(document);
 				source = 'zsxq';
+			} else if (isDocsQQDocUrl(document.URL)) {
+				const parsed = parseDocsQQUrl(document.URL);
+				if (!parsed) {
+					localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'docs.qq: failed to parse URL token' }));
+					return;
+				}
+				result = await extractDocsQQContent({ token: parsed.token, url: document.URL, doc: document });
+				source = 'docsqq' as any;
 			} else if (isWeChatArticleUrl(document.URL)) {
 				// mp.weixin uses inline helpers in main getPageContent path
 				// (not a dedicated extractor function). Replicate that path
@@ -757,7 +765,7 @@ declare global {
 				favicon: '',
 				image: '',
 				published: (result as any)?.published || '',
-				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : '',
+				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : (source as any) === 'docsqq' ? 'DocsQQ' : '',
 				language: '',
 				wordCount: (result as any)?.wordCount || 0,
 				extractedContent: simulatedExtractedContent,

@@ -93,6 +93,10 @@ module.exports = (env, argv) => {
 					mammoth: {
 						test: /[\\/]node_modules[\\/](mammoth|jszip|mathml-to-latex|underscore)[\\/]/,
 						name: 'mammoth-vendor',
+						// Exclude content entry: content scripts can't load async chunks via
+						// <script> tag injection unless those chunks are in web_accessible_resources
+						// (which would require listing them explicitly in manifest — fragile).
+						// Inlining into content.js is simpler and content.js is already large.
 						chunks: 'async',
 						priority: 10,
 						enforce: true,
@@ -206,6 +210,53 @@ module.exports = (env, argv) => {
 				'process.env.NODE_ENV': JSON.stringify(argv.mode),
 				'DEBUG_MODE': JSON.stringify(!isProduction)
 			}),
+			// Fix dynamic chunk loading in content script.
+			// Webpack auto-detects publicPath from document.currentScript.src. In a
+			// content script (injected by browser, not via <script> tag), this is null
+			// and the fallback picks the page's own last <script> URL (e.g.
+			// docs.gtimg.com/...), causing import('mammoth') to load from the wrong
+			// origin and fail.
+			//
+			// The fix: after webpack emits content.js, we do a source-level patch:
+			// replace the "Automatic publicPath is not supported" throw block with a
+			// chrome.runtime.getURL('') call. The target pattern is the scriptUrl
+			// auto-detection IIFE that ends with setting __webpack_require__.p.
+			{
+				apply: (compiler) => {
+					compiler.hooks.thisCompilation.tap('ContentScriptPublicPathPlugin', (compilation) => {
+						compilation.hooks.processAssets.tap(
+							{
+								name: 'ContentScriptPublicPathPlugin',
+								stage: webpack.Compilation.PROCESS_ASSETS_STAGE_SUMMARIZE,
+							},
+							(assets) => {
+								if (!assets['content.js']) return;
+								let src = assets['content.js'].source().toString();
+								// Patch: replace the auto-publicPath detection with chrome.runtime.getURL.
+								// In content scripts, document.currentScript is null (not injected via
+								// <script> tag), so webpack's auto-detection falls back to the page's
+								// own script URL (e.g. docs.gtimg.com/...) — wrong origin.
+								// We locate the exact throw-and-set block in the emitted JS and replace
+								// it with a chrome.runtime.getURL('') assignment.
+								// NOTE: each \ in content.js needs \\\\ in JS string literal here.
+								const needle = 'if(!scriptUrl)throw new Error("Automatic publicPath is not supported in this browser");scriptUrl=scriptUrl.replace(/^blob:/,"").replace(/#.*$/,"").replace(/\\?.*$/,"").replace(/\\/[^\\/]+$/,"/"),__webpack_require__.p=scriptUrl';
+								const patch = '__webpack_require__.p=(typeof chrome!=="undefined"&&chrome.runtime&&chrome.runtime.getURL)?chrome.runtime.getURL(""):""';
+								if (src.includes(needle)) {
+									src = src.replace(needle, patch);
+									compilation.updateAsset(
+										'content.js',
+										new webpack.sources.RawSource(src)
+									);
+									console.log('[ContentScriptPublicPathPlugin] Patched content.js publicPath → chrome.runtime.getURL');
+								} else {
+									// Pattern didn't match — warn so we notice if webpack changes its runtime
+									console.warn('[ContentScriptPublicPathPlugin] WARNING: publicPath detection pattern not found in content.js — dynamic imports may fail in extension content scripts');
+								}
+							}
+						);
+					});
+				}
+			},
 			...(isProduction ? [
 				new ZipPlugin({
 					path: path.resolve(__dirname, 'builds'),

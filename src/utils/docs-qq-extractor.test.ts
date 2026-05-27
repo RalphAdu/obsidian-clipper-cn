@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { parseDocsQQUrl, isDocsQQDocUrl } from './docs-qq-extractor';
+import {
+  DocsQQAuthError,
+  DocsQQNotFoundError,
+  DocsQQTransientError,
+  DocsQQExportFailedError,
+  DocsQQConvertError,
+} from './docs-qq-extractor';
 
 describe('parseDocsQQUrl', () => {
   it('parses doc URL with bare token', () => {
@@ -44,5 +51,26 @@ describe('isDocsQQDocUrl', () => {
   it('returns false for non-doc URL', () => {
     expect(isDocsQQDocUrl('https://docs.qq.com/sheet/abc')).toBe(false);
     expect(isDocsQQDocUrl('https://example.com/doc/abc')).toBe(false);
+  });
+});
+
+describe('Error classes', () => {
+  it('DocsQQAuthError instanceof Error and carries message', () => {
+    const e = new DocsQQAuthError('未登录');
+    expect(e).toBeInstanceOf(Error);
+    expect(e.message).toBe('未登录');
+    expect(e.name).toBe('DocsQQAuthError');
+  });
+
+  it('all error subclasses have distinct names', () => {
+    const errors = [
+      new DocsQQAuthError('a'),
+      new DocsQQNotFoundError('b'),
+      new DocsQQTransientError('c'),
+      new DocsQQExportFailedError('d'),
+      new DocsQQConvertError('e'),
+    ];
+    const names = errors.map(e => e.name);
+    expect(new Set(names).size).toBe(5);
   });
 });

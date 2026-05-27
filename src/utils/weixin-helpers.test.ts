@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions } from './weixin-helpers';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions, normalizeMdniceChapterHeadings, normalizeMdniceSubHeadings } from './weixin-helpers';
 
 const fixturePath = join(__dirname, 'fixtures', 'weixin-SPLTD-hFAsyYAA7V1lU8OA.html');
 const fixtureHtml = readFileSync(fixturePath, 'utf-8');
@@ -286,5 +286,106 @@ describe('normalizeMdniceImageCaptions', () => {
 		`);
 		normalizeMdniceImageCaptions(doc);
 		expect(doc.querySelector('section')).toBeNull();
+	});
+});
+
+describe('normalizeMdniceChapterHeadings', () => {
+	it('converts mdnice chapter heading section to <h1> + <p><em> subtitle', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section style="font-size:0;line-height:0;white-space:nowrap;">
+						<span style="font-size:120px;color:rgba(236,223,252,0.008);"><span leaf="">壹</span></span>
+						<span style="display:inline-block;">
+							<section style="font-size:26px;font-weight:700;color:#1b1c1a"><span leaf="">先采集</span></section>
+							<section style="font-size:17px;font-style:italic;color:rgba(27,28,26,0.40)"><span leaf="">Inbox First</span></section>
+						</span>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceChapterHeadings(doc);
+		expect(doc.querySelector('h1')?.textContent).toBe('先采集');
+		expect(doc.querySelector('em')?.textContent).toBe('Inbox First');
+		expect(doc.body.textContent).not.toContain('壹');
+	});
+
+	it('emits only <h1> when subtitle section missing', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section style="font-size:0;">
+						<span style="font-size:120px;color:rgba(236,223,252,0.008);"><span leaf="">贰</span></span>
+						<span><section style="font-size:26px;font-weight:700"><span leaf="">怎么搭的</span></section></span>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceChapterHeadings(doc);
+		expect(doc.querySelector('h1')?.textContent).toBe('怎么搭的');
+		expect(doc.querySelector('em')).toBeNull();
+	});
+
+	it('does not touch non-mdnice section without 120px decoration char', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<p>普通段落</p>
+					<p>另一个</p>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceChapterHeadings(doc);
+		expect(doc.querySelector('h1')).toBeNull();
+	});
+});
+
+describe('normalizeMdniceSubHeadings', () => {
+	it('converts mdnice sub-heading section to <h2> + <p><em> Node_ID', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section style="font-size:0;white-space:nowrap;">
+						<span style="display:inline-block;width:12px;margin-right:12px;">
+							<span style="background-color:#caa1ff;width:3px;"><span leaf="">&nbsp;</span></span>
+							<span style="background-color:#ab59ff;width:3px;"><span leaf="">&nbsp;</span></span>
+						</span>
+						<span style="display:inline-block;">
+							<section style="font-size:24px;font-weight:700;color:#1b1c1a"><span leaf="">监听更新</span></section>
+							<section style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(171,89,255,0.72)"><span leaf="">Node_ID: trigger</span></section>
+						</span>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceSubHeadings(doc);
+		expect(doc.querySelector('h2')?.textContent).toBe('监听更新');
+		expect(doc.querySelector('em')?.textContent).toBe('Node_ID: trigger');
+	});
+
+	it('emits only <h2> when subtitle missing', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<span><span style="background-color:#ab59ff;width:3px;"><span leaf="">&nbsp;</span></span></span>
+					<span><section style="font-size:24px;font-weight:700"><span leaf="">后筛选</span></section></span>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceSubHeadings(doc);
+		expect(doc.querySelector('h2')?.textContent).toBe('后筛选');
+		expect(doc.querySelector('em')).toBeNull();
+	});
+
+	it('does NOT touch chapter heading (font-size:26px) — chapterHeadings handles those', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<span><section style="font-size:26px;font-weight:700"><span leaf="">先采集</span></section></span>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceSubHeadings(doc);
+		expect(doc.querySelector('h2')).toBeNull();
 	});
 });

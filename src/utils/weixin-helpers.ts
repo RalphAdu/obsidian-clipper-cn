@@ -247,6 +247,109 @@ export function normalizeMdniceInlineBold(root: ParentNode): void {
 }
 
 /**
+ * Convert mdnice "chapter heading" sections to <h1> + optional italic
+ * subtitle <p><em>...</em></p>. The template encodes chapter title as:
+ *
+ *   <section>                             ← chapter container
+ *     <span font-size:120px color:rgba(...0.008)>壹</span>   ← decoration
+ *     <span>
+ *       <section font-size:26px font-weight:700>先采集</section>
+ *       <section font-size:17px font-style:italic>Inbox First</section>
+ *     </span>
+ *   </section>
+ *
+ * The decoration char (壹/贰/叁) is an enlarged ghost letter purely for
+ * visual flair; markdown does not need it. We pivot off this decoration
+ * span (font-size:120px + very-low-alpha color) as the unique signature.
+ */
+export function normalizeMdniceChapterHeadings(root: ParentNode): void {
+	forEachDescendant(root, el => {
+		if (el.tagName !== 'SECTION') return;
+		const deco = el.querySelector('span[style*="font-size:120px"]');
+		if (!deco) return;
+		const decoStyle = deco.getAttribute('style') || '';
+		if (!/color:\s*rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0?\.0\d/.test(decoStyle)) return;
+		const candidates = el.querySelectorAll('section');
+		let title: Element | null = null;
+		let subtitle: Element | null = null;
+		for (const sec of Array.from(candidates)) {
+			const style = (sec as Element).getAttribute('style') || '';
+			if (!title && /font-size:\s*26px/.test(style) && /font-weight:\s*700/.test(style)) {
+				title = sec as Element;
+			} else if (!subtitle && /font-size:\s*17px/.test(style) && /font-style:\s*italic/.test(style)) {
+				subtitle = sec as Element;
+			}
+		}
+		if (!title) return;
+		const ownerDoc = el.ownerDocument;
+		if (!ownerDoc) return;
+		const h1 = ownerDoc.createElement('h1');
+		h1.textContent = (title.textContent || '').trim();
+		const replacement = ownerDoc.createDocumentFragment();
+		replacement.appendChild(h1);
+		if (subtitle) {
+			const p = ownerDoc.createElement('p');
+			const em = ownerDoc.createElement('em');
+			em.textContent = (subtitle.textContent || '').trim();
+			p.appendChild(em);
+			replacement.appendChild(p);
+		}
+		el.replaceWith(replacement);
+	});
+}
+
+/**
+ * Convert mdnice "sub-heading" sections to <h2> + optional <p><em>
+ * subtitle ("Node_ID: trigger" style). Template:
+ *
+ *   <section>
+ *     <span>...purple bar decorations (background-color:#ab59ff width:3px)...</span>
+ *     <span>
+ *       <section font-size:24px font-weight:700>监听更新</section>
+ *       <section font-size:10px letter-spacing:3px uppercase color:rgba(171,89,255,*)>Node_ID: trigger</section>
+ *     </span>
+ *   </section>
+ *
+ * Pivot signature is the purple bar `background-color:#ab59ff` with
+ * width≤3px decoration, paired with a 24px+700 sibling section.
+ */
+export function normalizeMdniceSubHeadings(root: ParentNode): void {
+	forEachDescendant(root, el => {
+		if (el.tagName !== 'SECTION') return;
+		const bar = el.querySelector('span[style*="#ab59ff"], span[style*="#AB59FF"]');
+		if (!bar) return;
+		const barStyle = bar.getAttribute('style') || '';
+		if (!/width:\s*[123]px/.test(barStyle)) return;
+		const sections = el.querySelectorAll('section');
+		let title: Element | null = null;
+		let subtitle: Element | null = null;
+		for (const sec of Array.from(sections)) {
+			const style = (sec as Element).getAttribute('style') || '';
+			if (!title && /font-size:\s*24px/.test(style) && /font-weight:\s*700/.test(style)) {
+				title = sec as Element;
+			} else if (!subtitle && /font-size:\s*10px/.test(style) && /letter-spacing:\s*3px/.test(style)) {
+				subtitle = sec as Element;
+			}
+		}
+		if (!title) return;
+		const ownerDoc = el.ownerDocument;
+		if (!ownerDoc) return;
+		const h2 = ownerDoc.createElement('h2');
+		h2.textContent = (title.textContent || '').trim();
+		const replacement = ownerDoc.createDocumentFragment();
+		replacement.appendChild(h2);
+		if (subtitle) {
+			const p = ownerDoc.createElement('p');
+			const em = ownerDoc.createElement('em');
+			em.textContent = (subtitle.textContent || '').trim();
+			p.appendChild(em);
+			replacement.appendChild(p);
+		}
+		el.replaceWith(replacement);
+	});
+}
+
+/**
  * Remove duplicate image captions emitted by mdnice. Pattern:
  *
  *   <img alt="信息过滤" src="…">

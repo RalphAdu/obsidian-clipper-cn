@@ -11,6 +11,18 @@
 
 const OBSIDIAN_CALLOUT_MARKER_RE = /\\\[!(\w+)\\\]/g;
 
+// Turndown also escapes Obsidian/CommonMark footnote markers, e.g.
+//   inline ref:  `\[^1\]`  (should be `[^1]`)
+//   definition:  `\[^1\]:` (should be `[^1]:`)
+// Turndown escapes the brackets but NOT the caret, so the on-disk form is
+// `\[^N\]` (3 escaped chars: `[` becomes `\[`, `]` becomes `\]`, `^` stays
+// as bare `^` because turndown doesn't consider it dangerous). One regex
+// covers both inline and definition since they share the same opening shape.
+// mp.weixin's mdnice template normalizer emits these as part of the
+// trailing Sources footnote block; un-escape them so Obsidian recognises
+// the footnote syntax and renders backlinks.
+const FOOTNOTE_MARKER_RE = /\\\[\^(\d+)\\\]/g;
+
 // Defuddle's preformattedCode turndown rule emits fenced code blocks with a
 // fixed 3-backtick fence AND unconditionally escapes every inner backtick as
 // `\\\``. That's a bug: CommonMark spec says backslash escapes inside fenced
@@ -38,5 +50,6 @@ function fixFencedCodeBacktickEscapes(markdown: string): string {
 
 export function postProcessExtractorMarkdown(markdown: string): string {
 	const calloutsFixed = markdown.replace(OBSIDIAN_CALLOUT_MARKER_RE, '[!$1]');
-	return fixFencedCodeBacktickEscapes(calloutsFixed);
+	const footnotesFixed = calloutsFixed.replace(FOOTNOTE_MARKER_RE, '[^$1]');
+	return fixFencedCodeBacktickEscapes(footnotesFixed);
 }

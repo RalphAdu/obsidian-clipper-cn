@@ -15,7 +15,11 @@ import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bi
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
 import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
-import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks } from './utils/weixin-helpers';
+import {
+	extractWeChatPublishedFromDocument,
+	normalizePreBlockLineBreaks,
+	normalizeMdniceArticle,
+} from './utils/weixin-helpers';
 import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
 import type { Attachment } from './utils/attachment-types';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
@@ -72,6 +76,7 @@ declare global {
 		const articleClone = article.cloneNode(true) as HTMLElement;
 		normalizeImageSources(articleClone as unknown as Document);
 		articleClone.querySelectorAll('script, style').forEach(el => el.remove());
+		normalizeMdniceArticle(articleClone);
 		normalizePreBlockLineBreaks(articleClone);
 		return articleClone.outerHTML;
 	}
@@ -688,6 +693,7 @@ declare global {
 					const articleClone = article.cloneNode(true) as HTMLElement;
 					normalizeImageSources(articleClone as unknown as Document);
 					articleClone.querySelectorAll('script, style').forEach(el => el.remove());
+					normalizeMdniceArticle(articleClone);
 					normalizePreBlockLineBreaks(articleClone);
 					const wxContent = articleClone.outerHTML;
 					const wxPublished = extractWeChatPublishedFromDocument(document);

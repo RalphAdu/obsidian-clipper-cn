@@ -50,4 +50,26 @@ describe('postProcessExtractorMarkdown', () => {
 	it('handles empty string', () => {
 		expect(postProcessExtractorMarkdown('')).toBe('');
 	});
+
+	it('unescapes footnote inline ref [^N] mangled by turndown (turndown leaves ^ unescaped)', () => {
+		// Turndown escapes [ and ] but not ^. So real on-disk markdown is `\[^1\]`,
+		// not `\[\^1\]`. Verified against actual mp.weixin clip output.
+		const input = '正文 \\[^1\\] 引用';
+		expect(postProcessExtractorMarkdown(input)).toBe('正文 [^1] 引用');
+	});
+
+	it('unescapes footnote definition [^N]: mangled by turndown', () => {
+		const input = '\\[^1\\]: wechat-article-exporter — https://github.com/x';
+		expect(postProcessExtractorMarkdown(input)).toBe('[^1]: wechat-article-exporter — https://github.com/x');
+	});
+
+	it('unescapes multi-digit footnote markers', () => {
+		const input = 'see \\[^12\\] and \\[^99\\]:';
+		expect(postProcessExtractorMarkdown(input)).toBe('see [^12] and [^99]:');
+	});
+
+	it('does not touch plain [N] without caret (so non-footnote bracket text stays escaped)', () => {
+		const input = 'item \\[1\\] only, not a footnote';
+		expect(postProcessExtractorMarkdown(input)).toBe('item \\[1\\] only, not a footnote');
+	});
 });

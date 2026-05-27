@@ -316,7 +316,7 @@ export async function postProcessHtml(rawHtml: string): Promise<string> {
 		let mathmlToLatex: ((xml: string) => string) | null = null;
 		try {
 			const mod = await import('mathml-to-latex');
-			mathmlToLatex = ((mod as { default?: (xml: string) => string }).default || mod) as (xml: string) => string;
+			mathmlToLatex = ((mod as unknown as { default?: (xml: string) => string }).default || mod) as unknown as (xml: string) => string;
 		} catch {
 			// 模块加载失败，跳过公式转换
 		}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata } from './docs-qq-extractor';
+import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata, requestExportTask, pollExportStatus, fetchDocxFile } from './docs-qq-extractor';
 import {
   DocsQQAuthError,
   DocsQQNotFoundError,
@@ -131,5 +131,52 @@ describe('fetchDocMetadata', () => {
   it('throws DocsQQAuthError if no xsrf cookie', async () => {
     vi.stubGlobal('document', { cookie: 'other=foo' });
     await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQAuthError);
+  });
+});
+
+describe('requestExportTask', () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it('returns operationId on 200', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ret: 0, operationId: 'task-xyz-123' }), { status: 200 })
+    );
+    const id = await requestExportTask('300000000$BfotANGDEYOm', 'DQmZvdEFOR0RFWU9t');
+    expect(id).toBe('task-xyz-123');
+  });
+
+  it('throws DocsQQAuthError on 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 401 }));
+    await expect(requestExportTask('300000000$BfotANGDEYOm', 'X')).rejects.toBeInstanceOf(DocsQQAuthError);
+  });
+
+  it('throws DocsQQExportFailedError if response has no operationId', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ret: 0 }), { status: 200 })
+    );
+    await expect(requestExportTask('300000000$BfotANGDEYOm', 'X')).rejects.toBeInstanceOf(DocsQQExportFailedError);
+  });
+
+  it('throws DocsQQExportFailedError if ret != 0', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ret: 100, operationId: 'x' }), { status: 200 })
+    );
+    await expect(requestExportTask('300000000$BfotANGDEYOm', 'X')).rejects.toBeInstanceOf(DocsQQExportFailedError);
+  });
+
+  it('sends correct form-urlencoded body', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ret: 0, operationId: 'x' }), { status: 200 })
+    );
+    await requestExportTask('300000000$BfotANGDEYOm', 'DQmZvdEFOR0RFWU9t');
+    const init = spy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>)['Content-Type']).toContain('application/x-www-form-urlencoded');
+    const body = init.body as string;
+    expect(body).toContain('exportType=0');
+    expect(body).toContain('exportSource=client');
+    expect(body).toContain('docId=300000000%24BfotANGDEYOm');  // $ encoded
+    expect(body).toContain('switches=');
+    expect(body).toContain('objectMapping=');
   });
 });

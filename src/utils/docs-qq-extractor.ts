@@ -131,6 +131,45 @@ export async function fetchDocMetadata(token: string): Promise<DocsQQMetadata> {
 	};
 }
 
+// ============================================
+// Endpoint: 导出任务发起
+// ============================================
+
+export async function requestExportTask(
+	globalPadId: string,
+	token: string,
+): Promise<string> {
+	const body = new URLSearchParams({
+		exportType: '0',
+		switches: '{"embedFonts":false}',
+		exportSource: 'client',
+		docId: globalPadId,
+		objectMapping: '{"hinaMappings":[]}',
+	}).toString();
+
+	const response = await fetchWithTimeout('https://docs.qq.com/v1/export/export_office', {
+		method: 'POST',
+		credentials: 'include',
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+			'Accept': 'application/json, text/plain, */*',
+			'Referer': `https://docs.qq.com/doc/${token}`,
+		},
+		body,
+	});
+
+	throwForStatus(response.status, 'requestExportTask');
+
+	const data = await response.json();
+	if (data.ret !== 0) {
+		throw new DocsQQExportFailedError(`requestExportTask: ret=${data.ret}, body=${JSON.stringify(data).slice(0, 200)}`);
+	}
+	if (!data.operationId) {
+		throw new DocsQQExportFailedError(`requestExportTask: 缺 operationId 字段, body=${JSON.stringify(data).slice(0, 200)}`);
+	}
+	return data.operationId;
+}
+
 // 内部用：从 metadata response 同步拿 globalPadId（task 6 requestExportTask 用）
 // 但 padInfo.globalPadId 不在 DocsQQMetadata 里，需要单独 helper
 export async function fetchGlobalPadId(token: string): Promise<string> {

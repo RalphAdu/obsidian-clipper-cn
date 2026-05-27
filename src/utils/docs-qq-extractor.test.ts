@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata, requestExportTask, pollExportStatus, fetchDocxFile } from './docs-qq-extractor';
+import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata, requestExportTask, pollExportStatus, fetchDocxFile, convertDocxToHtml, postProcessHtml } from './docs-qq-extractor';
 import {
   DocsQQAuthError,
   DocsQQNotFoundError,
@@ -270,5 +270,110 @@ describe('fetchDocxFile', () => {
     await fetchDocxFile('https://example.com/x.docx');
     const init = spy.mock.calls[0][1] as RequestInit;
     expect(init.credentials).toBe('omit');
+  });
+});
+
+describe('convertDocxToHtml', () => {
+  beforeEach(() => { vi.restoreAllMocks(); vi.resetModules(); });
+
+  it('returns HTML string from valid docx ArrayBuffer (mocked mammoth)', async () => {
+    vi.doMock('mammoth', () => ({
+      default: {
+        convertToHtml: vi.fn().mockResolvedValue({
+          value: '<p>Hello</p>',
+          messages: [],
+        }),
+        images: {
+          imgElement: (_handler: unknown) => 'IMG_HANDLER_TOKEN',
+        },
+      },
+    }));
+
+    const { convertDocxToHtml: fn } = await import('./docs-qq-extractor');
+    const buf = new ArrayBuffer(8);
+    const html = await fn(buf);
+    expect(html).toContain('<p>Hello</p>');
+
+    vi.doUnmock('mammoth');
+  });
+
+  it('throws DocsQQConvertError when mammoth throws', async () => {
+    vi.doMock('mammoth', () => ({
+      default: {
+        convertToHtml: vi.fn().mockRejectedValue(new Error('corrupt docx')),
+        images: { imgElement: (_h: unknown) => 'X' },
+      },
+    }));
+
+    const { convertDocxToHtml: fn, DocsQQConvertError: Err } = await import('./docs-qq-extractor');
+    await expect(fn(new ArrayBuffer(8))).rejects.toBeInstanceOf(Err);
+
+    vi.doUnmock('mammoth');
+  });
+
+  it('throws DocsQQConvertError when import("mammoth") fails', async () => {
+    vi.doMock('mammoth', () => { throw new Error('module load failed'); });
+
+    const { convertDocxToHtml: fn, DocsQQConvertError: Err } = await import('./docs-qq-extractor');
+    await expect(fn(new ArrayBuffer(8))).rejects.toBeInstanceOf(Err);
+
+    vi.doUnmock('mammoth');
+  });
+});
+
+describe('postProcessHtml', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  it('converts inline MathML to $latex$', async () => {
+    vi.doMock('mathml-to-latex', () => ({
+      default: (_xml: string) => 'x^2',
+    }));
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<p>Eq: <math><mi>x</mi></math></p>';
+    const result = await fn(html);
+    expect(result).toContain('$x^2$');
+    vi.doUnmock('mathml-to-latex');
+  });
+
+  it('converts block MathML to $$latex$$', async () => {
+    vi.doMock('mathml-to-latex', () => ({
+      default: (_xml: string) => 'a + b = c',
+    }));
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<p><math display="block"><mi>a</mi></math></p>';
+    const result = await fn(html);
+    expect(result).toContain('$$a + b = c$$');
+    vi.doUnmock('mathml-to-latex');
+  });
+
+  it('removes empty <p>', async () => {
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<p>foo</p><p></p><p>bar</p>';
+    const result = await fn(html);
+    expect(result).not.toMatch(/<p>\s*<\/p>/);
+    expect(result).toContain('<p>foo</p>');
+    expect(result).toContain('<p>bar</p>');
+  });
+
+  it('keeps MathML untouched if mathml-to-latex throws', async () => {
+    vi.doMock('mathml-to-latex', () => ({
+      default: (_xml: string) => { throw new Error('cant parse'); },
+    }));
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<p><math><mi>x</mi></math></p>';
+    const result = await fn(html);
+    expect(result).toContain('<math');  // 保留原 MathML 标签
+    vi.doUnmock('mathml-to-latex');
+  });
+
+  it('returns html unchanged if no math/empty-p/double-br', async () => {
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<h1>Title</h1><p>Plain text</p>';
+    const result = await fn(html);
+    expect(result).toContain('<h1>Title</h1>');
+    expect(result).toContain('<p>Plain text</p>');
   });
 });

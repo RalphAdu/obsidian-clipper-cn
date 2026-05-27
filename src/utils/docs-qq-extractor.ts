@@ -263,3 +263,40 @@ export async function fetchDocxFile(fileUrl: string): Promise<ArrayBuffer> {
 
 	return await response.arrayBuffer();
 }
+
+// ============================================
+// docx → HTML (mammoth, 动态 import)
+// ============================================
+
+export async function convertDocxToHtml(arrayBuffer: ArrayBuffer): Promise<string> {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let mod: any;
+	try {
+		mod = await import('mammoth');
+	} catch (e) {
+		throw new DocsQQConvertError(`无法加载 mammoth 模块: ${(e as Error).message}`);
+	}
+
+	// CJS interop: real mammoth exposes convertToHtml directly on namespace;
+	// ESM-style mocks (vitest vi.doMock) wrap in .default
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const mammoth: any = (mod.default && typeof mod.default.convertToHtml === 'function')
+		? mod.default
+		: mod;
+
+	try {
+		const result = await mammoth.convertToHtml(
+			{ arrayBuffer },
+			{
+				convertImage: mammoth.images.imgElement((image: { contentType: string; read: (encoding: string) => Promise<string> }) =>
+					image.read('base64').then((data: string) => ({
+						src: `data:${image.contentType};base64,${data}`,
+					}))
+				),
+			},
+		);
+		return result.value;
+	} catch (e) {
+		throw new DocsQQConvertError(`mammoth 转换失败: ${(e as Error).message}`);
+	}
+}

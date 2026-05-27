@@ -87,7 +87,18 @@ module.exports = (env, argv) => {
 				})
 			],
 			moduleIds: 'named',
-			chunkIds: 'named'
+			chunkIds: 'named',
+			splitChunks: {
+				cacheGroups: {
+					mammoth: {
+						test: /[\\/]node_modules[\\/](mammoth|jszip|mathml-to-latex|underscore)[\\/]/,
+						name: 'mammoth-vendor',
+						chunks: 'async',
+						priority: 10,
+						enforce: true,
+					},
+				},
+			},
 		},
 		experiments: {
 			outputModule: false,

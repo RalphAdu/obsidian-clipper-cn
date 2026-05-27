@@ -15,6 +15,7 @@ import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bi
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
 import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
 import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
+import { extractDocsQQContent, isDocsQQDocUrl, parseDocsQQUrl } from './utils/docs-qq-extractor';
 import {
 	extractWeChatPublishedFromDocument,
 	normalizePreBlockLineBreaks,
@@ -306,6 +307,22 @@ declare global {
 					return null;
 				})
 				: null;
+			const docsQQContent = isDocsQQDocUrl(document.URL)
+				? await (async () => {
+					const parsed = parseDocsQQUrl(document.URL);
+					if (!parsed) return null;
+					return extractDocsQQContent({
+						token: parsed.token,
+						url: document.URL,
+						doc: document,
+					});
+				})().catch((error) => {
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract docs.qq structured content', { error: msg });
+					extractorWarnings.push(`docs.qq: ${msg}`);
+					return null;
+				})
+				: null;
 			// Site extractor matched URL but returned null (silently — e.g. scys
 			// extractScysArticleStandalone returns null on 401 instead of throwing,
 			// so the .catch above doesn't fire). Surface to user explicitly.
@@ -396,9 +413,9 @@ declare global {
 					: '';
 
 				const response: ContentResponse = {
-					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || defuddled.author,
+					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || docsQQContent?.author || defuddled.author,
 					attachments: scysContent?.attachments || [],
-					content: bilibiliContent?.structuredHtml || feishuContent?.content || scysContent?.content || zsxqContent?.content || weChatArticleContent || defuddled.content,
+					content: bilibiliContent?.structuredHtml || feishuContent?.content || scysContent?.content || zsxqContent?.content || docsQQContent?.content || weChatArticleContent || defuddled.content,
 					description: bilibiliContent?.description || defuddled.description,
 					domain: getDomain(document.URL),
 					extractedContent: extractedContent,
@@ -408,12 +425,12 @@ declare global {
 					image: bilibiliContent?.image || defuddled.image,
 					language: defuddled.language || '',
 					parseTime: defuddled.parseTime,
-					published: bilibiliContent?.published || feishuContent?.published || scysContent?.published || zsxqContent?.published || weChatPublished || defuddled.published,
+					published: bilibiliContent?.published || feishuContent?.published || scysContent?.published || zsxqContent?.published || docsQQContent?.published || weChatPublished || defuddled.published,
 					schemaOrgData: defuddled.schemaOrgData,
 					selectedHtml: selectedHtml,
-					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : defuddled.site,
-					title: bilibiliContent?.title || feishuContent?.title || scysContent?.title || zsxqContent?.title || defuddled.title,
-					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || zsxqContent?.wordCount || defuddled.wordCount,
+					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : docsQQContent ? 'DocsQQ' : defuddled.site,
+					title: bilibiliContent?.title || feishuContent?.title || scysContent?.title || zsxqContent?.title || docsQQContent?.title || defuddled.title,
+					wordCount: docsQQContent?.wordCount || bilibiliContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || zsxqContent?.wordCount || defuddled.wordCount,
 					metaTags: defuddled.metaTags || [],
 					extractorWarnings: extractorWarnings.length > 0 ? extractorWarnings : undefined,
 				};

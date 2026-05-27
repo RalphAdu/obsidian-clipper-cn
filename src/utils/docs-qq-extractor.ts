@@ -191,3 +191,50 @@ export async function fetchGlobalPadId(token: string): Promise<string> {
 	}
 	return globalPadId;
 }
+
+// ============================================
+// Endpoint: 任务状态轮询
+// ============================================
+
+export async function pollExportStatus(
+	operationId: string,
+	token: string,
+	opts: { timeoutMs: number; intervalMs: number }
+): Promise<string> {
+	const deadline = Date.now() + opts.timeoutMs;
+	const url = `https://docs.qq.com/v1/export/query_progress?operationId=${encodeURIComponent(operationId)}`;
+
+	while (Date.now() < deadline) {
+		const response = await fetchWithTimeout(url, {
+			method: 'GET',
+			credentials: 'include',
+			headers: {
+				'Accept': 'application/json, text/plain, */*',
+				'Referer': `https://docs.qq.com/doc/${token}`,
+			},
+		});
+		throwForStatus(response.status, 'pollExportStatus');
+
+		let data: { status?: string; file_url?: string };
+		try {
+			data = await response.json();
+		} catch {
+			throw new DocsQQTransientError(`pollExportStatus: 无法解析响应 JSON`);
+		}
+		const status: string = data.status ?? '';
+
+		if (status === 'Done') {
+			if (!data.file_url) {
+				throw new DocsQQExportFailedError(`pollExportStatus: status=Done 但缺 file_url`);
+			}
+			return data.file_url;
+		}
+		if (status === 'Failed' || status === 'failed') {
+			throw new DocsQQExportFailedError(`pollExportStatus: 任务失败 (response.status=${status})`);
+		}
+
+		await new Promise(resolve => setTimeout(resolve, opts.intervalMs));
+	}
+
+	throw new DocsQQTransientError(`pollExportStatus: 超过 ${opts.timeoutMs}ms 仍未完成`);
+}

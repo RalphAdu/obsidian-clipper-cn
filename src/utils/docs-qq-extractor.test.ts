@@ -180,3 +180,58 @@ describe('requestExportTask', () => {
     expect(body).toContain('objectMapping=');
   });
 });
+
+describe('pollExportStatus', () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it('returns file_url when status=Done first poll', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        ret: 0, status: 'Done', progress: 100,
+        file_url: 'https://cdn/x.docx',
+      }), { status: 200 })
+    );
+    const url = await pollExportStatus('task-xyz', 'DQmZvdEFOR0RFWU9t', { timeoutMs: 5000, intervalMs: 50 });
+    expect(url).toBe('https://cdn/x.docx');
+  });
+
+  it('polls multiple times until Done', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    spy.mockResolvedValueOnce(new Response(JSON.stringify({ ret: 0, status: 'Processing', progress: 0 }), { status: 200 }));
+    spy.mockResolvedValueOnce(new Response(JSON.stringify({ ret: 0, status: 'Processing', progress: 50 }), { status: 200 }));
+    spy.mockResolvedValueOnce(new Response(JSON.stringify({
+      ret: 0, status: 'Done', progress: 100, file_url: 'https://example.com/x.docx',
+    }), { status: 200 }));
+
+    const url = await pollExportStatus('task-xyz', 'X', { timeoutMs: 5000, intervalMs: 30 });
+    expect(url).toBe('https://example.com/x.docx');
+    expect(spy).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws DocsQQExportFailedError when status=Failed', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ret: 0, status: 'Failed' }), { status: 200 })
+    );
+    await expect(
+      pollExportStatus('task-xyz', 'X', { timeoutMs: 1000, intervalMs: 50 })
+    ).rejects.toBeInstanceOf(DocsQQExportFailedError);
+  });
+
+  it('throws DocsQQExportFailedError on status=Done but no file_url', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ret: 0, status: 'Done', progress: 100 }), { status: 200 })
+    );
+    await expect(
+      pollExportStatus('task-xyz', 'X', { timeoutMs: 1000, intervalMs: 50 })
+    ).rejects.toBeInstanceOf(DocsQQExportFailedError);
+  });
+
+  it('throws DocsQQTransientError on timeout', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ret: 0, status: 'Processing', progress: 0 }), { status: 200 })
+    );
+    await expect(
+      pollExportStatus('task-xyz', 'X', { timeoutMs: 200, intervalMs: 30 })
+    ).rejects.toBeInstanceOf(DocsQQTransientError);
+  });
+});

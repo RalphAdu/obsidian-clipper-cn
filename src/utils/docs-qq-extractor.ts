@@ -58,3 +58,97 @@ export class DocsQQExportFailedError extends Error {
 export class DocsQQConvertError extends Error {
   constructor(message: string) { super(message); this.name = 'DocsQQConvertError'; }
 }
+
+// ============================================
+// HTTP helpers
+// ============================================
+
+const FETCH_TIMEOUT_MS = 10_000;
+
+function getXsrfFromCookies(): string {
+	const m = document.cookie.match(/(?:^|;\s*)xsrf=([^;]+)/);
+	if (!m) throw new DocsQQAuthError('cookie 缺 xsrf token，请先登录腾讯文档');
+	return m[1];
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+	const ctrl = new AbortController();
+	const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+	try {
+		return await fetch(url, { ...init, signal: ctrl.signal });
+	} catch (e) {
+		if ((e as Error).name === 'AbortError') {
+			throw new DocsQQTransientError(`fetch timeout: ${url}`);
+		}
+		throw new DocsQQTransientError(`fetch failed: ${(e as Error).message}`);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+function throwForStatus(status: number, context: string): void {
+	if (status === 401 || status === 403) {
+		throw new DocsQQAuthError(`${context}: 未登录或无权限 (HTTP ${status})`);
+	}
+	if (status === 404) {
+		throw new DocsQQNotFoundError(`${context}: 文档不存在 (HTTP ${status})`);
+	}
+	if (status >= 500) {
+		throw new DocsQQTransientError(`${context}: 腾讯服务暂时不可用 (HTTP ${status})`);
+	}
+	if (status >= 400) {
+		throw new DocsQQTransientError(`${context}: HTTP ${status}`);
+	}
+}
+
+// ============================================
+// Endpoint: 文档元数据
+// ============================================
+
+export async function fetchDocMetadata(token: string): Promise<DocsQQMetadata> {
+	const xsrf = getXsrfFromCookies();
+	const url = `https://docs.qq.com/cgi-go/padinfo/getpadinfo?encodePadId=${encodeURIComponent(token)}&infoKeys=[1,2]&xsrf=${encodeURIComponent(xsrf)}`;
+	const response = await fetchWithTimeout(url, {
+		method: 'GET',
+		credentials: 'include',
+		headers: {
+			Referer: `https://docs.qq.com/doc/${token}`,
+			Accept: 'application/json, text/plain, */*',
+		},
+	});
+
+	throwForStatus(response.status, 'fetchDocMetadata');
+
+	const data = await response.json();
+	const title: string = data?.data?.title || '';
+	// author / createTime / modifyTime / wordCount 不返回（recon.md §1）— 留空，v2 优化
+	return {
+		title,
+		author: '',
+		createTime: '',
+		modifyTime: '',
+		wordCount: 0,
+	};
+}
+
+// 内部用：从 metadata response 同步拿 globalPadId（task 6 requestExportTask 用）
+// 但 padInfo.globalPadId 不在 DocsQQMetadata 里，需要单独 helper
+export async function fetchGlobalPadId(token: string): Promise<string> {
+	const xsrf = getXsrfFromCookies();
+	const url = `https://docs.qq.com/cgi-go/padinfo/getpadinfo?encodePadId=${encodeURIComponent(token)}&infoKeys=[1,2]&xsrf=${encodeURIComponent(xsrf)}`;
+	const response = await fetchWithTimeout(url, {
+		method: 'GET',
+		credentials: 'include',
+		headers: {
+			Referer: `https://docs.qq.com/doc/${token}`,
+			Accept: 'application/json, text/plain, */*',
+		},
+	});
+	throwForStatus(response.status, 'fetchGlobalPadId');
+	const data = await response.json();
+	const globalPadId: string | undefined = data?.data?.padInfo?.globalPadId;
+	if (!globalPadId) {
+		throw new DocsQQExportFailedError('getpadinfo: 缺 globalPadId 字段');
+	}
+	return globalPadId;
+}

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseDocsQQUrl, isDocsQQDocUrl } from './docs-qq-extractor';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata } from './docs-qq-extractor';
 import {
   DocsQQAuthError,
   DocsQQNotFoundError,
@@ -72,5 +72,64 @@ describe('Error classes', () => {
     ];
     const names = errors.map(e => e.name);
     expect(new Set(names).size).toBe(5);
+  });
+});
+
+describe('fetchDocMetadata', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    // mock document.cookie for xsrf via vi.stubGlobal (node env has no document)
+    vi.stubGlobal('document', { cookie: 'xsrf=2f43999878bb37d0; other=foo' });
+  });
+
+  it('returns parsed metadata on 200', async () => {
+    const mockResponse = {
+      retcode: 0,
+      msg: '成功',
+      data: {
+        padInfo: {
+          localPadId: 'BfotANGDEYOm',
+          domainId: '300000000',
+          globalPadId: '300000000$BfotANGDEYOm',
+        },
+        privilegeAttribute: { can_export: 1, can_export_online: 1 },
+        title: '望岳投资250618十小时全文',
+      },
+    };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockResponse), { status: 200 })
+    );
+
+    const meta = await fetchDocMetadata('DQmZvdEFOR0RFWU9t');
+    expect(meta.title).toBe('望岳投资250618十小时全文');
+    expect(meta.author).toBe('');
+    expect(meta.createTime).toBe('');
+    expect(meta.modifyTime).toBe('');
+    expect(meta.wordCount).toBe(0);
+  });
+
+  it('throws DocsQQAuthError on 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 401 }));
+    await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQAuthError);
+  });
+
+  it('throws DocsQQAuthError on 403', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 403 }));
+    await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQAuthError);
+  });
+
+  it('throws DocsQQNotFoundError on 404', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 404 }));
+    await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQNotFoundError);
+  });
+
+  it('throws DocsQQTransientError on 5xx', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 500 }));
+    await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQTransientError);
+  });
+
+  it('throws DocsQQAuthError if no xsrf cookie', async () => {
+    vi.stubGlobal('document', { cookie: 'other=foo' });
+    await expect(fetchDocMetadata('X')).rejects.toBeInstanceOf(DocsQQAuthError);
   });
 });

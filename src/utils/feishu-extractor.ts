@@ -1,5 +1,7 @@
 import browser from './browser-polyfill';
 import { createLogger } from './logger';
+import { extractFeishuComments } from './feishu-comments';
+import { convertDate } from './date-utils';
 
 const logger = createLogger('Feishu');
 
@@ -11,7 +13,9 @@ export interface FeishuParsedUrl {
 export interface FeishuStructuredContent {
 	title: string;
 	author: string;
-	content: string;
+	content: string;             // HTML (no comments appended)
+	commentsMarkdown?: string;   // already markdown — must NOT pass through turndown
+	published?: string;          // YYYY-MM-DD, from latest_modify_time
 	wordCount: number;
 }
 
@@ -41,8 +45,9 @@ interface FeishuTextBody {
 	elements?: Array<{
 		text_run?: FeishuTextRun;
 		mention_user?: FeishuMentionUser;
-		mention_doc?: { token?: string; title?: string; obj_type?: number; text_element_style?: FeishuTextElement['text_element_style'] };
+		mention_doc?: { token?: string; title?: string; obj_type?: number; url?: string; text_element_style?: FeishuTextElement['text_element_style'] };
 		equation?: { content?: string };
+		inline_block?: { block_id: string; text_element_style?: FeishuTextElement['text_element_style'] };
 	}>;
 	style?: {
 		align?: number; // 1=left, 2=center, 3=right
@@ -55,7 +60,7 @@ interface FeishuTextBody {
 	};
 }
 
-interface FeishuBlock {
+export interface FeishuBlock {
 	block_id: string;
 	parent_id?: string;
 	children?: string[];
@@ -79,15 +84,71 @@ interface FeishuBlock {
 	callout?: FeishuTextBody & { style?: FeishuTextBody['style'] & { background_color?: number; emoji_id?: string } };
 	quote_container?: object;
 	divider?: object;
-	image?: { width?: number; height?: number; token?: string };
+	image?: { width?: number; height?: number; token?: string; caption?: { content?: string } };
 	table?: { cells?: string[]; property?: { row_size?: number; column_size?: number; merge_info?: Array<{ row_span?: number; col_span?: number }> } };
 	table_cell?: object;
 	grid?: { column_size?: number };
 	grid_column?: object;
-	file?: { name?: string; token?: string };
+	file?: { name?: string; token?: string; size?: number };
+	iframe?: { component?: { iframe_type?: number; url?: string } };
 	view?: object;
+	source_synced?: FeishuTextBody;
 	undefined_block?: object;
 }
+
+// Feishu emoji shortcode → unicode emoji mapping for CALLOUT block icons.
+// Common ones observed in scys + feishu docs. Unknown shortcodes return ''
+// (silently dropped rather than rendering ":bulb:" raw text in markdown).
+const FEISHU_EMOJI_MAP: Record<string, string> = {
+	bulb: '💡',
+	mag_right: '🔍',
+	mag: '🔎',
+	warning: '⚠️',
+	bell: '🔔',
+	info: 'ℹ️',
+	information_source: 'ℹ️',
+	pushpin: '📌',
+	bookmark: '🔖',
+	pencil: '✏️',
+	memo: '📝',
+	fire: '🔥',
+	heavy_check_mark: '✅',
+	white_check_mark: '✅',
+	x: '❌',
+	thumbsup: '👍',
+	thinking_face: '🤔',
+	star: '⭐',
+	rocket: '🚀',
+	books: '📚',
+	clipboard: '📋',
+	question: '❓',
+	exclamation: '❗',
+	heart: '❤️',
+	speech_balloon: '💬',
+};
+
+function feishuEmojiToUnicode(emojiId: string): string {
+	return FEISHU_EMOJI_MAP[emojiId] || '';
+}
+
+// Feishu emoji shortcode → Obsidian native callout type. Used so callout
+// renders as a colored box in Obsidian (not a gray blockquote), while still
+// preserving the original emoji in the title for visual parity with feishu.
+const FEISHU_EMOJI_TO_CALLOUT_TYPE: Record<string, string> = {
+	bulb: 'tip',
+	mag_right: 'info', mag: 'info',
+	info: 'info', information_source: 'info',
+	warning: 'warning', exclamation: 'warning', bell: 'warning',
+	pushpin: 'important', rocket: 'important',
+	bookmark: 'note', pencil: 'note', memo: 'note',
+	fire: 'danger',
+	heavy_check_mark: 'success', white_check_mark: 'success', thumbsup: 'success',
+	x: 'failure',
+	thinking_face: 'question', question: 'question',
+	star: 'example', heart: 'example',
+	books: 'abstract', clipboard: 'abstract',
+	speech_balloon: 'quote',
+};
 
 const FEISHU_BLOCK_TYPE = {
 	PAGE: 1,
@@ -122,6 +183,7 @@ const FEISHU_BLOCK_TYPE = {
 	TABLE_CELL: 32,
 	VIEW: 33,
 	QUOTE_CONTAINER: 34,
+	SOURCE_SYNCED: 49,
 } as const;
 
 export function isFeishuDocUrl(url: string): boolean {
@@ -151,7 +213,7 @@ export function parseFeishuUrl(url: string): FeishuParsedUrl {
 	}
 }
 
-async function fetchFeishuApi(url: string, options?: { method?: string; body?: string; headers?: Record<string, string> }): Promise<any> {
+export async function fetchFeishuApi(url: string, options?: { method?: string; body?: string; headers?: Record<string, string> }): Promise<any> {
 	const response = await browser.runtime.sendMessage({
 		action: 'fetchFeishuApi',
 		url,
@@ -314,6 +376,87 @@ async function fetchFeishuImageDataUrl(fileToken: string): Promise<string | null
 	}
 }
 
+async function fetchFeishuSheetData(token: string): Promise<{ values: string[][] } | null> {
+	// token = {spreadsheet_token}_{sheet_id} — last underscore is the separator
+	const idx = token.lastIndexOf('_');
+	if (idx < 0) {
+		logger.warn(`Invalid sheet token format: ${token}`);
+		return null;
+	}
+	const ssToken = token.slice(0, idx);
+	const sheetId = token.slice(idx + 1);
+
+	// Feishu's public OpenAPI exposes cell values but not cell styles (bold,
+	// color, etc.) — the /style and /v3 cells endpoints return 404. Bold
+	// detection would require the cookie-based MainWorld pattern used for
+	// images; deferred as a follow-up enhancement.
+	try {
+		const resp = await fetchFeishuApi(
+			`https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/${ssToken}/values_batch_get?ranges=${sheetId}&valueRenderOption=ToString`
+		);
+		const values = (resp?.data?.valueRanges?.[0]?.values as string[][]) || [];
+		return { values };
+	} catch (e) {
+		logger.warn(`Sheet fetch failed [${token}]: ${String(e)}`);
+		return null;
+	}
+}
+
+function renderSheetAsHtmlTable(values: string[][]): string {
+	if (values.length === 0) return '<p>📊 [Sheet 为空]</p>';
+	const escape = (s: any) => escapeHtml(String(s ?? ''));
+
+	const [header, ...rows] = values;
+	const headHtml = `<thead><tr>${header.map((c) => `<th>${escape(c)}</th>`).join('')}</tr></thead>`;
+	const bodyHtml = `<tbody>${rows
+		.map((row) => `<tr>${row.map((c) => `<td>${escape(c)}</td>`).join('')}</tr>`)
+		.join('')}</tbody>`;
+	return `<table>${headHtml}${bodyHtml}</table>`;
+}
+
+async function resolveFeishuSheets(html: string): Promise<string> {
+	const placeholderPattern = /<table data-feishu-sheet="([^"]+)"><\/table>/g;
+	const matches: Array<{ full: string; token: string }> = [];
+	let m: RegExpExecArray | null;
+	while ((m = placeholderPattern.exec(html)) !== null) {
+		matches.push({ full: m[0], token: m[1] });
+	}
+
+	if (matches.length === 0) return html;
+
+	logger.debug(`Resolving ${matches.length} Feishu sheet(s)`);
+
+	// Concurrent fetch all sheets
+	const results = await Promise.all(matches.map((m) => fetchFeishuSheetData(m.token).then((r) => ({ token: m.token, full: m.full, data: r }))));
+
+	let result = html;
+	for (const item of results) {
+		const replacement = item.data
+			? renderSheetAsHtmlTable(item.data.values)
+			: `<p>📊 [Sheet 加载失败: ${escapeHtml(item.token.slice(0, 10))}...]</p>`;
+		result = result.replace(item.full, replacement);
+	}
+	return result;
+}
+
+export function resolveFeishuFiles(html: string, sourceDocUrl: string): string {
+	// Pass 1: top-level FILE block placeholder → <p>📎 <a>…</a></p>
+	const topPattern = /<a href="feishu-file-block:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">([^<]*)<\/a>/g;
+	let result = html.replace(topPattern, (_full, blockId, filename) => {
+		const url = `${sourceDocUrl}#${blockId}`;
+		return `<p>📎 <a href="${escapeHtml(url)}">${escapeHtml(filename)}</a></p>`;
+	});
+
+	// Pass 2: inline FILE placeholder → bare <a>…</a> (no <p>📎 wrap; sits inside existing <p>)
+	const inlinePattern = /<a href="feishu-file-inline:\/\/([A-Za-z0-9_-]+)" data-filename="([^"]*)">([^<]*)<\/a>/g;
+	result = result.replace(inlinePattern, (_full, blockId, filename) => {
+		const url = `${sourceDocUrl}#${blockId}`;
+		return `<a href="${escapeHtml(url)}">${escapeHtml(filename)}</a>`;
+	});
+
+	return result;
+}
+
 async function resolveFeishuImages(html: string): Promise<string> {
 	const tokenPattern = /feishu-image:\/\/([A-Za-z0-9_-]+)/g;
 	const tokens = new Set<string>();
@@ -380,6 +523,21 @@ async function resolveFeishuImages(html: string): Promise<string> {
 		);
 	}
 
+	// Defensive filter: if an image was fetched but stayed as application/octet-stream,
+	// the bytes are likely encrypted (feishu's copy_out/asynccode path returns encrypted
+	// blobs that the cn extractor doesn't decrypt). Drop those from base64Results so the
+	// substitution loop below leaves the token as an unresolved placeholder.
+	let droppedOctetStream = 0;
+	for (const [token, dataUrl] of [...base64Results.entries()]) {
+		if (dataUrl.startsWith('data:application/octet-stream')) {
+			base64Results.delete(token);
+			droppedOctetStream++;
+		}
+	}
+	if (droppedOctetStream > 0) {
+		logger.warn(`[img-resolve] dropped ${droppedOctetStream} image(s) with application/octet-stream MIME (likely encrypted)`);
+	}
+
 	let resolved = html;
 	for (const token of tokenList) {
 		const replacement = base64Results.get(token);
@@ -434,28 +592,120 @@ async function fetchAllBlocks(documentId: string): Promise<FeishuBlock[]> {
 	return allBlocks;
 }
 
-async function fetchDocumentMeta(documentId: string): Promise<{ title: string; owner?: string } | null> {
+async function fetchFeishuDocMeta(documentId: string, docType: 'docx' | 'doc' = 'docx'): Promise<{ ownerOpenId?: string; latestModifyTime?: number; title?: string } | null> {
 	try {
 		const result = await fetchFeishuApi(
-			`https://open.feishu.cn/open-apis/docx/v1/documents/${documentId}`
+			'https://open.feishu.cn/open-apis/drive/v1/metas/batch_query?user_id_type=open_id',
+			{
+				method: 'POST',
+				body: JSON.stringify({
+					request_docs: [{ doc_token: documentId, doc_type: docType }],
+					with_url: false,
+				}),
+			},
 		);
-		const doc = result?.data?.document;
-		return doc ? { title: doc.title || '', owner: doc.owner_id } : null;
-	} catch {
+		const meta = result?.data?.metas?.[0];
+		if (!meta) return null;
+		return {
+			ownerOpenId: meta.owner_id,
+			latestModifyTime: meta.latest_modify_time ? Number(meta.latest_modify_time) : undefined,
+			title: meta.title,
+		};
+	} catch (e) {
+		logger.warn(`fetchFeishuDocMeta failed: ${String(e)}`);
 		return null;
 	}
 }
 
-function renderTextElements(elements: FeishuTextBody['elements']): string {
+async function resolveFeishuUserName(openId: string): Promise<string | null> {
+	try {
+		const result = await fetchFeishuApi(
+			`https://open.feishu.cn/open-apis/contact/v3/users/${openId}?user_id_type=open_id`,
+		);
+		return result?.data?.user?.name || null;
+	} catch (e) {
+		// 41050: App lacks contact scope. Expected until user grants permission.
+		const msg = String(e);
+		if (msg.includes('41050') || msg.includes('no user authority')) {
+			logger.debug('Contact API blocked (41050) — falling back to open_id suffix');
+		} else {
+			logger.warn(`resolveFeishuUserName error: ${msg}`);
+		}
+		return null;
+	}
+}
+
+interface RenderCtx {
+	blockMap: Map<string, FeishuBlock>;
+	headingNumbers: Map<string, number>;
+	consumedInlineIds: Set<string>;
+}
+
+// Render an HTML heading with two scys-specific concerns handled:
+//   1. skipBold — heading text is already visually bold, so `<strong>` inside
+//      would round-trip as `## **二、…**` (noisy + breaks `**` pair counting).
+//   2. block-level text-align (style.align): scys/feishu encodes alignment as
+//      1=left (default), 2=center, 3=right. We translate to <div align="…">
+//      wrapper so Obsidian Reading view renders the alignment.
+function renderHeading(level: number, elements: any, _style: any, ctx: RenderCtx, seqNumber?: number): string {
+	// skipBold: heading <h*> tag is already visually bold; nested <strong> →
+	// markdown `## **…**` is noisy and breaks `**` pair counting in adjacent
+	// runs (downstream `****` literal artifacts).
+	// Note: alignment (style.align) is not represented in pure markdown.
+	const inner = renderTextElements(elements, ctx, { skipBold: true });
+	const prefix = seqNumber !== undefined ? `${seqNumber}. ` : '';
+	return `<h${level}>${prefix}${inner}</h${level}>`;
+}
+
+interface RenderTextOptions {
+	// Skip <strong> wrapping when bold=true. Used by HEADING* renderers since
+	// markdown heading lines are already visually bold — emitting **…** inside
+	// `## …` produces noisy `## **二、…**` and breaks `**` pair counting in
+	// adjacent strong runs.
+	skipBold?: boolean;
+}
+
+// Side effect: marks blockId in ctx.consumedInlineIds so renderBlock skips it
+// later (prevents double-render when the inlined block also appears as a child
+// in its parent's children traversal).
+function renderInlineBlock(blockId: string, ctx: RenderCtx): string {
+	const target = ctx.blockMap.get(blockId);
+	if (!target) return '';
+	ctx.consumedInlineIds.add(blockId);
+	switch (target.block_type) {
+		case FEISHU_BLOCK_TYPE.FILE: {
+			const file = target.file;
+			if (!file?.name) return '';
+			return `<a href="feishu-file-inline://${target.block_id}" data-filename="${escapeHtml(file.name)}">${escapeHtml(file.name)}</a>`;
+		}
+		case FEISHU_BLOCK_TYPE.IMAGE: {
+			const img = target.image;
+			if (!img?.token) return '';
+			return `<img src="feishu-image://${img.token}" alt="">`;
+		}
+		default:
+			return `[内联块 ${blockId.slice(0, 8)}]`;
+	}
+}
+
+function renderTextElements(elements: FeishuTextBody['elements'], ctx: RenderCtx, opts: RenderTextOptions = {}): string {
 	if (!elements || !elements.length) return '';
 
-	return elements.map((el) => {
+	const rendered = elements.map((el) => {
+		if (el.inline_block?.block_id) {
+			return renderInlineBlock(el.inline_block.block_id, ctx);
+		}
 		if (el.equation?.content) {
 			return `<code>${escapeHtml(el.equation.content)}</code>`;
 		}
 
 		if (el.mention_doc?.title) {
-			return escapeHtml(el.mention_doc.title);
+			const title = escapeHtml(el.mention_doc.title);
+			const url = el.mention_doc.url;
+			if (url) {
+				return `<a href="${escapeAttr(url)}">${title}</a>`;
+			}
+			return title;
 		}
 
 		const run = el.text_run || el.mention_user;
@@ -470,7 +720,7 @@ function renderTextElements(elements: FeishuTextBody['elements']): string {
 		if (style?.inline_code) {
 			html = `<code>${html}</code>`;
 		}
-		if (style?.bold) {
+		if (style?.bold && !opts.skipBold) {
 			html = `<strong>${html}</strong>`;
 		}
 		if (style?.italic) {
@@ -482,6 +732,9 @@ function renderTextElements(elements: FeishuTextBody['elements']): string {
 		if (style?.underline) {
 			html = `<u>${html}</u>`;
 		}
+		// Note: scys/feishu text_color is not encoded into markdown — pure
+		// markdown has no color primitive, and HTML <span style="color:…">
+		// gets stripped by defuddle's turndown anyway. Skip silently.
 		if (style?.link?.url) {
 			try {
 				const decoded = decodeURIComponent(style.link.url);
@@ -489,10 +742,58 @@ function renderTextElements(elements: FeishuTextBody['elements']): string {
 			} catch {
 				html = `<a href="${escapeAttr(style.link.url)}">${html}</a>`;
 			}
+		} else {
+			// Autolink bare URLs in content. scys (esp. /articleDetail/xq_topic/)
+			// strips link metadata and leaves URLs as plain strings in content;
+			// GFM autolink fails when a CJK punctuation (e.g. "：") sits directly
+			// before the URL, so Obsidian renders it as inert text. Wrap explicitly
+			// so it becomes [url](url) in markdown.
+			html = autolinkBareUrls(html);
 		}
 
 		return html;
 	}).join('');
+	// Collapse adjacent identical <strong>/<em> blocks into a single span. Defuddle
+	// converts `<strong>aa</strong><strong>bb</strong>` to `**aa****bb**`, where
+	// the middle `****` is two empty strong markers that some markdown renderers
+	// surface as literal `**` artifacts. Merging avoids that.
+	return rendered
+		.replace(/<\/strong>(\s*)<strong>/g, '$1')
+		.replace(/<\/em>(\s*)<em>/g, '$1');
+}
+
+// Wraps bare http(s) URLs in <a href="…">…</a>. Skips URLs already inside an
+// anchor (defense against double-wrapping when called on rich HTML like
+// server-rendered comment content) and trailing punctuation that's almost
+// certainly not part of the URL (Chinese/ASCII sentence terminators and
+// matching brackets).
+export function autolinkBareUrls(html: string): string {
+	// Stop URL at whitespace, HTML metacharacters, or common Chinese/ASCII
+	// closing punctuation that won't be part of a URL.
+	const URL_RE = /https?:\/\/[^\s<>"'）)】」』，。；：、！？]+/g;
+	const wrapOne = (url: string): string => {
+		const trailing = url.match(/[.,;:!?)\]}>'"]+$/);
+		let core = url;
+		let tail = '';
+		if (trailing) {
+			core = url.slice(0, -trailing[0].length);
+			tail = trailing[0];
+		}
+		return `<a href="${escapeAttr(core)}">${core}</a>${tail}`;
+	};
+	// Split on existing <a>…</a> blocks; only autolink the segments outside.
+	// Anchor opening tags may carry any attributes (href, target, …).
+	const ANCHOR_RE = /<a\b[^>]*>[\s\S]*?<\/a>/gi;
+	const parts: string[] = [];
+	let last = 0;
+	let m: RegExpExecArray | null;
+	while ((m = ANCHOR_RE.exec(html)) !== null) {
+		parts.push(html.slice(last, m.index).replace(URL_RE, wrapOne));
+		parts.push(m[0]); // keep existing anchor untouched
+		last = m.index + m[0].length;
+	}
+	parts.push(html.slice(last).replace(URL_RE, wrapOne));
+	return parts.join('');
 }
 
 function getTextBody(block: FeishuBlock): FeishuTextBody | undefined {
@@ -517,149 +818,351 @@ function getTextBody(block: FeishuBlock): FeishuTextBody | undefined {
 	}
 }
 
-function convertBlocksToHtml(blocks: FeishuBlock[]): string {
+export function convertBlocksToHtml(blocks: FeishuBlock[], options?: { autoNumberHeadings?: boolean }): string {
 	const blockMap = new Map<string, FeishuBlock>();
 	for (const b of blocks) {
 		blockMap.set(b.block_id, b);
 	}
 
+	// Optional H1+H4 auto-numbering — feishu-only (scys reuses convertBlocksToHtml
+	// but its docs hand-write their own "2.1.1" prefixes, so we'd double-number).
+	// Feishu web's CSS counter:
+	//   - H1: global "1./2./..." across the doc (one counter for the whole doc)
+	//   - H4: "1./2./..." within each H2 section (counter resets at each H2)
+	// H2/H3/H5+ are NOT auto-numbered (users typically hand-write "一、二、" prefixes).
+	const headingNumbers = new Map<string, number>();
+	if (options?.autoNumberHeadings) {
+		let h1Seq = 0;
+		let h4Seq = 0;
+		for (const b of blocks) {
+			if (b.block_type === FEISHU_BLOCK_TYPE.HEADING1) {
+				h1Seq += 1;
+				headingNumbers.set(b.block_id, h1Seq);
+			} else if (b.block_type === FEISHU_BLOCK_TYPE.HEADING2) {
+				h4Seq = 0; // reset H4 counter at each H2 boundary
+			} else if (b.block_type === FEISHU_BLOCK_TYPE.HEADING4) {
+				h4Seq += 1;
+				headingNumbers.set(b.block_id, h4Seq);
+			}
+		}
+	}
+
+	const ctx: RenderCtx = { blockMap, headingNumbers, consumedInlineIds: new Set() };
+
 	const pageBlock = blocks.find(b => b.block_type === FEISHU_BLOCK_TYPE.PAGE);
 	if (!pageBlock?.children?.length) {
 		return blocks.filter(b => b.block_type !== FEISHU_BLOCK_TYPE.PAGE)
-			.map(b => renderBlock(b, blockMap))
+			.map(b => renderBlock(b, ctx))
 			.join('');
 	}
 
-	return renderChildren(pageBlock.children, blockMap);
+	return renderChildren(pageBlock.children, ctx);
 }
 
-function renderChildren(childIds: string[], blockMap: Map<string, FeishuBlock>): string {
+/**
+ * Returns true if `block` is a TEXT block whose text content (joined across
+ * all text_run elements) is empty after trim. Spacer = feishu's "blank line"
+ * convention between paragraphs/sections.
+ */
+function isEmptyTextSpacer(block: FeishuBlock | undefined): boolean {
+	if (!block || block.block_type !== FEISHU_BLOCK_TYPE.TEXT) return false;
+	const text = (block.text?.elements || [])
+		.map((e) => e.text_run?.content || '')
+		.join('');
+	return text.trim().length === 0;
+}
+
+/**
+ * Returns true if `block` is a TEXT block whose every non-empty `text_run`
+ * element is bold — the feishu-web convention for an inline section header
+ * placed between two list groups (e.g. "家长的痛点：" above a bullet list).
+ *
+ * Empty TEXTs (spacers) → false. Plain TEXTs (explanation paragraphs) → false.
+ */
+export function isSectionHeaderText(block: FeishuBlock): boolean {
+	if (block.block_type !== FEISHU_BLOCK_TYPE.TEXT) return false;
+	const elements = block.text?.elements || [];
+	const nonEmpty = elements.filter(
+		(e) => (e.text_run?.content || '').trim().length > 0,
+	);
+	if (nonEmpty.length === 0) return false;
+	return nonEmpty.every(
+		(e) => e.text_run?.text_element_style?.bold === true,
+	);
+}
+
+const LIST_KINDS = [
+	FEISHU_BLOCK_TYPE.BULLET,
+	FEISHU_BLOCK_TYPE.ORDERED,
+	FEISHU_BLOCK_TYPE.TODO,
+] as const;
+type ListKind = typeof LIST_KINDS[number];
+
+// Structural blocks that close any open list when encountered as a sibling.
+// Anything not in this set and not a list kind is treated as a "follower"
+// (continuation content) that gets appended to the preceding <li>.
+const LIST_BOUNDARIES = new Set<number>([
+	FEISHU_BLOCK_TYPE.PAGE,
+	FEISHU_BLOCK_TYPE.HEADING1, FEISHU_BLOCK_TYPE.HEADING2, FEISHU_BLOCK_TYPE.HEADING3,
+	FEISHU_BLOCK_TYPE.HEADING4, FEISHU_BLOCK_TYPE.HEADING5, FEISHU_BLOCK_TYPE.HEADING6,
+	FEISHU_BLOCK_TYPE.HEADING7, FEISHU_BLOCK_TYPE.HEADING8, FEISHU_BLOCK_TYPE.HEADING9,
+	FEISHU_BLOCK_TYPE.CALLOUT,
+	FEISHU_BLOCK_TYPE.QUOTE_CONTAINER,
+	FEISHU_BLOCK_TYPE.GRID,
+	FEISHU_BLOCK_TYPE.TABLE,
+	FEISHU_BLOCK_TYPE.DIVIDER,
+	FEISHU_BLOCK_TYPE.IFRAME,
+]);
+
+function isListKind(t: number): t is ListKind {
+	return (LIST_KINDS as readonly number[]).includes(t);
+}
+
+function renderTodoItem(
+	block: FeishuBlock,
+	ctx: RenderCtx,
+	appendHtml = '',
+): string {
+	const done = (block.todo as any)?.style?.done === true;
+	const inner = renderTextElements(block.todo?.elements, ctx);
+	const children = renderBlockChildren(block, ctx);
+	const checkbox = done ? '[x] ' : '[ ] ';
+	return `<li>${escapeHtml(checkbox)}${inner}${children}${appendHtml}</li>`;
+}
+
+// Accumulates a single logical list starting at childIds[startIdx].
+// - blocks of `kind` → new <li>, and any buffered followers flush to the
+//   PREVIOUS <li> (the one this block does NOT belong to)
+// - LIST_BOUNDARIES or a different list kind → close the list
+// - other blocks → buffered as followers (TEXT, IFRAME, IMAGE, FILE, QUOTE, …)
+// - on close, remaining followers flush to the LAST <li>
+function collectListGroup(
+	kind: ListKind,
+	childIds: string[],
+	startIdx: number,
+	ctx: RenderCtx,
+): { html: string; nextIdx: number } {
+	type Entry = { block: FeishuBlock; followerBlocks: FeishuBlock[] };
+	const entries: Entry[] = [];
+	let pendingFollowers: FeishuBlock[] = [];
+	let i = startIdx;
+
+	while (i < childIds.length) {
+		const b = ctx.blockMap.get(childIds[i]);
+		if (!b) { i++; continue; }
+
+		if (b.block_type === kind) {
+			if (entries.length > 0 && pendingFollowers.length > 0) {
+				entries[entries.length - 1].followerBlocks.push(...pendingFollowers);
+				pendingFollowers = [];
+			}
+			entries.push({ block: b, followerBlocks: [] });
+			i++;
+			continue;
+		}
+
+		if (isListKind(b.block_type) || LIST_BOUNDARIES.has(b.block_type)) {
+			break;
+		}
+
+		// A bold-only TEXT block is the feishu convention for a section header
+		// (e.g., "家长的痛点：" above a bullet list). Close the current list so
+		// the header renders as its own <p><strong>…</strong></p> paragraph.
+		if (isSectionHeaderText(b)) {
+			break;
+		}
+
+		// An empty TEXT spacer (feishu's blank-line convention) signals
+		// end-of-list when the next non-empty block is NOT the same list kind.
+		// If the next non-empty block IS the same kind, keep absorbing the
+		// spacer as a follower so list items separated by a blank line stay
+		// in one <ul>/<ol>.
+		if (isEmptyTextSpacer(b)) {
+			let j = i + 1;
+			while (j < childIds.length && isEmptyTextSpacer(ctx.blockMap.get(childIds[j]))) {
+				j++;
+			}
+			const next = j < childIds.length ? ctx.blockMap.get(childIds[j]) : undefined;
+			if (next && next.block_type === kind) {
+				pendingFollowers.push(b);
+				i++;
+				continue;
+			}
+			// Close the list; leave `i` pointing AT the spacer so the upper
+			// `renderChildren` loop processes spacer + following blocks as
+			// page-level siblings (empty TEXT renders as '' in renderBlock).
+			break;
+		}
+
+		pendingFollowers.push(b);
+		i++;
+	}
+
+	if (entries.length > 0 && pendingFollowers.length > 0) {
+		entries[entries.length - 1].followerBlocks.push(...pendingFollowers);
+	}
+
+	const liHtml = entries.map(({ block, followerBlocks }) => {
+		const appendHtml = followerBlocks.map((fb) => renderBlock(fb, ctx)).join('');
+		if (kind === FEISHU_BLOCK_TYPE.TODO) {
+			return renderTodoItem(block, ctx, appendHtml);
+		}
+		return renderListItem(block, ctx, appendHtml);
+	}).join('');
+
+	const openTag =
+		kind === FEISHU_BLOCK_TYPE.ORDERED ? '<ol>' :
+		kind === FEISHU_BLOCK_TYPE.TODO ? '<ul class="feishu-todo">' :
+		'<ul>';
+	const closeTag = kind === FEISHU_BLOCK_TYPE.ORDERED ? '</ol>' : '</ul>';
+
+	return { html: `${openTag}${liHtml}${closeTag}`, nextIdx: i };
+}
+
+function renderChildren(childIds: string[], ctx: RenderCtx): string {
 	const parts: string[] = [];
 	let i = 0;
 
 	while (i < childIds.length) {
-		const block = blockMap.get(childIds[i]);
+		const block = ctx.blockMap.get(childIds[i]);
 		if (!block) { i++; continue; }
 
-		if (block.block_type === FEISHU_BLOCK_TYPE.BULLET) {
-			const listItems: string[] = [];
-			while (i < childIds.length) {
-				const b = blockMap.get(childIds[i]);
-				if (!b || b.block_type !== FEISHU_BLOCK_TYPE.BULLET) break;
-				listItems.push(renderListItem(b, blockMap));
-				i++;
-			}
-			parts.push(`<ul>${listItems.join('')}</ul>`);
+		if (isListKind(block.block_type)) {
+			const { html, nextIdx } = collectListGroup(
+				block.block_type as ListKind,
+				childIds,
+				i,
+				ctx,
+			);
+			parts.push(html);
+			i = nextIdx;
 			continue;
 		}
 
-		if (block.block_type === FEISHU_BLOCK_TYPE.ORDERED) {
-			const listItems: string[] = [];
-			while (i < childIds.length) {
-				const b = blockMap.get(childIds[i]);
-				if (!b || b.block_type !== FEISHU_BLOCK_TYPE.ORDERED) break;
-				listItems.push(renderListItem(b, blockMap));
-				i++;
-			}
-			parts.push(`<ol>${listItems.join('')}</ol>`);
-			continue;
-		}
-
-		if (block.block_type === FEISHU_BLOCK_TYPE.TODO) {
-			const listItems: string[] = [];
-			while (i < childIds.length) {
-				const b = blockMap.get(childIds[i]);
-				if (!b || b.block_type !== FEISHU_BLOCK_TYPE.TODO) break;
-				const done = (b.todo as any)?.style?.done === true;
-				const inner = renderTextElements(b.todo?.elements);
-				const checkbox = done ? '[x] ' : '[ ] ';
-				listItems.push(`<li>${escapeHtml(checkbox)}${inner}${renderBlockChildren(b, blockMap)}</li>`);
-				i++;
-			}
-			parts.push(`<ul class="feishu-todo">${listItems.join('')}</ul>`);
-			continue;
-		}
-
-		parts.push(renderBlock(block, blockMap));
+		parts.push(renderBlock(block, ctx));
 		i++;
 	}
 
 	return parts.join('');
 }
 
-function renderListItem(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderListItem(
+	block: FeishuBlock,
+	ctx: RenderCtx,
+	appendHtml = '',
+): string {
 	const body = getTextBody(block);
-	const inner = renderTextElements(body?.elements);
-	const children = renderBlockChildren(block, blockMap);
-	return `<li>${inner}${children}</li>`;
+	const inner = renderTextElements(body?.elements, ctx);
+	const children = renderBlockChildren(block, ctx);
+	return `<li>${inner}${children}${appendHtml}</li>`;
 }
 
-function renderBlockChildren(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderBlockChildren(block: FeishuBlock, ctx: RenderCtx): string {
 	if (!block.children?.length) return '';
-	return renderChildren(block.children, blockMap);
+	return renderChildren(block.children, ctx);
 }
 
-function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderBlock(block: FeishuBlock, ctx: RenderCtx): string {
+	if (ctx.consumedInlineIds.has(block.block_id)) {
+		return '';
+	}
 	switch (block.block_type) {
 		case FEISHU_BLOCK_TYPE.PAGE:
-			return renderBlockChildren(block, blockMap);
+			return renderBlockChildren(block, ctx);
 
 		case FEISHU_BLOCK_TYPE.TEXT: {
-			const inner = renderTextElements(block.text?.elements);
+			const inner = renderTextElements(block.text?.elements, ctx);
 			if (!inner.trim()) return '';
 			return `<p>${inner}</p>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.HEADING1:
-			return `<h1>${renderTextElements(block.heading1?.elements)}</h1>`;
+			return renderHeading(1, block.heading1?.elements, (block.heading1 as any)?.style, ctx, ctx.headingNumbers.get(block.block_id));
 		case FEISHU_BLOCK_TYPE.HEADING2:
-			return `<h2>${renderTextElements(block.heading2?.elements)}</h2>`;
+			return renderHeading(2, block.heading2?.elements, (block.heading2 as any)?.style, ctx);
 		case FEISHU_BLOCK_TYPE.HEADING3:
-			return `<h3>${renderTextElements(block.heading3?.elements)}</h3>`;
+			return renderHeading(3, block.heading3?.elements, (block.heading3 as any)?.style, ctx);
 		case FEISHU_BLOCK_TYPE.HEADING4:
-			return `<h4>${renderTextElements(block.heading4?.elements)}</h4>`;
+			return renderHeading(4, block.heading4?.elements, (block.heading4 as any)?.style, ctx, ctx.headingNumbers.get(block.block_id));
 		case FEISHU_BLOCK_TYPE.HEADING5:
-			return `<h5>${renderTextElements(block.heading5?.elements)}</h5>`;
+			return renderHeading(5, block.heading5?.elements, (block.heading5 as any)?.style, ctx);
 		case FEISHU_BLOCK_TYPE.HEADING6:
-			return `<h6>${renderTextElements(block.heading6?.elements)}</h6>`;
+			return renderHeading(6, block.heading6?.elements, (block.heading6 as any)?.style, ctx);
 		case FEISHU_BLOCK_TYPE.HEADING7:
 		case FEISHU_BLOCK_TYPE.HEADING8:
 		case FEISHU_BLOCK_TYPE.HEADING9: {
 			const body = getTextBody(block);
-			return `<h6>${renderTextElements(body?.elements)}</h6>`;
+			return renderHeading(6, body?.elements, (body as any)?.style, ctx);
 		}
 
 		case FEISHU_BLOCK_TYPE.BULLET:
-			return `<ul>${renderListItem(block, blockMap)}</ul>`;
+			return `<ul>${renderListItem(block, ctx)}</ul>`;
 		case FEISHU_BLOCK_TYPE.ORDERED:
-			return `<ol>${renderListItem(block, blockMap)}</ol>`;
+			return `<ol>${renderListItem(block, ctx)}</ol>`;
 
 		case FEISHU_BLOCK_TYPE.CODE: {
-			const inner = renderTextElements(block.code?.elements);
+			const inner = renderTextElements(block.code?.elements, ctx);
 			return `<pre><code>${inner}</code></pre>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.QUOTE: {
-			const inner = renderTextElements(block.quote?.elements);
+			const inner = renderTextElements(block.quote?.elements, ctx);
 			return `<blockquote><p>${inner}</p></blockquote>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.QUOTE_CONTAINER: {
-			const children = renderBlockChildren(block, blockMap);
+			const children = renderBlockChildren(block, ctx);
 			return `<blockquote>${children}</blockquote>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.TODO: {
 			const done = (block.todo as any)?.style?.done === true;
-			const inner = renderTextElements(block.todo?.elements);
+			const inner = renderTextElements(block.todo?.elements, ctx);
 			const checkbox = done ? '[x] ' : '[ ] ';
 			return `<ul class="feishu-todo"><li>${escapeHtml(checkbox)}${inner}</li></ul>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.CALLOUT: {
-			const inner = renderTextElements(block.callout?.elements);
-			const children = renderBlockChildren(block, blockMap);
-			return `<blockquote class="feishu-callout">${inner ? `<p>${inner}</p>` : ''}${children}</blockquote>`;
+			// Two emoji_id shapes seen:
+			//   scys docx:       block.callout.emoji_id
+			//   feishu standard: block.callout.style.emoji_id
+			// Emit Obsidian-native callout syntax (`[!type] title`) so reading
+			// view shows a colored box matching feishu's tinted callout, and
+			// keep the original emoji inline in the title so visual parity is
+			// preserved when Obsidian's default icon for that type differs.
+			const callout = block.callout as any;
+			const emojiId = callout?.emoji_id || callout?.style?.emoji_id || '';
+			const emoji = emojiId ? feishuEmojiToUnicode(emojiId) : '';
+			const calloutType = FEISHU_EMOJI_TO_CALLOUT_TYPE[emojiId] || 'note';
+
+			let titleText = renderTextElements(block.callout?.elements, ctx);
+			const allChildIds = block.children || [];
+			let bodyChildIds = allChildIds;
+			// scys docx callouts have callout.elements=null and put the visual
+			// title as a leading heading child. Promote that into the title
+			// line so Obsidian shows it on the callout's coloured header bar.
+			if (!titleText && allChildIds.length > 0) {
+				const firstChild = ctx.blockMap.get(allChildIds[0]);
+				const headingKey = firstChild ? ({
+					[FEISHU_BLOCK_TYPE.HEADING1]: 'heading1',
+					[FEISHU_BLOCK_TYPE.HEADING2]: 'heading2',
+					[FEISHU_BLOCK_TYPE.HEADING3]: 'heading3',
+					[FEISHU_BLOCK_TYPE.HEADING4]: 'heading4',
+					[FEISHU_BLOCK_TYPE.HEADING5]: 'heading5',
+					[FEISHU_BLOCK_TYPE.HEADING6]: 'heading6',
+					[FEISHU_BLOCK_TYPE.HEADING7]: 'heading7',
+					[FEISHU_BLOCK_TYPE.HEADING8]: 'heading8',
+					[FEISHU_BLOCK_TYPE.HEADING9]: 'heading9',
+				} as Record<number, string | undefined>)[firstChild.block_type as number] : undefined;
+				if (firstChild && headingKey) {
+					titleText = renderTextElements((firstChild as any)[headingKey]?.elements, ctx);
+					bodyChildIds = allChildIds.slice(1);
+				}
+			}
+			const childrenHtml = renderChildren(bodyChildIds, ctx);
+			const title = [emoji, titleText].filter(Boolean).join(' ');
+			const titleLine = `[!${calloutType}]${title ? ' ' + title : ''}`;
+			return `<blockquote class="feishu-callout"><p>${titleLine}</p>${childrenHtml}</blockquote>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.DIVIDER:
@@ -667,35 +1170,64 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 
 		case FEISHU_BLOCK_TYPE.IMAGE: {
 			const img = block.image;
-			if (img?.token) {
-				return `<figure><img src="feishu-image://${img.token}" alt="" width="${img.width || ''}" height="${img.height || ''}"></figure>`;
-			}
-			return '';
+			if (!img?.token) return '';
+			const captionHtml = img.caption?.content
+				? `<figcaption>${escapeHtml(img.caption.content)}</figcaption>`
+				: '';
+			return `<figure><img src="feishu-image://${img.token}" alt="" width="${img.width || ''}" height="${img.height || ''}">${captionHtml}</figure>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.FILE: {
 			const file = block.file;
-			if (file?.name) {
-				return `<p>[File: ${escapeHtml(file.name)}]</p>`;
+			if (!file?.name || !block.block_id) {
+				return file?.name ? `<p>📎 ${escapeHtml(file.name)}</p>` : '';
 			}
-			return '';
+			// Use block_id (not file_token): Feishu doesn't expose attachments
+			// as standalone /file/{token} URLs — they live inside their parent
+			// doc. Anchor with #{block_id} makes the doc scroll to the
+			// attachment when opened.
+			return `<a href="feishu-file-block://${block.block_id}" data-filename="${escapeHtml(file.name)}">${escapeHtml(file.name)}</a>`;
 		}
 
 		case FEISHU_BLOCK_TYPE.TABLE: {
-			return renderTable(block, blockMap);
+			return renderTable(block, ctx);
 		}
 
 		case FEISHU_BLOCK_TYPE.GRID: {
-			return renderBlockChildren(block, blockMap);
+			return renderBlockChildren(block, ctx);
 		}
 
 		case FEISHU_BLOCK_TYPE.GRID_COLUMN: {
-			return renderBlockChildren(block, blockMap);
+			return renderBlockChildren(block, ctx);
 		}
 
-		case FEISHU_BLOCK_TYPE.IFRAME:
+		// VIEW (33) and SOURCE_SYNCED (49) are transparent containers — render
+		// children, drop self elements. VIEW wraps embedded attachments /
+		// referenced documents (actual FILE child sits one level down, must
+		// recurse to render it instead of dropping the whole subtree).
+		case FEISHU_BLOCK_TYPE.VIEW:
+		case FEISHU_BLOCK_TYPE.SOURCE_SYNCED: {
+			return renderBlockChildren(block, ctx);
+		}
+
+		case FEISHU_BLOCK_TYPE.SHEET: {
+			// Embedded spreadsheet: token format is {spreadsheet_token}_{sheet_id}.
+			// Emit a placeholder; resolveFeishuSheets() fetches data + replaces it
+			// with a real HTML table.
+			const token = (block as any).sheet?.token;
+			if (!token) return `<p>📊 [Sheet 无 token]</p>`;
+			return `<table data-feishu-sheet="${token}"></table>`;
+		}
+
+		case FEISHU_BLOCK_TYPE.IFRAME: {
+			const rawUrl = block.iframe?.component?.url;
+			if (!rawUrl) return `<p>[Embedded content: type 26]</p>`;
+			const decoded = safeDecode(rawUrl);
+			const label = extractDomainLabel(decoded) || decoded;
+			return `<p>🌐 <a href="${escapeAttr(decoded)}">${escapeHtml(label)}</a></p>`;
+		}
+
 		case FEISHU_BLOCK_TYPE.WIDGET:
-		case FEISHU_BLOCK_TYPE.SHEET:
 		case FEISHU_BLOCK_TYPE.MINDNOTE:
 		case FEISHU_BLOCK_TYPE.DIAGRAM:
 		case FEISHU_BLOCK_TYPE.CHAT_CARD:
@@ -706,7 +1238,7 @@ function renderBlock(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 	}
 }
 
-function renderTable(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): string {
+function renderTable(block: FeishuBlock, ctx: RenderCtx): string {
 	const table = block.table;
 	if (!table?.property) return '';
 
@@ -722,10 +1254,10 @@ function renderTable(block: FeishuBlock, blockMap: Map<string, FeishuBlock>): st
 		for (let c = 0; c < colSize; c++) {
 			const idx = r * colSize + c;
 			const cellId = cellIds[idx];
-			const cellBlock = cellId ? blockMap.get(cellId) : undefined;
+			const cellBlock = cellId ? ctx.blockMap.get(cellId) : undefined;
 			const tag = r === 0 ? 'th' : 'td';
 			if (cellBlock?.children?.length) {
-				const content = renderChildren(cellBlock.children, blockMap);
+				const content = renderChildren(cellBlock.children, ctx);
 				cells.push(`<${tag}>${content}</${tag}>`);
 			} else {
 				cells.push(`<${tag}></${tag}>`);
@@ -754,9 +1286,9 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	logger.debug('Resolved document', { documentId: resolved.documentId, objType: resolved.objType });
 
-	const [blocks, meta] = await Promise.all([
+	const [blocks, docMeta] = await Promise.all([
 		fetchAllBlocks(resolved.documentId),
-		fetchDocumentMeta(resolved.documentId),
+		fetchFeishuDocMeta(resolved.documentId, resolved.objType as 'docx' | 'doc'),
 	]);
 
 	if (!blocks.length) {
@@ -766,9 +1298,39 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 
 	logger.info('Extraction complete', { documentId: resolved.documentId, blockCount: blocks.length });
 
-	const rawContent = convertBlocksToHtml(blocks);
-	const content = await resolveFeishuImages(rawContent);
-	const title = meta?.title || doc.title || '';
+	const rawContent = convertBlocksToHtml(blocks, { autoNumberHeadings: true });
+	const imagesResolved = await resolveFeishuImages(rawContent);
+	const sheetsResolved = await resolveFeishuSheets(imagesResolved);
+	const content = resolveFeishuFiles(sheetsResolved, doc.URL);
+
+	let commentsMarkdown = '';
+	try {
+		commentsMarkdown = await extractFeishuComments(resolved.documentId);
+	} catch (e) {
+		logger.warn(`Comments extraction threw: ${String(e)}`);
+	}
+
+	// Author resolution priority:
+	//   1. DOM scrape — feishu web renders the doc owner's display name in
+	//      `.docs-info-avatar-name-text` (first match = primary owner).
+	//      Works without OpenAPI permissions because the page already loaded
+	//      contact info for current user's view.
+	//   2. Contact API — fallback for clipping flows without page DOM
+	//      (e.g., headless test). Returns null on 41050 (cross-tenant user).
+	//   3. Empty string — open_id is a useless feishu internal ID for users;
+	//      we don't surface it. frontmatter `author:` stays empty.
+	const ownerOpenId = docMeta?.ownerOpenId || '';
+	const domAuthor = (() => {
+		try {
+			const el = doc.querySelector?.('.docs-info-avatar-name-text');
+			return el?.textContent?.trim() || '';
+		} catch { return ''; }
+	})();
+	const apiName = !domAuthor && ownerOpenId ? await resolveFeishuUserName(ownerOpenId) : null;
+	const authorTag = domAuthor || apiName || '';
+	const publishedDate = docMeta?.latestModifyTime
+		? convertDate(new Date(docMeta.latestModifyTime * 1000))
+		: '';
 
 	const textContent = blocks
 		.map(b => {
@@ -784,9 +1346,11 @@ export async function extractFeishuStructuredContent(doc: Document): Promise<Fei
 	const wordCount = textContent.split(/\s+/).filter(Boolean).length || textContent.length;
 
 	return {
-		title,
-		author: meta?.owner || '',
+		title: docMeta?.title || doc.title || '',
+		author: authorTag,
 		content,
+		commentsMarkdown: commentsMarkdown || undefined,
+		published: publishedDate || undefined,
 		wordCount,
 	};
 }
@@ -807,4 +1371,20 @@ function escapeAttr(value: string): string {
 		.replace(/'/g, '&#39;')
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;');
+}
+
+function safeDecode(s: string): string {
+	try { return decodeURIComponent(s); } catch { return s; }
+}
+
+function extractDomainLabel(url: string): string {
+	try {
+		const u = new URL(url);
+		const hostname = u.hostname.replace(/^www\./, '');
+		const path = u.pathname && u.pathname !== '/' ? u.pathname : '';
+		const search = !path && u.search ? u.search : '';
+		return hostname + path + search;
+	} catch {
+		return '';
+	}
 }

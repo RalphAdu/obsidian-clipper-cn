@@ -25,12 +25,12 @@ module.exports = (env, argv) => {
 	const isSafari = env.BROWSER === 'safari';
 	const isProduction = argv.mode === 'production';
 
+	// cn 约定：开发与生产构建统一输出到 dist*/。Chrome 等扩展恒定加载 dist/，
+	// 避免出现"watch 在 dev/ 而扩展加载 dist/"导致的代码改了 reload 没反应。
+	// 开发模式仍带 sourcemap + 不 minify（见 devtool / optimization 配置），
+	// production build 写同一目录覆盖之，是预期行为。
 	const getOutputDir = () => {
-		if (isProduction) {
-			return isFirefox ? 'dist_firefox' : (isSafari ? 'dist_safari' : 'dist');
-		} else {
-			return isFirefox ? 'dev_firefox' : (isSafari ? 'dev_safari' : 'dev');
-		}
+		return isFirefox ? 'dist_firefox' : (isSafari ? 'dist_safari' : 'dist');
 	};
 
 	const outputDir = getOutputDir();
@@ -41,6 +41,8 @@ module.exports = (env, argv) => {
 		entry: {
 			popup: './src/core/popup.ts',
 			settings: './src/core/settings.ts',
+			highlights: './src/core/highlights.ts',
+			'reader-page': './src/core/reader-view.ts',
 			content: './src/content.ts',
 			background: './src/background.ts',
 			style: './src/style.scss',
@@ -144,9 +146,12 @@ module.exports = (env, argv) => {
 					{ from: "src/popup.html", to: "popup.html" },
 					{ from: "src/side-panel.html", to: "side-panel.html" },
 					{ from: "src/settings.html", to: "settings.html" },
+					{ from: "src/highlights.html", to: "highlights.html" },
+					{ from: "src/reader.html", to: "reader.html" },
 					{ from: "src/icons", to: "icons" },
 					{ from: "node_modules/webextension-polyfill/dist/browser-polyfill.min.js", to: "browser-polyfill.min.js" },
 					{ from: "src/flatten-shadow-dom.js", to: "flatten-shadow-dom.js" },
+					{ from: "src/scys-docx-patch.js", to: "scys-docx-patch.js" },
 					{
 						from: 'src/_locales',
 						to: '_locales'
@@ -160,6 +165,29 @@ module.exports = (env, argv) => {
 				apply: (compiler) => {
 					compiler.hooks.afterEmit.tap('RemoveDSStore', (compilation) => {
 						removeDSStore(path.resolve(__dirname, outputDir));
+					});
+				}
+			},
+			// Emit a build-marker.txt with the current timestamp every build.
+			// The background service worker polls this file when DEBUG_MODE is on
+			// and reloads the extension when the contents change. Enables fully
+			// automated dev-iteration: edit code, npm build, extension auto-reloads.
+			{
+				apply: (compiler) => {
+					compiler.hooks.thisCompilation.tap('BuildMarkerPlugin', (compilation) => {
+						compilation.hooks.processAssets.tap(
+							{
+								name: 'BuildMarkerPlugin',
+								stage: webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
+							},
+							() => {
+								const marker = String(Date.now());
+								compilation.emitAsset(
+									'build-marker.txt',
+									new webpack.sources.RawSource(marker)
+								);
+							}
+						);
 					});
 				}
 			},

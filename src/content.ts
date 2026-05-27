@@ -1,16 +1,24 @@
 import browser from './utils/browser-polyfill';
 import * as highlighter from './utils/highlighter';
+import { removeExistingHighlights } from './utils/highlighter-overlays';
 import { loadSettings, generalSettings } from './utils/storage-utils';
-import Defuddle from 'defuddle';
 import { getDomain, normalizeImageSources } from './utils/string-utils';
 import { extractContentBySelector as extractContentBySelectorShared } from './utils/shared';
+import Defuddle from 'defuddle';
 import { createMarkdownContent } from 'defuddle/full';
 import { flattenShadowDom } from './utils/flatten-shadow-dom';
+import { serializeChildren } from './utils/dom-utils';
 import { saveFile } from './utils/file-utils';
 import { debugLog } from './utils/debug';
 import { createLogger } from './utils/logger';
 import { extractBilibiliStructuredContent, isBilibiliVideoUrl } from './utils/bilibili-extractor';
 import { extractFeishuStructuredContent, isFeishuDocUrl } from './utils/feishu-extractor';
+import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArticleUrl } from './utils/scys-extractor';
+import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks } from './utils/weixin-helpers';
+import { postProcessExtractorMarkdown } from './utils/markdown-post-process';
+import type { Attachment } from './utils/attachment-types';
+import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 
 const contentLogger = createLogger('Content');
 
@@ -64,6 +72,7 @@ declare global {
 		const articleClone = article.cloneNode(true) as HTMLElement;
 		normalizeImageSources(articleClone as unknown as Document);
 		articleClone.querySelectorAll('script, style').forEach(el => el.remove());
+		normalizePreBlockLineBreaks(articleClone);
 		return articleClone.outerHTML;
 	}
 
@@ -71,22 +80,10 @@ declare global {
 	const iframeId = 'obsidian-clipper-iframe';
 	const containerId = 'obsidian-clipper-container';
 
-	let sidebarWidthRaf: number | null = null;
-
-	function updateSidebarWidth(container: HTMLElement | null) {
-		if (sidebarWidthRaf) cancelAnimationFrame(sidebarWidthRaf);
-		sidebarWidthRaf = requestAnimationFrame(() => {
-			if (container && document.contains(container)) {
-				document.documentElement.style.setProperty('--clipper-sidebar-width', `${container.offsetWidth + 24}px`);
-			} else {
-				document.documentElement.style.removeProperty('--clipper-sidebar-width');
-			}
-		});
-	}
-
 	function removeContainer(container: HTMLElement) {
 		container.classList.add('is-closing');
-		updateSidebarWidth(null);
+		updateSidebarWidth(document, null);
+		cleanupResizeHandlers(document);
 		container.addEventListener('animationend', () => {
 			container.remove();
 			highlighter.repositionHighlights();
@@ -116,107 +113,21 @@ declare global {
 
 		const iframe = document.createElement('iframe');
 		iframe.id = iframeId;
+		iframe.allow = 'clipboard-write; web-share';
 		iframe.src = browser.runtime.getURL('side-panel.html?context=iframe');
 		container.appendChild(iframe);
 
-		// Add resize handle (left side only)
-		const handle = document.createElement('div');
-		handle.className = `obsidian-clipper-resize-handle obsidian-clipper-resize-handle-w`;
-		container.appendChild(handle);
-		addResizeListener(container, handle, 'w');
-
-		const southHandle = document.createElement('div');
-		southHandle.className = `obsidian-clipper-resize-handle obsidian-clipper-resize-handle-s`;
-		container.appendChild(southHandle);
-		addResizeListener(container, southHandle, 's');
-
-		const southWestHandle = document.createElement('div');
-		southWestHandle.className = 'obsidian-clipper-resize-handle obsidian-clipper-resize-handle-sw';
-		container.appendChild(southWestHandle);
-		addResizeListener(container, southWestHandle, 'sw');
+		const resizeCallbacks = {
+			onResize: () => highlighter.repositionHighlights(),
+			onResizeEnd: () => highlighter.repositionHighlights(),
+		};
+		addResizeHandle(document, container, 'w', resizeCallbacks);
+		addResizeHandle(document, container, 's', resizeCallbacks);
+		addResizeHandle(document, container, 'sw', resizeCallbacks);
 
 		document.body.appendChild(container);
-		updateSidebarWidth(container);
-		container.addEventListener('animationend', () => {
-			highlighter.repositionHighlights();
-		}, { once: true });
-	}
-
-	function addResizeListener(container: HTMLElement, handle: HTMLElement, direction: string) {
-		let isResizing = false;
-		let startX: number, startY: number, startWidth: number, startHeight: number, startLeft: number, startTop: number;
-	
-		handle.onmousedown = (e) => {
-			e.stopPropagation();
-			isResizing = true;
-			startX = e.clientX;
-			startY = e.clientY;
-			startWidth = container.offsetWidth;
-			startHeight = container.offsetHeight;
-			startLeft = container.offsetLeft;
-			startTop = container.offsetTop;
-
-			document.body.style.cursor = window.getComputedStyle(handle).cursor;
-	
-			const iframe = container.querySelector('#obsidian-clipper-iframe');
-			if (iframe) iframe.classList.add('is-resizing');
-	
-			document.onmousemove = (moveEvent) => {
-				if (!isResizing) return;
-
-				const dx = moveEvent.clientX - startX;
-				const dy = moveEvent.clientY - startY;
-
-				const minWidth = parseInt(container.style.minWidth) || 200;
-				const minHeight = parseInt(container.style.minHeight) || 200;
-
-				if (direction.includes('e')) {
-					let newWidth = startWidth + dx;
-					if (newWidth < minWidth) newWidth = minWidth;
-					container.style.width = `${newWidth}px`;
-				}
-				if (direction.includes('w')) {
-					let newWidth = startWidth - dx;
-					if (newWidth < minWidth) {
-						newWidth = minWidth;
-					}
-					container.style.width = `${newWidth}px`;
-				}
-				if (direction.includes('s')) {
-					let newHeight = startHeight + dy;
-					if (newHeight < minHeight) newHeight = minHeight;
-					container.style.height = `${newHeight}px`;
-				}
-				if (direction.includes('n')) {
-					let newHeight = startHeight - dy;
-					let newTop = startTop + dy;
-					if (newHeight < minHeight) {
-						newHeight = minHeight;
-						newTop = startTop + startHeight - minHeight;
-					}
-					container.style.height = `${newHeight}px`;
-					container.style.top = `${newTop}px`;
-				}
-
-				updateSidebarWidth(container);
-			};
-	
-			document.onmouseup = () => {
-				isResizing = false;
-				const iframe = container.querySelector('#obsidian-clipper-iframe');
-				if (iframe) iframe.classList.remove('is-resizing');
-				document.body.style.cursor = '';
-				
-				const newWidth = container.offsetWidth;
-				const newHeight = container.offsetHeight;
-				browser.storage.local.set({ clipperIframeWidth: newWidth, clipperIframeHeight: newHeight });
-
-				highlighter.repositionHighlights();
-
-				document.onmousemove = null;
-				document.onmouseup = null;
-			};
-		};
+		updateSidebarWidth(document, container);
+		container.addEventListener('animationend', () => highlighter.repositionHighlights(), { once: true });
 	}
 
 	// Firefox
@@ -241,6 +152,8 @@ declare global {
 		wordCount: number;
 		language: string;
 		metaTags: { name?: string | null; property?: string | null; content: string | null }[];
+		attachments: Attachment[];
+		extractorWarnings?: string[];
 	}
 
 	browser.runtime.onMessage.addListener((request: any, sender, sendResponse) => {
@@ -343,7 +256,7 @@ declare global {
 					const clonedSelection = range.cloneContents();
 					const div = document.createElement('div');
 					div.appendChild(clonedSelection);
-					selectedHtml = div.innerHTML;
+					selectedHtml = serializeChildren(div);
 				}
 
 				// Use parseAsync to ensure async variables like {{transcript}} are available.
@@ -355,18 +268,45 @@ declare global {
 				);
 				const defuddled = await Promise.race([defuddle.parseAsync(), parseTimeout])
 					.catch(() => defuddle.parse());
+			const extractorWarnings: string[] = [];
 			const bilibiliContent = isBilibiliVideoUrl(document.URL)
 				? await extractBilibiliStructuredContent(document).catch((error) => {
-					contentLogger.warn('Failed to extract Bilibili structured content', { error: String(error) });
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract Bilibili structured content', { error: msg });
+					extractorWarnings.push(`Bilibili: ${msg}`);
 					return null;
 				})
 				: null;
 			const feishuContent = isFeishuDocUrl(document.URL)
 				? await extractFeishuStructuredContent(document).catch((error) => {
-					contentLogger.warn('Failed to extract Feishu structured content', { error: String(error) });
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract Feishu structured content', { error: msg });
+					extractorWarnings.push(`Feishu: ${msg}`);
 					return null;
 				})
 				: null;
+			const scysContent = (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL) || isScysArticleUrl(document.URL))
+				? await extractScysStructuredContent(document).catch((error) => {
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract scys structured content', { error: msg });
+					extractorWarnings.push(`scys: ${msg}`);
+					return null;
+				})
+				: null;
+			const zsxqContent = (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL) || isZsxqArticlesHtmlUrl(document.URL))
+				? await extractZsxqStructuredContent(document).catch((error) => {
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract zsxq structured content', { error: msg });
+					extractorWarnings.push(`zsxq: ${msg}`);
+					return null;
+				})
+				: null;
+			// Site extractor matched URL but returned null (silently — e.g. scys
+			// extractScysArticleStandalone returns null on 401 instead of throwing,
+			// so the .catch above doesn't fire). Surface to user explicitly.
+			if (isScysArticleUrl(document.URL) && !scysContent) {
+				extractorWarnings.push('scys article: extractor returned null (likely session expired — try logging in again)');
+			}
 			const extractedContent: { [key: string]: string } = {
 				...defuddled.variables,
 			};
@@ -380,6 +320,20 @@ declare global {
 				extractedContent.cid = String(bilibiliContent.cid);
 				extractedContent.page = String(bilibiliContent.page);
 			}
+
+			if (feishuContent?.commentsMarkdown) {
+				extractedContent.commentsMarkdown = feishuContent.commentsMarkdown;
+			}
+
+			// scysContent's title/author/content/wordCount/description are already
+			// surfaced via the ContentResponse cascade (line ~352-367) which feeds
+			// initializePageContent → buildVariables, where {{title}}/{{author}}/
+			// {{content}}/{{words}}/{{description}} are bound from params. Writing
+			// them into extractedContent here would re-overwrite {{content}} with
+			// raw HTML (extractedContent dict is iterated last in buildVariables
+			// shared.ts:70, after content-extractor.ts:160 ran createMarkdownContent).
+			// Bug 2026-05-16: Obsidian users saw raw HTML in clipped notes when
+			// this block was present. See BACKLOG §X.X.
 
 				// Create a new DOMParser
 				const parser = new DOMParser();
@@ -426,27 +380,42 @@ declare global {
 				const weChatArticleContent = isWeChatArticleUrl(document.URL)
 					? extractWeChatArticleContent(doc)
 					: null;
+				// Walk live <script> nodes' textContent — do NOT route through
+				// documentElement.outerHTML. Empirical browser-runtime behavior:
+				// the outerHTML serializer can omit inline <script> bodies
+				// (CSP / nonce / Trusted Types vary), even though the script
+				// nodes themselves are alive in the DOM. Reading textContent
+				// directly is the canonical path.
+				const weChatPublished = isWeChatArticleUrl(document.URL)
+					? extractWeChatPublishedFromDocument(document)
+					: '';
 
-			const response: ContentResponse = {
-				author: bilibiliContent?.author || feishuContent?.author || defuddled.author,
-				content: bilibiliContent?.structuredHtml || feishuContent?.content || weChatArticleContent || defuddled.content,
-				description: bilibiliContent?.description || defuddled.description,
-				domain: getDomain(document.URL),
-				extractedContent: extractedContent,
-				favicon: defuddled.favicon,
-				fullHtml: cleanedHtml,
-				highlights: highlighter.getHighlights(),
-				image: bilibiliContent?.image || defuddled.image,
-				language: defuddled.language || '',
-				parseTime: defuddled.parseTime,
-				published: bilibiliContent?.published || defuddled.published,
-				schemaOrgData: defuddled.schemaOrgData,
-				selectedHtml: selectedHtml,
-				site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : defuddled.site,
-				title: bilibiliContent?.title || feishuContent?.title || defuddled.title,
-				wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || defuddled.wordCount,
-				metaTags: defuddled.metaTags || []
-			};
+				const response: ContentResponse = {
+					author: bilibiliContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || defuddled.author,
+					attachments: scysContent?.attachments || [],
+					content: bilibiliContent?.structuredHtml || feishuContent?.content || scysContent?.content || zsxqContent?.content || weChatArticleContent || defuddled.content,
+					description: bilibiliContent?.description || defuddled.description,
+					domain: getDomain(document.URL),
+					extractedContent: extractedContent,
+					favicon: defuddled.favicon,
+					fullHtml: cleanedHtml,
+					highlights: highlighter.getHighlights(),
+					image: bilibiliContent?.image || defuddled.image,
+					language: defuddled.language || '',
+					parseTime: defuddled.parseTime,
+					published: bilibiliContent?.published || feishuContent?.published || scysContent?.published || zsxqContent?.published || weChatPublished || defuddled.published,
+					schemaOrgData: defuddled.schemaOrgData,
+					selectedHtml: selectedHtml,
+					site: bilibiliContent ? 'Bilibili' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : defuddled.site,
+					title: bilibiliContent?.title || feishuContent?.title || scysContent?.title || zsxqContent?.title || defuddled.title,
+					wordCount: bilibiliContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || zsxqContent?.wordCount || defuddled.wordCount,
+					metaTags: defuddled.metaTags || [],
+					extractorWarnings: extractorWarnings.length > 0 ? extractorWarnings : undefined,
+				};
+				if (response.title) {
+					highlighter.setPageTitle(response.title);
+				}
+				highlighter.updatePageDomainSettings({ site: response.site, favicon: response.favicon });
 				sendResponse(response);
 			}).catch((error: unknown) => {
 				contentLogger.error('getPageContent error', { error: error instanceof Error ? error.message : String(error) });
@@ -526,7 +495,6 @@ declare global {
 				}
 
 				if (elementToHighlight) {
-					const xpath = highlighter.getElementXPath(elementToHighlight);
 					highlighter.highlightElement(elementToHighlight);
 				} else {
 					console.warn('Could not find element to highlight. Info:', request.targetElementInfo);
@@ -591,11 +559,36 @@ declare global {
 		}
 
 		await highlighter.loadHighlights();
+		highlighter.setPageTitle(document.title);
 		updateHasHighlights();
 	}
 
 	// Initialize highlighter
 	initializeHighlighter();
+
+	// Expose highlighter API on window so reader-script.js (a separate
+	// webpack bundle injected when reader mode activates) can delegate
+	// all state operations to this single module instance. Without this,
+	// both bundles own a copy of highlighter.ts with independent mutable
+	// state — the bridge ensures one source of truth per tab.
+	window.__obsidianHighlighter = {
+		toggleHighlighterMenu: highlighter.toggleHighlighterMenu,
+		handleTextSelection: highlighter.handleTextSelection,
+		highlightElement: highlighter.highlightElement,
+		applyHighlights: highlighter.applyHighlights,
+		loadHighlights: highlighter.loadHighlights,
+		invalidateHighlightCache: highlighter.invalidateHighlightCache,
+		repositionHighlights: highlighter.repositionHighlights,
+		getHighlights: highlighter.getHighlights,
+		setPageUrl: highlighter.setPageUrl,
+		setPageTitle: highlighter.setPageTitle,
+		updatePageDomainSettings: highlighter.updatePageDomainSettings,
+		clearHighlights: highlighter.clearHighlights,
+		saveHighlights: highlighter.saveHighlights,
+		updateHighlighterMenu: highlighter.updateHighlighterMenu,
+		removeExistingHighlights,
+		ensureHighlighterCSS: () => { ensureHighlighterCSS(); },
+	} satisfies highlighter.HighlighterAPI;
 
 	// Call updateHasHighlights when the page loads
 	window.addEventListener('load', updateHasHighlights);
@@ -648,6 +641,173 @@ declare global {
 					console.error('[Content]','Error in toggle flow:', error);
 				}
 			});
+		}
+	});
+
+	// Page-world visible marker for debugging — write build timestamp to document
+	// root attribute so page-world JS can verify cn content.js injection version.
+	try {
+		document.documentElement.setAttribute('data-cn-clipper-build', String(Date.now()));
+	} catch {}
+
+	// Page-world test bridge: allows automated tests to trigger Feishu extraction
+	// from page-world JS via window.postMessage. Result is written to localStorage
+	// (shared by isolated/page worlds at same origin) so the caller can poll for
+	// completion without holding a synchronous reply channel. Restricted to feishu
+	// origins so arbitrary pages can't probe it.
+	window.addEventListener('message', async (event) => {
+		const data = event.data;
+		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
+		const origin = location.hostname;
+		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$|^mp\.weixin\.qq\.com$/.test(origin)) return;
+		const testId = data.testId;
+		const key = '__obsidianClipperTestResult__:' + testId;
+		try {
+			localStorage.setItem(key, JSON.stringify({ status: 'running' }));
+
+			// Route by URL: scys.com → scys-extractor; feishu/lark → feishu-extractor;
+			// wx.zsxq.com → zsxq-extractor; mp.weixin.qq.com → inline helpers (content.ts
+			// main path).
+			let result: { title?: string; content?: string; author?: string; published?: string } | null = null;
+			let source: 'scys' | 'feishu' | 'zsxq' | 'wechat' | null = null;
+			if (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL) || isScysArticleUrl(document.URL)) {
+				result = await extractScysStructuredContent(document);
+				source = 'scys';
+			} else if (isFeishuDocUrl(document.URL)) {
+				result = await extractFeishuStructuredContent(document);
+				source = 'feishu';
+			} else if (isZsxqTopicUrl(document.URL) || isZsxqArticleUrl(document.URL) || isZsxqArticlesHtmlUrl(document.URL)) {
+				result = await extractZsxqStructuredContent(document);
+				source = 'zsxq';
+			} else if (isWeChatArticleUrl(document.URL)) {
+				// mp.weixin uses inline helpers in main getPageContent path
+				// (not a dedicated extractor function). Replicate that path
+				// here so bridge produces equivalent result shape.
+				const article = document.querySelector('#js_content');
+				if (article) {
+					const articleClone = article.cloneNode(true) as HTMLElement;
+					normalizeImageSources(articleClone as unknown as Document);
+					articleClone.querySelectorAll('script, style').forEach(el => el.remove());
+					normalizePreBlockLineBreaks(articleClone);
+					const wxContent = articleClone.outerHTML;
+					const wxPublished = extractWeChatPublishedFromDocument(document);
+					const titleEl = document.querySelector('h2.rich_media_title, h1.rich_media_title, title');
+					const wxTitle = (titleEl?.textContent || '').trim().replace(/\s+/g, ' ');
+					const authorEl = document.querySelector('#js_name');
+					const wxAuthor = (authorEl?.textContent || '').trim();
+					result = { title: wxTitle, content: wxContent, author: wxAuthor, published: wxPublished };
+					source = 'wechat';
+				}
+				if (!result) {
+					localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'mp.weixin #js_content not found' }));
+					return;
+				}
+			} else {
+				localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'unsupported url for bridge' }));
+				return;
+			}
+
+			const content = result?.content || '';
+			const defuddleMod = await import('defuddle/full');
+			const markdown = postProcessExtractorMarkdown(defuddleMod.createMarkdownContent(content, document.URL));
+
+			// --- Popup-path simulation (regression guard for 2026-05-16 HTML-leak bug) ---
+			// The real clip flow goes through popup → initializePageContent →
+			// buildVariables, where extractedContent dict overrides {{content}}.
+			// Bridge previously stopped at createMarkdownContent and missed bugs in
+			// the dict-overlay step. Simulate that step locally and POST what the
+			// template engine would actually see.
+			const sharedMod = await import('./utils/shared');
+			const simulatedExtractedContent: Record<string, string> = {};
+			// Mirror exactly what content.ts builds for the main path (no scys
+			// content/title override — bug 2026-05-16). Comments here would be a
+			// good place to add other extractor-specific dict entries if any branch
+			// re-introduces the pattern.
+			const simulatedVars = sharedMod.buildVariables({
+				title: result?.title || '',
+				author: (result as any)?.author || '',
+				content: markdown,
+				contentHtml: content,
+				url: document.URL,
+				fullHtml: '',
+				description: '',
+				favicon: '',
+				image: '',
+				published: (result as any)?.published || '',
+				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : '',
+				language: '',
+				wordCount: (result as any)?.wordCount || 0,
+				extractedContent: simulatedExtractedContent,
+			});
+			const popupMarkdown = simulatedVars['{{content}}'] || '';
+			const popupMatchesBridge = popupMarkdown === markdown;
+
+			// --- Obsidian-note simulation ---
+			// Reproduce the final .md file that user's default template would
+			// emit to Obsidian's Clippings/ folder (assembled via cn's default
+			// 7-property frontmatter + {{content}} body). The result is what
+			// Obsidian receives via obsidian://new?file=...&content=... —
+			// equivalent to user-triggered clip output, sans Obsidian's own
+			// file write. Lets e2e validation read this without any UI step.
+			const fmEscape = (v: string) => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+			const today = new Date().toISOString().slice(0, 10);
+			const fmTitle = fmEscape(simulatedVars['{{title}}'] || '');
+			const fmDescription = fmEscape(simulatedVars['{{description}}'] || '');
+			const fmAuthor = fmEscape(simulatedVars['{{author}}'] || '');
+			const fmPublished = fmEscape(simulatedVars['{{published}}'] || '');
+			const obsidianNote = [
+				'---',
+				`title: "${fmTitle}"`,
+				`source: "${document.URL}"`,
+				`author:${fmAuthor ? ` "${fmAuthor}"` : ''}`,
+				`published:${fmPublished ? ` ${fmPublished}` : ''}`,
+				`created: ${today}`,
+				`description: ${fmDescription ? `"${fmDescription}"` : ''}`,
+				`tags:`,
+				`  - "clippings"`,
+				'---',
+				popupMarkdown,
+			].join('\n');
+
+			// Security: only upload to localhost / 127.0.0.1 (BACKLOG §5.2 option B).
+			// Upload the full simulated Obsidian note (frontmatter + popup-path
+			// markdown). The result file equals what user would see in
+			// Clippings/, enabling fully automated e2e validation without
+			// requiring the user to click the extension icon.
+			let uploadedTo: string | null = null;
+			let uploadError: string | null = null;
+			if (data.uploadUrl && typeof data.uploadUrl === 'string') {
+				try {
+					const u = new URL(data.uploadUrl);
+					if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
+						const resp = await fetch(data.uploadUrl, { method: 'POST', body: obsidianNote });
+						uploadedTo = data.uploadUrl;
+						if (!resp.ok) uploadError = `HTTP ${resp.status}`;
+					} else {
+						uploadError = `hostname rejected: ${u.hostname}`;
+					}
+				} catch (e) {
+					uploadError = String(e);
+				}
+			}
+			localStorage.setItem(key, JSON.stringify({
+				status: 'done',
+				source,
+				title: result?.title,
+				contentLength: content.length,
+				contentHead: content.slice(0, 500),
+				contentTail: content.slice(-2000),
+				markdownLength: markdown.length,
+				markdownHead: markdown.slice(0, 500),
+				markdownTail: markdown.slice(-1000),
+				popupMarkdownLength: popupMarkdown.length,
+				popupMatchesBridge,
+				popupMarkdownHead: popupMarkdown.slice(0, 500),
+				uploadedTo,
+				uploadError,
+			}));
+		} catch (err) {
+			localStorage.setItem(key, JSON.stringify({ status: 'error', error: String(err) }));
 		}
 	});
 

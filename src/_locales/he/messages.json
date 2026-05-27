@@ -26,6 +26,9 @@
 	"advanced": {
 		"message": "מתקדם"
 	},
+	"allHighlights": {
+		"message": "כל ההדגשות"
+	},
 	"allProperties": {
 		"message": "כל המאפיינים"
 	},
@@ -162,6 +165,15 @@
 	"delete": {
 		"message": "מחק"
 	},
+	"deleteAllHighlightsConfirm": {
+		"message": "האם אתה בטוח שברצונך למחוק את כל ההדגשות?"
+	},
+	"deleteHighlightsForDomain": {
+		"message": "למחוק את כל ההדגשות עבור דומיין זה?"
+	},
+	"deleteHighlightsForPage": {
+		"message": "למחוק את כל ההדגשות עבור דף זה?"
+	},
 	"deleteModelConfirm": {
 		"message": "האם את/ה בטוח/ה שברצונך למחוק מודל זה?"
 	},
@@ -196,6 +208,9 @@
 	},
 	"earlyAccessFeatures": {
 		"message": "תכונות גישה מוקדמת"
+	},
+	"edit": {
+		"message": "עריכה"
 	},
 	"editModel": {
 		"message": "ערוך מודל"
@@ -272,6 +287,9 @@
 	},
 	"extensionName": {
 		"message": "Obsidian Web Clipper"
+	},
+	"extractorFailedFallback": {
+		"message": "Site extractor failed — fell back to default extraction; result may be incomplete:"
 	},
 	"failedToCopyText": {
 		"message": "נכשל בהעתקת טקסט"
@@ -351,6 +369,9 @@
 	"highlightPage": {
 		"message": "סמן דף"
 	},
+	"highlightSelection": {
+		"message": "הדגש"
+	},
 	"highlighter": {
 		"message": "מסמן"
 	},
@@ -359,6 +380,12 @@
 	},
 	"highlighterSettings": {
 		"message": "הגדרות מסמן"
+	},
+	"highlights": {
+		"message": "הדגשות"
+	},
+	"highlightsNotFound": {
+		"message": "לא נמצאו הדגשות במאמר"
 	},
 	"history": {
 		"message": "היסטוריה"
@@ -445,6 +472,12 @@
 	"legacyModeDescription": {
 		"message": "שימוש בשיטת URI המתאימה ל-Obsidian 1.6.7 ומטה. שים/י לב שאורך התוכן מוגבל על ידי הדפדפן ומערכת ההפעלה. חלק מהדפים עלולים להיכשל ללא הודעת שגיאה."
 	},
+	"loadArticle": {
+		"message": "קרא מאמר"
+	},
+	"loading": {
+		"message": "טוען…"
+	},
 	"modelName": {
 		"message": "שם המודל"
 	},
@@ -477,6 +510,9 @@
 	},
 	"noHighlights": {
 		"message": "אל תעשה כלום"
+	},
+	"noResults": {
+		"message": "לא נמצאו תוצאות"
 	},
 	"noTemplates": {
 		"message": "אין תבניות זמינות. אנא הוסף תבנית בהגדרות."
@@ -522,6 +558,12 @@
 	},
 	"openEmbedded": {
 		"message": "פתח בעמוד"
+	},
+	"openHighlights": {
+		"message": "פתח הדגשות"
+	},
+	"openReader": {
+		"message": "פתח קורא"
 	},
 	"openSidePanel": {
 		"message": "פתח חלונית צדדית"
@@ -760,6 +802,9 @@
 	"readerLineWidth": {
 		"message": "רוחב שורה"
 	},
+	"readerLoadFailed": {
+		"message": "הטעינה נכשלה. ייתכן שהדף נחסם על ידי הדפדפן שלך."
+	},
 	"readerLoading": {
 		"message": "מפענח…"
 	},
@@ -789,6 +834,9 @@
 	},
 	"readerTypography": {
 		"message": "טיפוגרפיה"
+	},
+	"readerUrlPlaceholder": {
+		"message": "הדבק כתובת URL לקריאה…"
 	},
 	"readerViewFullSize": {
 		"message": "הצג בגודל מלא"
@@ -843,6 +891,9 @@
 	},
 	"saveFile": {
 		"message": "שמור קובץ..."
+	},
+	"searchHighlightsPlaceholder": {
+		"message": "חפש בהדגשות…"
 	},
 	"searchVariables": {
 		"message": "חפש משתנים..."
@@ -903,6 +954,21 @@
 	},
 	"silentOpenDescription": {
 		"message": "פתקים שנגזרו יישמרו אך לא ייפתחו בכרטיסייה חדשה. Obsidian עדיין יועבר לחזית."
+	},
+	"sort": {
+		"message": "מיון"
+	},
+	"sortAZ": {
+		"message": "א׳ עד ת׳"
+	},
+	"sortNewOld": {
+		"message": "החדשות ביותר תחילה"
+	},
+	"sortOldNew": {
+		"message": "הישנות ביותר תחילה"
+	},
+	"sortZA": {
+		"message": "ת׳ עד א׳"
 	},
 	"specificNoteName": {
 		"message": "שם פתק ספציפי"

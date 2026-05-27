@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-clipper",
-	"version": "1.4.4",
+	"version": "1.5.0",
 	"description": "Official web clipper for Obsidian.",
 	"bin": {
 		"obsidian-clipper": "./dist/cli.cjs"
@@ -27,9 +27,12 @@
 		"dev": "npm run dev:chrome",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"test:e2e": "vitest run --config vitest.e2e.config.ts",
+		"test:all": "vitest run --config vitest.all.config.ts",
 		"update-locales": "ts-node --project scripts/tsconfig.json scripts/update-locales.ts",
 		"check-strings": "ts-node --project scripts/tsconfig.json scripts/check-unused-strings.ts",
 		"add-locale": "ts-node --project scripts/tsconfig.json scripts/add-locale.ts",
+		"audit:summarize": "npx tsx scripts/audit-summarize.ts",
 		"prepublishOnly": "npm run build:cli && npm run build:api"
 	},
 	"devDependencies": {
@@ -43,6 +46,9 @@
 		"dotenv": "^16.4.1",
 		"esbuild": "^0.25.0",
 		"mini-css-extract-plugin": "^2.9.1",
+		"playwright": "^1.60.0",
+		"playwright-extra": "^4.3.6",
+		"puppeteer-extra-plugin-stealth": "^2.11.2",
 		"sass": "^1.77.8",
 		"sass-loader": "^16.0.1",
 		"ts-loader": "^9.5.1",
@@ -57,7 +63,7 @@
 	"dependencies": {
 		"@types/safari-extension": "^0.0.33",
 		"dayjs": "^1.11.13",
-		"defuddle": "^0.16.0",
+		"defuddle": "^0.18.1",
 		"dompurify": "^3.0.9",
 		"highlight.js": "^11.11.1",
 		"linkedom": "^0.18.0",

@@ -5,6 +5,7 @@
 
 import { sanitizeFileName, getDomain, escapeDoubleQuotes } from './string-utils';
 import { Property } from '../types/types';
+import type { Attachment } from './attachment-types';
 import dayjs from 'dayjs';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,7 @@ export interface BuildVariablesParams {
 	schemaOrgData?: any;
 	metaTags?: { name?: string | null; property?: string | null; content: string | null }[];
 	extractedContent?: Record<string, string>;
+	attachments?: Attachment[];
 }
 
 /**
@@ -43,6 +45,9 @@ export function buildVariables(params: BuildVariablesParams): Record<string, str
 
 	const timestamp = dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
 	const variables: Record<string, string> = {
+		'{{attachments}}': (params.attachments || [])
+			.map((a: Attachment) => `- 📎 [${a.name}](${a.url})`)
+			.join('\n'),
 		'{{author}}': (params.author || '').trim(),
 		'{{content}}': (params.content || '').trim(),
 		'{{contentHtml}}': (params.contentHtml || '').trim(),

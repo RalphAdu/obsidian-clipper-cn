@@ -1,15 +1,61 @@
 import browser from 'webextension-polyfill';
 import { detectBrowser } from './utils/browser-detection';
-import { updateCurrentActiveTab, isValidUrl, isBlankPage } from './utils/active-tab-manager';
+import { updateCurrentActiveTab, isValidUrl, isBlankPage, isNormalPageUrl } from './utils/active-tab-manager';
 import { TextHighlightData } from './utils/highlighter';
 import { debounce } from './utils/debounce';
 import { Settings } from './types/types';
 import { createLogger } from './utils/logger';
+import { debugLog } from './utils/debug';
 
 const bgLogger = createLogger('Background');
 
 const YOUTUBE_EMBED_RULE_ID = 9001;
 const BILIBILI_EMBED_RULE_ID = 9002;
+const YOUTUBE_INNERTUBE_RULE_ID = 9003;
+
+// Hot reload: poll build-marker.txt (written by webpack on every build) and
+// reload the extension when its contents change. Lets `npm run build` trigger
+// an automatic chrome.runtime.reload() so iteration doesn't require clicking
+// the reload button in chrome://extensions every time.
+// Uses chrome.alarms (not setInterval) because MV3 service workers get
+// unloaded after ~30s of idle and setInterval doesn't survive that. The
+// alarm wakes the worker reliably even after it's been put to sleep.
+// Active in all build modes — for users installing from the webstore the
+// marker file is written once at build time and never changes, so this only
+// ever fires for self-built / unpacked installations.
+const HOT_RELOAD_ALARM = 'cn-hot-reload-poll';
+const HOT_RELOAD_MARKER_KEY = 'cnHotReloadLastMarker';
+async function checkBuildMarker() {
+	try {
+		const url = chrome.runtime.getURL('build-marker.txt');
+		const resp = await fetch(url, { cache: 'no-store' });
+		if (!resp.ok) return;
+		const current = (await resp.text()).trim();
+		// Persist last seen marker across service-worker restarts so we don't
+		// erroneously reload after every idle wake-up.
+		const stored = await chrome.storage.session.get(HOT_RELOAD_MARKER_KEY);
+		const last = stored[HOT_RELOAD_MARKER_KEY] as string | undefined;
+		if (!last) {
+			await chrome.storage.session.set({ [HOT_RELOAD_MARKER_KEY]: current });
+			return;
+		}
+		if (last !== current) {
+			bgLogger.info(`Build marker changed (${last} -> ${current}), reloading extension`);
+			chrome.runtime.reload();
+		}
+	} catch {
+		// Service worker may be transitioning; ignore and retry next alarm
+	}
+}
+// Chrome enforces a 30s minimum for periodInMinutes on packed extensions but
+// allows shorter periods for unpacked / loaded-from-disk extensions. We need
+// the short period to make dev iteration tight.
+chrome.alarms.create(HOT_RELOAD_ALARM, { periodInMinutes: 0.05 }); // every 3 seconds (unpacked)
+chrome.alarms.onAlarm.addListener((alarm) => {
+	if (alarm.name === HOT_RELOAD_ALARM) checkBuildMarker();
+});
+// Also check immediately on startup (e.g. just after install)
+checkBuildMarker();
 
 function fetchBilibiliJsonViaMainWorld(tabId: number, url: string): Promise<any> {
 	if (!isAllowedBilibiliFetchUrl(url)) {
@@ -274,6 +320,74 @@ async function fetchFeishuImageAsBase64(fileToken: string): Promise<{ dataUrl: s
 	return { dataUrl: `data:${mimeType};base64,${base64}` };
 }
 
+// Set Origin header on YouTube innertube API requests from the extension.
+// YouTube doesn't accept chrome-extension://...
+async function enableYouTubeInnertubeRule(): Promise<void> {
+	const dnr = (typeof chrome !== 'undefined' && chrome.declarativeNetRequest)
+		|| (typeof browser !== 'undefined' && (browser as any).declarativeNetRequest);
+	if (!dnr) return;
+	try {
+		await dnr.updateSessionRules({
+			removeRuleIds: [YOUTUBE_INNERTUBE_RULE_ID],
+			addRules: [{
+				id: YOUTUBE_INNERTUBE_RULE_ID,
+				priority: 1,
+				action: {
+					type: 'modifyHeaders' as any,
+					requestHeaders: [
+						{ header: 'Origin', operation: 'set' as any, value: 'https://www.youtube.com' },
+						{ header: 'Referer', operation: 'set' as any, value: 'https://www.youtube.com/' },
+					]
+				},
+				condition: {
+					urlFilter: '||youtube.com/youtubei/',
+					resourceTypes: ['xmlhttprequest' as any],
+					initiatorDomains: [chrome?.runtime?.id || ''].filter(Boolean),
+				}
+			}]
+		});
+	} catch { /* Firefox/Safari use webRequest or native messaging instead */ }
+}
+
+// Firefox/Safari: use webRequest.onBeforeSendHeaders to set Origin/Referer on
+// YouTube innertube requests. Fallback for browsers where declarativeNetRequest
+// doesn't work or isn't supported.
+if (typeof browser !== 'undefined' && browser.webRequest?.onBeforeSendHeaders) {
+	try {
+		browser.webRequest.onBeforeSendHeaders.addListener(
+			(details) => {
+				// Only modify requests from tabs showing extension pages
+				if (details.tabId && details.tabId > 0) {
+					// Check asynchronously would be complex — instead check
+					// if the request has an extension origin or referer
+					const refHeader = details.requestHeaders?.find(h => h.name.toLowerCase() === 'referer');
+					const refValue = refHeader?.value || '';
+					const originHeader = details.requestHeaders?.find(h => h.name.toLowerCase() === 'origin');
+					const originValue = originHeader?.value || '';
+					const isFromExtension = refValue.startsWith('moz-extension://') || originValue.startsWith('moz-extension://')
+						|| refValue.startsWith('safari-web-extension://') || originValue.startsWith('safari-web-extension://');
+					if (!isFromExtension) return { requestHeaders: details.requestHeaders };
+				}
+
+				const headers = details.requestHeaders || [];
+				const setHeader = (name: string, value: string) => {
+					const existing = headers.find(h => h.name.toLowerCase() === name.toLowerCase());
+					if (existing) {
+						existing.value = value;
+					} else {
+						headers.push({ name, value });
+					}
+				};
+				setHeader('Origin', 'https://www.youtube.com');
+				setHeader('Referer', 'https://www.youtube.com/');
+				return { requestHeaders: headers };
+			},
+			{ urls: ['*://www.youtube.com/*'] },
+			['blocking', 'requestHeaders']
+		);
+	} catch { /* webRequest not available */ }
+}
+
 let sidePanelOpenWindows: Set<number> = new Set();
 let highlighterModeState: { [tabId: number]: boolean } = {};
 let readerModeState: { [tabId: number]: boolean } = {};
@@ -283,16 +397,16 @@ let popupPorts: { [tabId: number]: browser.Runtime.Port } = {};
 
 async function injectContentScript(tabId: number): Promise<void> {
 	if (browser.scripting) {
-		console.log('[Obsidian Clipper] Using scripting API');
+		debugLog('Clipper', 'Using scripting API');
 		await browser.scripting.executeScript({
 			target: { tabId },
 			files: ['content.js']
 		});
 	} else {
-		console.log('[Obsidian Clipper] Using tabs.executeScript fallback');
+		debugLog('Clipper', 'Using tabs.executeScript fallback');
 		await browser.tabs.executeScript(tabId, { file: 'content.js' });
 	}
-	console.log('[Obsidian Clipper] Injection completed, waiting for init...');
+	debugLog('Clipper', 'Injection completed, waiting for init...');
 
 	// Poll until the content script responds, rather than a fixed delay.
 	// Try immediately after injection, then back off with 50ms sleeps.
@@ -310,7 +424,7 @@ async function injectContentScript(tabId: number): Promise<void> {
 	if (!ready) {
 		throw new Error('Content script did not respond after injection');
 	}
-	console.log('[Obsidian Clipper] Post-injection ping succeeded');
+	debugLog('Clipper', 'Post-injection ping succeeded');
 }
 
 async function ensureContentScriptLoadedInBackground(tabId: number): Promise<void> {
@@ -325,7 +439,7 @@ async function ensureContentScriptLoadedInBackground(tabId: number): Promise<voi
 
 		// Attempt to send a message to the content script
 		await browser.tabs.sendMessage(tabId, { action: "ping" });
-		console.log('[Obsidian Clipper] Content script ping succeeded');
+		debugLog('Clipper', 'Content script ping succeeded');
 	} catch (error) {
 		// If the error is about invalid URL, re-throw it
 		if (error instanceof Error && error.message.includes('invalid URL')) {
@@ -333,8 +447,24 @@ async function ensureContentScriptLoadedInBackground(tabId: number): Promise<voi
 		}
 
 		// If the message fails, the content script is not loaded, so inject it
-		console.log('[Obsidian Clipper] Ping failed, injecting content script...', error);
+		debugLog('Clipper', 'Ping failed, injecting content script...', error);
 		await injectContentScript(tabId);
+	}
+}
+
+// Route a message to a tab, handling both normal pages (via content script)
+// and extension pages like the reader page (via runtime.sendMessage forwarding).
+async function routeMessageToTab(tabId: number, message: any): Promise<any> {
+	const tab = await browser.tabs.get(tabId);
+	if (isNormalPageUrl(tab.url)) {
+		await ensureContentScriptLoadedInBackground(tabId);
+		return browser.tabs.sendMessage(tabId, message);
+	} else {
+		return browser.runtime.sendMessage({
+			action: 'extensionPageMessage',
+			targetTabId: tabId,
+			message
+		});
 	}
 }
 
@@ -344,6 +474,40 @@ function getHighlighterModeForTab(tabId: number): boolean {
 
 function getReaderModeForTab(tabId: number): boolean {
 	return readerModeState[tabId] ?? false;
+}
+
+function isReaderPageUrl(url: string | undefined): string | null {
+	if (!url) return null;
+	const readerPagePrefix = browser.runtime.getURL('reader.html');
+	if (url.startsWith(readerPagePrefix)) {
+		try {
+			const parsed = new URL(url);
+			return parsed.searchParams.get('url');
+		} catch {}
+	}
+	return null;
+}
+
+async function exitReaderPageIfNeeded(tabId: number, readerUrl?: string): Promise<boolean> {
+	let originalUrl: string | null = null;
+	try {
+		const tab = await browser.tabs.get(tabId);
+		originalUrl = isReaderPageUrl(tab.url);
+	} catch {}
+
+	// Fallback: the embedded clipper passes the reader URL when
+	// tabs.get() can't access the extension page URL
+	if (!originalUrl && readerUrl) {
+		originalUrl = isReaderPageUrl(readerUrl);
+	}
+
+	if (originalUrl) {
+		await browser.tabs.update(tabId, { url: originalUrl });
+		readerModeState[tabId] = false;
+		debouncedUpdateContextMenu(tabId);
+		return true;
+	}
+	return false;
 }
 
 async function initialize() {
@@ -359,10 +523,13 @@ async function initialize() {
 		// Initialize context menu
 		await debouncedUpdateContextMenu(-1);
 
+		// Enable Origin header for YouTube innertube API requests
+		await enableYouTubeInnertubeRule();
+
 		// Set up action popup based on openBehavior setting
 		await updateActionPopup();
 
-		console.log('Background script initialized successfully');
+		debugLog('Clipper', 'Background script initialized successfully');
 	} catch (error) {
 		console.error('Error initializing background script:', error);
 	}
@@ -397,9 +564,56 @@ async function sendMessageToPopup(tabId: number, message: any): Promise<void> {
 
 
 
+// Safari: route fetch through native messaging (URLSession in Swift).
+// Called from the background script where sendNativeMessage works reliably.
+async function nativeFetch(url: string, options?: any): Promise<{ ok: boolean; status: number; text: string; error?: string }> {
+	try {
+		const result = await browser.runtime.sendNativeMessage('application.id', {
+			type: 'fetchRequest',
+			url,
+			method: options?.method || 'GET',
+			headers: options?.headers || {},
+			body: options?.body || null,
+		}) as { ok: boolean; status: number; text: string; error?: string };
+		return result || { ok: false, status: 0, text: '', error: 'Empty native response' };
+	} catch (err) {
+		return { ok: false, status: 0, text: '', error: (err as Error).message };
+	}
+}
+
+// Fetch proxy for extension pages (reader, highlights).
+// Returns a Promise for the webextension-polyfill.
+// On Firefox MV3, host_permissions require explicit user grant —
+// callers detect CORS_PERMISSION_NEEDED and prompt via permissions.request().
+browser.runtime.onMessage.addListener((request: unknown) => {
+	if (typeof request !== 'object' || request === null) return;
+	if ((request as any).action !== 'fetchProxy') return;
+	const { url, options } = request as { url: string; options?: any };
+	const fetchOptions: RequestInit = {};
+	if (options?.method) fetchOptions.method = options.method;
+	if (options?.headers) fetchOptions.headers = options.headers;
+	if (options?.body) fetchOptions.body = options.body;
+	return fetch(url, fetchOptions)
+		.then(async (resp) => {
+			const text = await resp.text();
+			// If YouTube returns bot-detection HTML, try native messaging (Safari)
+			if (!resp.ok && (text.includes('Sorry') || text.includes('<html')) && typeof browser.runtime.sendNativeMessage === 'function') {
+				return nativeFetch(url, options);
+			}
+			return { ok: resp.ok, status: resp.status, text, finalUrl: resp.url };
+		})
+		.catch(async () => {
+			// CORS failure — try native messaging (Safari), else report permission needed
+			if (typeof browser.runtime.sendNativeMessage === 'function') {
+				return nativeFetch(url, options);
+			}
+			return { ok: false, status: 0, text: '', error: 'CORS_PERMISSION_NEEDED' };
+		});
+});
+
 browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime.MessageSender, sendResponse: (response?: any) => void): true | undefined => {
 	if (typeof request === 'object' && request !== null) {
-		const typedRequest = request as { action: string; isActive?: boolean; hasHighlights?: boolean; tabId?: number; text?: string; section?: string; url?: string };
+		const typedRequest = request as { action: string; isActive?: boolean; hasHighlights?: boolean; tabId?: number; text?: string; section?: string; url?: string; readerUrl?: string };
 		
 		if (typedRequest.action === 'fetchBilibiliJsonViaMainWorld' && typedRequest.url) {
 			const tabId = sender.tab?.id;
@@ -442,6 +656,8 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			});
 			return true;
 		}
+
+		// fetchProxy is handled by a separate listener below
 
 		if (typedRequest.action === "extractContent" && sender.tab && sender.tab.id) {
 			browser.tabs.sendMessage(sender.tab.id, request).then(sendResponse);
@@ -535,6 +751,39 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
+		if (typedRequest.action === 'fetchFeishuCommentImage') {
+			const token = (typedRequest as any).token as string;
+			if (!token) {
+				sendResponse({ success: false, error: 'Missing token' });
+				return true;
+			}
+			(async () => {
+				try {
+					const tenantToken = await getFeishuTenantToken();
+					const resp = await fetch(
+						`https://open.feishu.cn/open-apis/drive/v1/medias/${encodeURIComponent(token)}/download`,
+						{ headers: { Authorization: `Bearer ${tenantToken}` } },
+					);
+					if (!resp.ok) {
+						sendResponse({ success: false, error: `HTTP ${resp.status}` });
+						return;
+					}
+					const mime = resp.headers.get('content-type') || 'image/png';
+					const buf = await resp.arrayBuffer();
+					const bytes = new Uint8Array(buf);
+					let binary = '';
+					for (let i = 0; i < bytes.byteLength; i++) {
+						binary += String.fromCharCode(bytes[i]);
+					}
+					const base64 = btoa(binary);
+					sendResponse({ success: true, mime, base64 });
+				} catch (e) {
+					sendResponse({ success: false, error: String(e) });
+				}
+			})();
+			return true;
+		}
+
 		if (typedRequest.action === 'getFeishuApiHost') {
 			const tabId = sender.tab?.id;
 			if (!tabId) {
@@ -583,18 +832,27 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 					const fetchDataUrl = function(url: string): Promise<string | undefined> {
 						return fetch(url).then(function(res: Response) {
 							if (!res.ok) return undefined;
-							const contentType = res.headers.get('Content-Type') || '';
-							if (contentType.indexOf('application/json') !== -1 || contentType.indexOf('text/') !== -1) {
-								return undefined;
-							}
-							const mimeType = contentType.split(';')[0].trim() || 'image/png';
 							return res.arrayBuffer().then(function(buf: ArrayBuffer) {
 								const bytes = new Uint8Array(buf);
+								// Magic-byte detection — server Content-Type is often wrong
+								// (e.g., encrypted box-file URLs return application/octet-stream
+								// even when underlying bytes are real PNG/JPEG).
+								let mime = '';
+								if (bytes.length >= 4 && bytes[0]===0x89 && bytes[1]===0x50 && bytes[2]===0x4e && bytes[3]===0x47) mime = 'image/png';
+								else if (bytes.length >= 3 && bytes[0]===0xff && bytes[1]===0xd8 && bytes[2]===0xff) mime = 'image/jpeg';
+								else if (bytes.length >= 3 && bytes[0]===0x47 && bytes[1]===0x49 && bytes[2]===0x46) mime = 'image/gif';
+								else if (bytes.length >= 12 && bytes[0]===0x52 && bytes[1]===0x49 && bytes[2]===0x46 && bytes[3]===0x46 && bytes[8]===0x57 && bytes[9]===0x45 && bytes[10]===0x42 && bytes[11]===0x50) mime = 'image/webp';
+								else {
+									const ct = (res.headers.get('Content-Type') || '').split(';')[0].trim();
+									if (ct.indexOf('image/') === 0) mime = ct;
+								}
+								// Not an identifiable image — caller treats as unresolved (placeholder).
+								if (mime.indexOf('image/') !== 0) return undefined;
 								let bin = '';
 								for (let i = 0; i < bytes.byteLength; i++) {
 									bin += String.fromCharCode(bytes[i]);
 								}
-								return 'data:' + mimeType + ';base64,' + btoa(bin);
+								return 'data:' + mime + ';base64,' + btoa(bin);
 							});
 						}).catch(function() {
 							return undefined;
@@ -602,55 +860,120 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 					};
 
 					const runtimeImageBlocks: Array<{ token: string; block: any }> = [];
+					const tokenSet = new Set(tokens);
+					const visited = new Set<any>();
+
+					const extractImageToken = function(block: any): string | undefined {
+						return block?.snapshot?.image?.token
+							|| block?.image?.token
+							|| block?.snapshot?.image_token
+							|| block?.image_token;
+					};
+
+					const tryRegister = function(block: any) {
+						const tk = extractImageToken(block);
+						if (tk && tokenSet.has(tk) && block?.imageManager?.fetch && !runtimeImageBlocks.find(function(x) { return x.token === tk; })) {
+							runtimeImageBlocks.push({ token: tk, block: block });
+						}
+					};
+
 					try {
-						const rootBlock = (window as any).PageMain?.blockManager?.rootBlockModel;
-						const seen = new Set<any>();
-						const walk = function(block: any) {
-							if (!block || seen.has(block) || seen.size > 500) return;
-							seen.add(block);
-							const imageToken = block?.snapshot?.image?.token;
-							if (imageToken && block?.imageManager?.fetch) {
-								runtimeImageBlocks.push({ token: imageToken, block });
+						const bm = (window as any).PageMain?.blockManager;
+						const rootBlock = bm?.rootBlockModel;
+
+						// Strategy A + B: recursive walk via direct children array AND snapshot.children IDs.
+						const visit = function(block: any) {
+							if (!block || visited.has(block)) return;
+							visited.add(block);
+							tryRegister(block);
+							// Strategy A: direct children array
+							const childArr = Array.isArray(block.children) ? block.children : [];
+							for (let i = 0; i < childArr.length; i++) visit(childArr[i]);
+							// Strategy B: snapshot.children is an ID array — look up via blockManager
+							const childIds = Array.isArray(block?.snapshot?.children) ? block.snapshot.children : [];
+							for (let i = 0; i < childIds.length; i++) {
+								const childBlock = bm?.getBlockById?.(childIds[i]);
+								if (childBlock) visit(childBlock);
 							}
-							const children = Array.isArray(block.children) ? block.children : [];
-							for (let i = 0; i < children.length; i++) walk(children[i]);
 						};
-						walk(rootBlock);
-					} catch {
-						// Fall through to copy_out fallback.
+						visit(rootBlock);
+
+						// Strategy C: defensive — if feishu exposes an enumeration of all blocks, scan it.
+						try {
+							const allBlocks = bm?.allBlocks || bm?.blockModels;
+							if (allBlocks && typeof allBlocks === 'object') {
+								const candidates = Array.isArray(allBlocks) ? allBlocks : Object.values(allBlocks);
+								for (let i = 0; i < candidates.length; i++) {
+									tryRegister(candidates[i] as any);
+								}
+							}
+						} catch (_) { /* registry API not available */ }
+					} catch (_) {
+						// Fall through to copy_out fallback below.
 					}
 
-					return runtimeImageBlocks
-						.filter(function(item) { return tokens.indexOf(item.token) !== -1; })
-						.reduce(function(chain, item) {
-							return chain.then(function() {
-								return new Promise<void>(function(resolve) {
-									try {
-										item.block.imageManager.fetch(
-											{ token: item.token, isHD: true, fuzzy: false },
-											{},
-											function(sources: any) {
-												const sourceUrl = sources?.originSrc || sources?.src || '';
-												if (!sourceUrl) {
-													resolve();
-													return;
-												}
-												fetchDataUrl(sourceUrl).then(function(dataUrl) {
-													if (dataUrl) results[item.token] = dataUrl;
+					// Debug: emit one console.warn so we can see which tokens the walk missed.
+					try {
+						const found = new Set(runtimeImageBlocks.map(function(x) { return x.token; }));
+						const missed = tokens.filter(function(t) { return !found.has(t); });
+						console.warn('[feishu-image-walk] requested=' + tokens.length + ' found=' + found.size + ' missed=' + missed.length, missed.slice(0, 5));
+					} catch (_) { /* logging best-effort */ }
+
+					// Strategy 0 (primary): /api/box/stream/download/v2/cover/{token} returns
+					// decrypted image bytes with correct image/* mime for any image visible
+					// to the current cookie-authenticated user. Same URL feishu web's <img>
+					// elements use. Avoids the encrypted box-file path that
+					// imageManager.fetch returns (sources.originSrc).
+					const strategy0 = tokens.reduce(function(chain, token) {
+						return chain.then(function() {
+							if (results[token]) return;
+							return fetchDataUrl(apiBase + '/api/box/stream/download/v2/cover/' + token).then(function(dataUrl) {
+								if (dataUrl) results[token] = dataUrl;
+							});
+						});
+					}, Promise.resolve() as Promise<void | undefined>);
+
+					return strategy0
+						.then(function() {
+							const resolvedCount = Object.keys(results).length;
+							try { console.warn('[feishu-image-cover] strategy0 resolved=' + resolvedCount + '/' + tokens.length); } catch (_) { /* logging best-effort */ }
+							if (resolvedCount === tokens.length) {
+								return { success: true as const, results };
+							}
+							// Strategy 1: PageMain walk + imageManager.fetch for tokens Strategy 0 missed.
+							return runtimeImageBlocks
+								.filter(function(item) { return tokens.indexOf(item.token) !== -1 && !results[item.token]; })
+								.reduce(function(chain, item) {
+									return chain.then(function() {
+										return new Promise<void>(function(resolve) {
+											try {
+												item.block.imageManager.fetch(
+													{ token: item.token, isHD: true, fuzzy: false },
+													{},
+													function(sources: any) {
+														const sourceUrl = sources?.originSrc || sources?.src || '';
+														if (!sourceUrl) {
+															resolve();
+															return;
+														}
+														fetchDataUrl(sourceUrl).then(function(dataUrl) {
+															if (dataUrl) results[item.token] = dataUrl;
+															resolve();
+														});
+													}
+												).catch(function() {
 													resolve();
 												});
+											} catch {
+												resolve();
 											}
-										).catch(function() {
-											resolve();
 										});
-									} catch {
-										resolve();
-									}
-								});
-							});
-						}, Promise.resolve() as Promise<void | undefined>)
+									});
+								}, Promise.resolve() as Promise<void | undefined>)
+								.then(function() { return undefined; });
+						})
 						.then(function() {
-							if (Object.keys(results).length > 0) {
+							if (Object.keys(results).length === tokens.length) {
 								return { success: true as const, results };
 							}
 
@@ -668,6 +991,7 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 								}
 								return tokens.reduce(function(chain, token) {
 									return chain.then(function() {
+										if (results[token]) return;
 										const code = tokenToCode[token];
 										return fetchDataUrl(
 											apiBase + '/api/box/stream/download/asynccode/?code=' + encodeURIComponent(code)
@@ -695,6 +1019,39 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
+		if (typedRequest.action === 'fetchScysImagesViaMainWorld') {
+			const urls = (typedRequest as any).urls as string[];
+			if (!Array.isArray(urls) || urls.length === 0) {
+				sendResponse({ success: false, error: 'Missing urls' });
+				return true;
+			}
+			(async () => {
+				const results: Record<string, string> = {};
+				await Promise.all(urls.map(async (url) => {
+					try {
+						const res = await fetch(url);
+						if (!res.ok) return;
+						const buf = await res.arrayBuffer();
+						const bytes = new Uint8Array(buf);
+						// Detect actual format from magic bytes; some servers return wrong Content-Type.
+						let mime: string;
+						if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) mime = 'image/jpeg';
+						else if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) mime = 'image/png';
+						else if (bytes.length >= 3 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) mime = 'image/gif';
+						else if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) mime = 'image/webp';
+						else mime = (res.headers.get('Content-Type') || 'image/png').split(';')[0].trim();
+						let bin = '';
+						for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+						results[url] = `data:${mime};base64,${btoa(bin)}`;
+					} catch (err) {
+						// best-effort; leave unresolved
+					}
+				}));
+				sendResponse({ success: true, results });
+			})();
+			return true;
+		}
+
 		if (typedRequest.action === 'fetchFeishuImage') {
 			const fileToken = (typedRequest as any).fileToken as string;
 			if (!fileToken) {
@@ -709,6 +1066,65 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 					error: error instanceof Error ? error.message : String(error)
 				});
 			});
+			return true;
+		}
+
+		if (typedRequest.action === 'fetchZsxqImagesAsBase64') {
+			const urls = (typedRequest as any).urls as string[];
+			if (!Array.isArray(urls) || urls.length === 0) {
+				sendResponse({ success: false, error: 'Missing urls' });
+				return true;
+			}
+			(async () => {
+				const results: Record<string, string> = {};
+				await Promise.all(urls.map(async (url) => {
+					try {
+						const res = await fetch(url);
+						if (!res.ok) return;
+						const buf = await res.arrayBuffer();
+						const bytes = new Uint8Array(buf);
+						// Detect actual format from magic bytes; default to image/jpeg if absent.
+						let mime: string;
+						if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) mime = 'image/jpeg';
+						else if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) mime = 'image/png';
+						else if (bytes.length >= 3 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) mime = 'image/gif';
+						else if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) mime = 'image/webp';
+						else mime = (res.headers.get('Content-Type') || 'image/jpeg').split(';')[0].trim();
+						let bin = '';
+						for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+						results[url] = `data:${mime};base64,${btoa(bin)}`;
+					} catch (err) {
+						// best-effort; leave unresolved
+					}
+				}));
+				sendResponse({ success: true, results });
+			})();
+			return true;
+		}
+
+		if (typedRequest.action === 'fetchZsxqArticleHtml') {
+			const articleId = (typedRequest as any).articleId as string;
+			if (!articleId) {
+				sendResponse({ success: false, error: 'Missing articleId' });
+				return true;
+			}
+			(async () => {
+				try {
+					const res = await fetch(`https://articles.zsxq.com/id_${articleId}.html`);
+					if (!res.ok) {
+						sendResponse({ success: false, error: `HTTP ${res.status}`, html: null });
+						return;
+					}
+					const html = await res.text();
+					sendResponse({ success: true, html });
+				} catch (error) {
+					sendResponse({
+						success: false,
+						error: error instanceof Error ? error.message : String(error),
+						html: null,
+					});
+				}
+			})();
 			return true;
 		}
 
@@ -792,19 +1208,27 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 		}
 
 		if (typedRequest.action === "toggleReaderMode" && typedRequest.tabId) {
-			injectReaderScript(typedRequest.tabId).then(() => {
-				browser.tabs.sendMessage(typedRequest.tabId!, { action: "toggleReaderMode" })
-					.then((response: any) => {
-						if (response?.success) {
-							readerModeState[typedRequest.tabId!] = response.isActive ?? false;
-							debouncedUpdateContextMenu(typedRequest.tabId!);
-						}
-						sendResponse(response);
-					})
-					.catch(() => {
-						// Page may have reloaded before responding (reader restore)
-						sendResponse({ success: true, isActive: false });
-					});
+			const tabId = typedRequest.tabId;
+			// Check if the tab is on the extension's reader.html page
+			exitReaderPageIfNeeded(tabId, typedRequest.readerUrl).then((wasReaderPage) => {
+				if (wasReaderPage) {
+					sendResponse({ success: true, isActive: false });
+					return;
+				}
+				injectReaderScript(tabId).then(() => {
+					browser.tabs.sendMessage(tabId, { action: "toggleReaderMode" })
+						.then((response: any) => {
+							if (response?.success) {
+								readerModeState[tabId] = response.isActive ?? false;
+								debouncedUpdateContextMenu(tabId);
+							}
+							sendResponse(response);
+						})
+						.catch(() => {
+							// Page may have reloaded before responding (reader restore)
+							sendResponse({ success: true, isActive: false });
+						});
+				});
 			});
 			return true;
 		}
@@ -814,15 +1238,7 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 				const currentTab = tabs[0];
 				if (currentTab && currentTab.id) {
 					try {
-						// Check if the URL is valid before trying to inject content script
-						if (!currentTab.url || !isValidUrl(currentTab.url) || isBlankPage(currentTab.url)) {
-							sendResponse({success: false, error: 'Cannot open iframe on this page'});
-							return;
-						}
-
-						// Ensure content script is loaded first
-						await ensureContentScriptLoadedInBackground(currentTab.id);
-						await browser.tabs.sendMessage(currentTab.id, { action: "toggle-iframe" });
+						await routeMessageToTab(currentTab.id, { action: "toggle-iframe" });
 						sendResponse({success: true});
 					} catch (error) {
 						console.error('Error sending toggle-iframe message:', error);
@@ -837,9 +1253,8 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 
 		if (typedRequest.action === "toggleIframe") {
 			const tab = sender.tab;
-			if (tab?.id && tab.url && isValidUrl(tab.url) && !isBlankPage(tab.url)) {
-				ensureContentScriptLoadedInBackground(tab.id)
-					.then(() => browser.tabs.sendMessage(tab.id!, { action: "toggle-iframe" }))
+			if (tab?.id) {
+				routeMessageToTab(tab.id, { action: "toggle-iframe" })
 					.then(() => sendResponse({ success: true }))
 					.catch((error) => {
 						console.error('Error toggling iframe:', error);
@@ -889,6 +1304,14 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
+		if (typedRequest.action === "openHighlights") {
+			const domain = (typedRequest as any).domain;
+			const query = domain ? `?domain=${encodeURIComponent(domain)}` : '';
+			browser.tabs.create({ url: browser.runtime.getURL(`highlights.html${query}`) });
+			sendResponse({ success: true });
+			return true;
+		}
+
 		if (typedRequest.action === "openSettings") {
 			try {
 				const section = typedRequest.section ? `?section=${typedRequest.section}` : '';
@@ -905,26 +1328,23 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 
 		if (typedRequest.action === "copyMarkdownToClipboard" || typedRequest.action === "saveMarkdownToFile") {
 			if (sender.tab?.id) {
-				(async () => {
-					try {
-						await ensureContentScriptLoadedInBackground(sender.tab!.id!);
-						await browser.tabs.sendMessage(sender.tab!.id!, { action: typedRequest.action });
-						sendResponse({success: true});
-					} catch (error) {
-						sendResponse({success: false, error: error instanceof Error ? error.message : String(error)});
-					}
-				})();
+				routeMessageToTab(sender.tab.id, { action: typedRequest.action })
+					.then(() => sendResponse({success: true}))
+					.catch((error) => sendResponse({success: false, error: error instanceof Error ? error.message : String(error)}));
 				return true;
 			}
 		}
 
 		if (typedRequest.action === "getTabInfo") {
 			browser.tabs.get(typedRequest.tabId as number).then((tab) => {
+				// For reader page tabs, return the article URL so the
+				// clipper treats it as a normal web page
+				const url = isReaderPageUrl(tab.url) ?? tab.url;
 				sendResponse({
 					success: true,
 					tab: {
 						id: tab.id,
-						url: tab.url
+						url: url
 					}
 				});
 			}).catch((error) => {
@@ -957,12 +1377,7 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			const tabId = (typedRequest as any).tabId;
 			const message = (typedRequest as any).message;
 			if (tabId && message) {
-				// Ensure content script is loaded before sending message
-				ensureContentScriptLoadedInBackground(tabId).then(() => {
-					console.log('[Obsidian Clipper] Sending message to tab:', message.action);
-					return browser.tabs.sendMessage(tabId, message);
-				}).then((response) => {
-					console.log('[Obsidian Clipper] Tab response:', response ? 'has content=' + !!((response as any).content) : response);
+				routeMessageToTab(tabId, message).then((response) => {
 					sendResponse(response);
 				}).catch((error) => {
 					console.error('[Obsidian Clipper] Error sending message to tab:', error);
@@ -979,6 +1394,19 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 				});
 				return true;
 			}
+		}
+
+		if (typedRequest.action === "openReaderPage") {
+			const articleUrl = (typedRequest as any).url;
+			if (articleUrl && sender.tab?.id) {
+				const readerUrl = browser.runtime.getURL('reader.html?url=' + encodeURIComponent(articleUrl));
+				browser.tabs.update(sender.tab.id, { url: readerUrl })
+					.then(() => sendResponse({ success: true }))
+					.catch((error) => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }));
+			} else {
+				sendResponse({ success: false, error: 'Missing URL or tab' });
+			}
+			return true;
 		}
 
 		if (typedRequest.action === "openObsidianUrl") {
@@ -1027,7 +1455,10 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			typedRequest.action === "openObsidianUrl" ||
 			typedRequest.action === 'fetchBilibiliJson' ||
 			typedRequest.action === 'fetchFeishuApi' ||
-			typedRequest.action === 'fetchFeishuImage') {
+			typedRequest.action === 'fetchFeishuImage' ||
+			typedRequest.action === 'fetchScysImagesViaMainWorld' ||
+			typedRequest.action === 'fetchZsxqImagesAsBase64' ||
+			typedRequest.action === 'fetchZsxqArticleHtml') {
 			return true;
 		}
 	}

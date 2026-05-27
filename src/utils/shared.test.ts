@@ -74,6 +74,28 @@ describe('buildVariables', () => {
 		expect(vars['{{author}}']).toBe('padded author');
 	});
 
+	// Regression for bug discovered 2026-05-16: writing `content` into the
+	// extractedContent dict silently overwrites the canonical {{content}}
+	// variable that came from params.content (the markdown body produced by
+	// createMarkdownContent in content-extractor.ts). content.ts must NOT
+	// include `content` in the extractedContent dict — push your custom
+	// markdown through params.content instead, or use a distinct key.
+	test('extractedContent dict overrides {{content}} from params (documented footgun)', () => {
+		const vars = buildVariables(makeParams({
+			content: 'this is markdown',
+			extractedContent: { content: '<h1>raw HTML overrides!</h1>' },
+		}));
+		// Document the behaviour: extractedContent wins.
+		expect(vars['{{content}}']).toBe('<h1>raw HTML overrides!</h1>');
+		// Sanity: without the dict entry, params.content survives.
+		const varsNoOverride = buildVariables(makeParams({
+			content: 'this is markdown',
+			extractedContent: { transcript: 'bilibili specific data' },
+		}));
+		expect(varsNoOverride['{{content}}']).toBe('this is markdown');
+		expect(varsNoOverride['{{transcript}}']).toBe('bilibili specific data');
+	});
+
 	test('handles empty/falsy values', () => {
 		const vars = buildVariables(makeParams({
 			author: '',

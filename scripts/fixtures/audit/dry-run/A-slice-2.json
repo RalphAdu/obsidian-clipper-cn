@@ -1,0 +1,20 @@
+{
+	"url": "https://scys.com/articleDetail/xq_topic/55188248452852824",
+	"slice": "2-of-4",
+	"grid_range": [8, 14],
+	"status": "PASS",
+	"checklist": {
+		"frontmatter": "na",
+		"heading": "pass",
+		"list": "pass",
+		"table": "na",
+		"code": "pass",
+		"bold_italic": "pass",
+		"image": "pass",
+		"quote": "na",
+		"link": "pass",
+		"comment": "na"
+	},
+	"diffs": [],
+	"notes": "中段：列表 + 行内 code + 图片均一致"
+}

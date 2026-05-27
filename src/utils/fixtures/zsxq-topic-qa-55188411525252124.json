@@ -1,0 +1,207 @@
+{
+  "succeeded": true,
+  "resp_data": {
+    "topic": {
+      "topic_id": 55188411525252130,
+      "topic_uid": "55188411525252124",
+      "group": {
+        "group_id": 28882555515121,
+        "name": "老毛和他的朋友们",
+        "type": "pay",
+        "background_url": "https://images.zsxq.com/FtTYfuEDW9OsskKSpM2RiXUa4IQq?e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:p3WjSFWMktrSzdLV7pOrU-DE90k="
+      },
+      "type": "q&a",
+      "question": {
+        "owner": {
+          "user_id": 88255182141452,
+          "name": "投资致富",
+          "avatar_url": "https://images.zsxq.com/FgNmE11bOr4HBX3VCGgnDUFK0qld?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:deCDc7qyExjLRsae2gHIBxMrwRk=",
+          "location": "上海"
+        },
+        "questionee": {
+          "user_id": 15422551525812,
+          "name": "释老毛",
+          "avatar_url": "https://images.zsxq.com/Fk5-anL5O80XT0jP5S097oVQAxf6?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:3K5_SPmHJj9FQuFQs9Gjnk6LJyA=",
+          "description": "70后，博士，教授，网络大V，股票达人，价值投资粉儿，奥派经济学粉儿，股龄近20年，财经公众号“毛有话说”博主。",
+          "location": "北京"
+        },
+        "text": "巨师好！看到有个帖子的回复中您推荐了红利基金。目前，市场上的红利类基金种类繁杂，有上证红利、中证红利、红利低波，红利机会，恒生红利等等。巨师能否分析一下这些红利类基金的优缺点，长期持有买哪个更好？",
+        "expired": true,
+        "anonymous": false,
+        "owner_detail": {
+          "questions_count": 11,
+          "join_time": "2025-02-25T21:35:12.506+0800",
+          "status": "joined"
+        },
+        "owner_location": "上海"
+      },
+      "answer": {
+        "owner": {
+          "user_id": 15422551525812,
+          "name": "释老毛",
+          "avatar_url": "https://images.zsxq.com/Fk5-anL5O80XT0jP5S097oVQAxf6?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:3K5_SPmHJj9FQuFQs9Gjnk6LJyA=",
+          "description": "70后，博士，教授，网络大V，股票达人，价值投资粉儿，奥派经济学粉儿，股龄近20年，财经公众号“毛有话说”博主。",
+          "location": "北京"
+        },
+        "text": "凡是名字叫红利的都大同小异。主要是按照利股息率来选取成分股。当然，每一个产品设计不一样，标准会有所取舍。我比较喜欢红利低波，例如南方标普中国A股大盘红利低波50ETF，515450，这个指数的行业相对均衡，它把银行股的权重做了限制，不至于红利策略被银行股绑架。"
+      },
+      "answered": true,
+      "silenced": false,
+      "latest_likes": [
+        {
+          "create_time": "2026-03-24T06:26:06.149+0800",
+          "owner": {
+            "user_id": 815254484215522,
+            "name": "七姐的小弟",
+            "avatar_url": "https://images.zsxq.com/Fp4gHWN3l6qcEEdi7F0Lv2kZGCja?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:Wd13QtMeqG8skUnIRTfuIW9wc60=",
+            "number": 1320
+          }
+        },
+        {
+          "create_time": "2026-03-22T16:59:14.286+0800",
+          "owner": {
+            "user_id": 158842412512,
+            "name": "风雨浸衣骨更硬",
+            "avatar_url": "https://images.zsxq.com/FqqBgTPruHnR4wp17i6GT9zhdXzl?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:bMUS-7t-4uSvM__hJiBUWvFvnbQ=",
+            "number": 1646
+          }
+        },
+        {
+          "create_time": "2026-03-20T10:37:15.214+0800",
+          "owner": {
+            "user_id": 414418545412128,
+            "name": "chenchen",
+            "alias": "BayesRule",
+            "avatar_url": "https://images.zsxq.com/Fs5GfqoDYAxZdW6ebyUh1MOTZ1Fn?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:Rs9de85HIHkB7q_xjI10iWqFvEE=",
+            "number": 291
+          }
+        },
+        {
+          "create_time": "2026-03-17T11:32:22.436+0800",
+          "owner": {
+            "user_id": 244188522851511,
+            "name": "Asta",
+            "avatar_url": "https://images.zsxq.com/FmUNfqV_Zp1agistg4_Fv2zxGtFP?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:LcP8l5s8E2SpKwlXXPj8WBFdkhI=",
+            "number": 1002
+          }
+        },
+        {
+          "create_time": "2026-03-17T09:34:23.479+0800",
+          "owner": {
+            "user_id": 241551252218221,
+            "name": "中彩",
+            "avatar_url": "https://images.zsxq.com/FkqzdBjYE6pY9bWd9eOgSXrRG38-?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:GzeygPIzZ-BAN6dDfs9QMTSTaBE=",
+            "number": 234
+          }
+        },
+        {
+          "create_time": "2026-03-17T08:34:01.512+0800",
+          "owner": {
+            "user_id": 815111224584582,
+            "name": "沧海一粟",
+            "avatar_url": "https://images.zsxq.com/FuC-h-nl_GEPEwuvtGHgQ9aW8TyN?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:VfNu23JUokfEslzXtW7IYM7giog=",
+            "number": 493
+          }
+        },
+        {
+          "create_time": "2026-03-17T07:07:11.220+0800",
+          "owner": {
+            "user_id": 15451842522222,
+            "name": "kolen",
+            "avatar_url": "https://images.zsxq.com/FpMdI13QLB8LUy0C0OD6YVcXkRpB?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:VRRBrHp-dM3LBpgnnm0Xs8Gulig=",
+            "number": 387
+          }
+        },
+        {
+          "create_time": "2026-03-17T00:07:19.803+0800",
+          "owner": {
+            "user_id": 51112488284884,
+            "name": "Julie",
+            "avatar_url": "https://images.zsxq.com/FqvZX-MxLPjg1mW-hrcIhcxvc-c2?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:L9Q0mVwRPoWM6FkpO-jHf1GoxbA=",
+            "number": 718
+          }
+        },
+        {
+          "create_time": "2026-03-16T23:32:55.437+0800",
+          "owner": {
+            "user_id": 28842222114421,
+            "name": "二球",
+            "avatar_url": "https://images.zsxq.com/FsyeTTNeSex0nGAQZxgdsitbC80u?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:-xKjQafELWtJTr8BNeqTTmGZ9Pw=",
+            "number": 2363
+          }
+        },
+        {
+          "create_time": "2026-03-16T23:18:11.770+0800",
+          "owner": {
+            "user_id": 28421415411111,
+            "name": "惬意三潭月",
+            "avatar_url": "https://images.zsxq.com/FjTePlEqPTmg4V-Pn39P0oySiobn?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:E3Cm-AMyi7b1W2KzlFGuT6wCwyE=",
+            "number": 993
+          }
+        }
+      ],
+      "show_comments": [
+        {
+          "comment_id": 5125442585224154,
+          "create_time": "2026-03-17T14:54:15.743+0800",
+          "owner": {
+            "user_id": 48582152115258,
+            "name": "兰俭",
+            "avatar_url": "https://images.zsxq.com/FkQXJzARioOSJojnr1Bp-256RBfv?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:u_V7Il54pqYmI_EaRak5fem8MGg=",
+            "location": "四川"
+          },
+          "text": "请问这支etf规模是不是偏小，是否有影响呢？",
+          "likes_count": 1,
+          "rewards_count": 0,
+          "sticky": false,
+          "replies_count": 1
+        },
+        {
+          "comment_id": 5125442422142454,
+          "parent_comment_id": 5125442585224154,
+          "create_time": "2026-03-17T17:07:35.548+0800",
+          "owner": {
+            "user_id": 15422551525812,
+            "name": "释老毛",
+            "avatar_url": "https://images.zsxq.com/Fk5-anL5O80XT0jP5S097oVQAxf6?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:3K5_SPmHJj9FQuFQs9Gjnk6LJyA=",
+            "description": "70后，博士，教授，网络大V，股票达人，价值投资粉儿，奥派经济学粉儿，股龄近20年，财经公众号“毛有话说”博主。",
+            "location": "北京"
+          },
+          "text": "158亿规模不小了",
+          "likes_count": 0,
+          "rewards_count": 0,
+          "sticky": false,
+          "repliee": {
+            "user_id": 48582152115258,
+            "name": "兰俭",
+            "avatar_url": "https://images.zsxq.com/FkQXJzARioOSJojnr1Bp-256RBfv?imageMogr2/auto-orient/thumbnail/150x/format/jpg/blur/1x0/quality/75/ignore-error/1&e=1782835199&token=q6iZ0sQtf9U7s1qz0r4yMawNq3-u2w6lbnai6y2J:u_V7Il54pqYmI_EaRak5fem8MGg="
+          }
+        }
+      ],
+      "likes_count": 42,
+      "tourist_likes_count": 0,
+      "likes_detail": {
+        "emojis": [
+          {
+            "emoji_key": "[强]",
+            "likes_count": 42
+          }
+        ]
+      },
+      "rewards_count": 0,
+      "comments_count": 2,
+      "reading_count": 1,
+      "readers_count": 1480,
+      "digested": false,
+      "sticky": false,
+      "create_time": "2026-03-16T08:01:18.396+0800",
+      "user_specific": {
+        "liked": false,
+        "liked_emojis": [],
+        "subscribed": false
+      },
+      "title": "凡是名字叫红利的都大同小异。主..."
+    },
+    "type": "all"
+  }
+}

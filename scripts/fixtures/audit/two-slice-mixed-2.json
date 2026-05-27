@@ -1,0 +1,28 @@
+{
+  "url": "https://example.com/article/2",
+  "slice": "2-of-2",
+  "grid_range": [6, 10],
+  "status": "FAIL",
+  "checklist": {
+    "frontmatter": "na",
+    "heading": "pass",
+    "list": "pass",
+    "table": "fail",
+    "code": "na",
+    "bold_italic": "unknown",
+    "image": "pass",
+    "quote": "na",
+    "link": "pass",
+    "comment": "na"
+  },
+  "diffs": [
+    {
+      "grid": "sbs-09.png",
+      "location": "右半 obsidian 中段 / 表格第 3 行",
+      "category": "table",
+      "severity": "blocker",
+      "desc": "browser 显示 4 列，obsidian 只 3 列"
+    }
+  ],
+  "notes": "bold 截在 grid 边界看不清"
+}

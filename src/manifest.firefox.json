@@ -3,19 +3,31 @@
 	"default_locale": "en",
 	"name": "obsidian-web-clipper-cn",
 	"homepage_url": "https://obsidian.md/",
-	"version": "1.4.4",
+	"version": "1.5.0",
 	"description": "Save and highlight web pages in a private and durable format that you can access offline. The official extension for Obsidian.",
 	"permissions": [
 		"activeTab",
 		"clipboardWrite",
 		"contextMenus",
 		"storage",
-		"scripting"
+		"scripting",
+		"webRequest",
+		"webRequestBlocking",
+		"alarms"
 	],
 	"host_permissions": [
 		"<all_urls>",
 		"http://*/*",
-		"https://*/*"
+		"https://*/*",
+		"https://scys.com/*",
+		"https://*.aliyuncs.com/*",
+		"https://api.zsxq.com/*",
+		"https://articles.zsxq.com/*",
+		"https://images.zsxq.com/*",
+		"https://article-images.zsxq.com/*"
+	],
+	"optional_host_permissions": [
+		"<all_urls>"
 	],
 	"action": {
 		"default_popup": "popup.html",
@@ -41,6 +53,12 @@
 		{
 			"matches": ["http://*/*", "https://*/*"],
 			"js": ["browser-polyfill.min.js", "content.js"]
+		},
+		{
+			"matches": ["https://scys.com/view/docx/*"],
+			"js": ["scys-docx-patch.js"],
+			"run_at": "document_start",
+			"world": "MAIN"
 		}
 	],
 	"web_accessible_resources": [

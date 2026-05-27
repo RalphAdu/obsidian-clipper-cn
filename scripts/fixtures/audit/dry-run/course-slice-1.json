@@ -1,0 +1,20 @@
+{
+	"url": "https://scys.com/course/detail/172?chapterId=11408",
+	"slice": "1-of-2",
+	"grid_range": [1, 7],
+	"status": "PASS",
+	"checklist": {
+		"frontmatter": "pass",
+		"heading": "pass",
+		"list": "pass",
+		"table": "pass",
+		"code": "pass",
+		"bold_italic": "pass",
+		"image": "pass",
+		"quote": "na",
+		"link": "pass",
+		"comment": "na"
+	},
+	"diffs": [],
+	"notes": "首屏含 frontmatter + 课程介绍表格（3 列），渲染一致"
+}

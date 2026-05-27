@@ -20,6 +20,7 @@ assets/shared
 *.xcuserstate
 *.xcuserdatad
 
+.context
 .cursorrules
 .env
 context/
@@ -30,3 +31,31 @@ context/
 
 # Chrome extension signing key (do not commit)
 keys/
+
+# Per-feature worktrees (superpowers workflow) — never tracked
+.claude/worktrees/
+
+# Playwright persistent profiles for sites that require interactive QR login
+# (scys-pw-profile is created by scripts/scys-login-persist.ts after a one-time
+# WeChat scan; subsequent e2e runs reuse it via runRealClip({ userDataDir }))
+.*-pw-profile/
+
+# Local Claude Code chat-history exports — never tracked
+.claude/chat-exports/
+
+# Serena MCP local project workspace (config + LSP symbol cache) — never tracked
+.serena/
+
+# Superpowers work area — entire dir is gitignored. spec/plan/BACKLOG/feishu
+# credentials all live here as local-only documents. The ONLY file promoted to
+# git is BACKLOG.md via explicit `git add -f docs/superpowers/BACKLOG.md` (it's
+# the project's "cold-start handbook" maintained across features).
+# Notes:
+# - `!negate` rules below a parent-ignore directive are NO-OP in git (父目录
+#   被 ignore 时子文件 negate 规则失效). Earlier versions of this file had
+#   such rules — removed 2026-05-19 as they were dead code that misled readers.
+# - To intentionally track another file under this dir, must use `git add -f`.
+docs/superpowers/
+
+# macOS Vision OCR compiled binary (build with `swiftc -O scripts/macos-vision-ocr.swift -o scripts/macos-vision-ocr`)
+scripts/macos-vision-ocr

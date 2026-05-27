@@ -2,19 +2,27 @@
 	"manifest_version": 3,
 	"name": "obsidian-web-clipper-cn",
 	"homepage_url": "https://obsidian.md/",
-	"version": "1.4.4",
+	"version": "1.5.0",
 	"description": "Save content from the web to Obsidian, in a private and durable format you can always access offline.",
 	"permissions": [
 		"activeTab",
 		"clipboardWrite",
 		"contextMenus",
+		"nativeMessaging",
 		"storage",
-		"scripting"
+		"scripting",
+		"alarms"
 	],
 	"host_permissions": [
 		"<all_urls>",
 		"http://*/*",
-		"https://*/*"
+		"https://*/*",
+		"https://scys.com/*",
+		"https://*.aliyuncs.com/*",
+		"https://api.zsxq.com/*",
+		"https://articles.zsxq.com/*",
+		"https://images.zsxq.com/*",
+		"https://article-images.zsxq.com/*"
 	],
 	"action": {
 		"default_popup": "popup.html",
@@ -39,6 +47,12 @@
 		{
 			"matches": ["http://*/*", "https://*/*"],
 			"js": ["browser-polyfill.min.js", "content.js"]
+		},
+		{
+			"matches": ["https://scys.com/view/docx/*"],
+			"js": ["scys-docx-patch.js"],
+			"run_at": "document_start",
+			"world": "MAIN"
 		}
 	],
 	"web_accessible_resources": [

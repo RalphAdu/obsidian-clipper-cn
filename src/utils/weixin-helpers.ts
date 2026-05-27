@@ -96,3 +96,109 @@ export function normalizePreBlockLineBreaks(root: ParentNode): void {
 		}
 	});
 }
+
+/**
+ * Strip <a href="javascript:..."> elements down to their inner text.
+ * mdnice editor uses these as in-page anchors (e.g.
+ * `<a href="javascript:;">公众号监控脚本</a>`); turndown otherwise emits
+ * `[公众号监控脚本](javascript:;)` which is useless in markdown.
+ */
+export function normalizeMdniceJavascriptLinks(root: ParentNode): void {
+  const anchors = root.querySelectorAll('a[href^="javascript:"]');
+  anchors.forEach(a => {
+    const ownerDoc = (a as any).ownerDocument;
+    if (!ownerDoc) return;
+    a.replaceWith(ownerDoc.createTextNode((a as any).textContent || ''));
+  });
+}
+
+// ============================================================
+// mdnice template normalizers — shared utilities
+// ============================================================
+
+/**
+ * Test if an element's inline style attribute matches all given regex
+ * patterns. Single-element predicate used by the mdnice normalizers
+ * below to detect template-encoded structures.
+ */
+function styleMatchesAll(el: Element, patterns: RegExp[]): boolean {
+  const style = el.getAttribute('style') || '';
+  return patterns.every(p => p.test(style));
+}
+
+/**
+ * Walk every descendant of root and call fn. We use a snapshot array so
+ * fn is free to mutate the DOM (replaceWith / remove) without breaking
+ * the live NodeList iteration.
+ */
+function forEachDescendant(root: ParentNode, fn: (el: Element) => void): void {
+  const arr: Element[] = [];
+  const walker = (node: ParentNode) => {
+    for (const child of Array.from(node.children || [])) {
+      arr.push(child as Element);
+      walker(child as ParentNode);
+    }
+  };
+  walker(root);
+  arr.forEach(fn);
+}
+
+/**
+ * Remove two mdnice "section card" decorations:
+ *
+ *   1. Reading Time meta card at article top — `<section>` with
+ *      `padding: 10px 12px` + `background-color: rgb(244, 244, 240)`.
+ *      Contains author badge + reading time, pure decoration.
+ *
+ *   2. Column-divider anchor — `<section>` whose textContent is an
+ *      all-uppercase identifier (WECHAT_MONITOR / EXPORT_AND_SKILL),
+ *      rendered as small letter-spaced purple text. Used as a visual
+ *      section divider in mdnice; markdown gets H1 from the chapter
+ *      heading right below it, so the anchor is redundant.
+ */
+export function normalizeMdniceSectionCards(root: ParentNode): void {
+  forEachDescendant(root, el => {
+    if (el.tagName !== 'SECTION') return;
+    const style = el.getAttribute('style') || '';
+    const text = (el.textContent || '').trim();
+
+    // Pattern 1: Reading Time meta card.
+    const isMetaCard =
+      /padding:\s*10px\s*12px/.test(style) &&
+      /background-color:\s*rgb\(\s*244,\s*244,\s*240\s*\)/.test(style) &&
+      /Reading Time/i.test(text);
+    // Pattern 2: column anchor (all-uppercase identifier, short).
+    const isColumnAnchor =
+      text.length > 0 && text.length < 40 && /^[A-Z][A-Z0-9_]+$/.test(text);
+
+    if (isMetaCard || isColumnAnchor) {
+      el.remove();
+    }
+  });
+}
+
+/**
+ * Promote mdnice "small heading" <p> elements (letter-spaced uppercase
+ * purple text — used as section labels like "流程闭环" / "Sources") to
+ * <h3>. Signature is all 5 inline-style properties matching simultaneously,
+ * which is highly specific to mdnice's template; ordinary paragraphs do
+ * not carry this combination.
+ */
+export function normalizeMdniceSmallHeadings(root: ParentNode): void {
+  const ps = root.querySelectorAll('p');
+  ps.forEach(p => {
+    const style = p.getAttribute('style') || '';
+    const matches =
+      /font-size:\s*(?:9|10|11|12)px/.test(style) &&
+      /letter-spacing:\s*[23]px/.test(style) &&
+      /text-transform:\s*uppercase/.test(style) &&
+      /color:\s*#ab59ff/i.test(style) &&
+      /font-weight:\s*(?:700|800|900|bold)/.test(style);
+    if (!matches) return;
+    const ownerDoc = (p as any).ownerDocument;
+    if (!ownerDoc) return;
+    const h3 = ownerDoc.createElement('h3');
+    h3.textContent = (p.textContent || '').trim();
+    p.replaceWith(h3);
+  });
+}

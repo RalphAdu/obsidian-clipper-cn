@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions, normalizeMdniceChapterHeadings, normalizeMdniceSubHeadings, normalizeMdniceCodeBlocks, normalizeMdniceFootnotes } from './weixin-helpers';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions, normalizeMdniceChapterHeadings, normalizeMdniceSubHeadings, normalizeMdniceCodeBlocks, normalizeMdniceFootnotes, normalizeMdniceArticle } from './weixin-helpers';
 
 const fixturePath = join(__dirname, 'fixtures', 'weixin-SPLTD-hFAsyYAA7V1lU8OA.html');
 const fixtureHtml = readFileSync(fixturePath, 'utf-8');
@@ -338,6 +338,24 @@ describe('normalizeMdniceChapterHeadings', () => {
 		normalizeMdniceChapterHeadings(doc);
 		expect(doc.querySelector('h1')).toBeNull();
 	});
+
+	it('handles nested chapter sections — processes innermost, not outer wrapper', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section>
+						<section style="font-size:0;">
+							<span style="font-size:120px;color:rgba(236,223,252,0.008);"><span leaf="">壹</span></span>
+							<span><section style="font-size:26px;font-weight:700"><span leaf="">先采集</span></section></span>
+						</section>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceChapterHeadings(doc);
+		expect(doc.querySelectorAll('h1').length).toBe(1);
+		expect(doc.querySelector('h1')?.textContent).toBe('先采集');
+	});
 });
 
 describe('normalizeMdniceSubHeadings', () => {
@@ -387,6 +405,24 @@ describe('normalizeMdniceSubHeadings', () => {
 		`);
 		normalizeMdniceSubHeadings(doc);
 		expect(doc.querySelector('h2')).toBeNull();
+	});
+
+	it('handles nested sub-heading sections — processes innermost, not outer wrapper', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section>
+						<section>
+							<span><span style="background-color:#ab59ff;width:3px;"><span leaf="">&nbsp;</span></span></span>
+							<span><section style="font-size:24px;font-weight:700"><span leaf="">监听更新</span></section></span>
+						</section>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceSubHeadings(doc);
+		expect(doc.querySelectorAll('h2').length).toBe(1);
+		expect(doc.querySelector('h2')?.textContent).toBe('监听更新');
 	});
 });
 
@@ -459,6 +495,22 @@ describe('normalizeMdniceCodeBlocks', () => {
 		normalizeMdniceCodeBlocks(doc);
 		expect(doc.querySelector('pre')).toBeNull();
 	});
+
+	it('matches lang badge using rgba color (not just hex #ab59ff)', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section>
+						<span style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:rgba(171,89,255,0.62);font-weight:700"><span leaf="">terminal</span></span>
+						<span style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:rgba(171,89,255,0.62);font-weight:700"><span leaf="">TEXT</span></span>
+						<section><span leaf="">line one</span></section>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceCodeBlocks(doc);
+		expect(doc.querySelector('code')?.getAttribute('class')).toBe('language-text');
+	});
 });
 
 describe('normalizeMdniceFootnotes', () => {
@@ -514,5 +566,27 @@ describe('normalizeMdniceFootnotes', () => {
 		normalizeMdniceFootnotes(doc);
 		expect(doc.body.innerHTML).toContain('<p>normal paragraph</p>');
 		expect(doc.querySelector('div[data-mdnice-footnotes]')).toBeNull();
+	});
+});
+
+describe('normalizeMdniceArticle (integration)', () => {
+	it('runs all 9 sub-normalizers in the right order on the real fixture', () => {
+		const fixturePath = join(__dirname, 'fixtures', 'weixin-mdnice-HCBkgfIZ.html');
+		const html = readFileSync(fixturePath, 'utf-8');
+		const { document: doc } = parseHTML(html);
+		const root = doc.querySelector('#js_content');
+		expect(root, 'fixture should contain #js_content').not.toBeNull();
+		normalizeMdniceArticle(root!);
+
+		expect(root!.querySelectorAll('h1').length).toBeGreaterThanOrEqual(2);
+		expect(root!.querySelectorAll('h2').length).toBeGreaterThanOrEqual(5);
+		expect(root!.querySelectorAll('h3').length).toBeGreaterThanOrEqual(1);
+		expect(root!.querySelectorAll('pre code').length).toBeGreaterThanOrEqual(2);
+		expect(root!.querySelectorAll('strong').length).toBeGreaterThanOrEqual(1);
+		expect(root!.querySelector('div[data-mdnice-footnotes]')).not.toBeNull();
+		expect(root!.querySelector('a[href^="javascript:"]')).toBeNull();
+		expect((root!.textContent || '')).not.toContain('Reading Time');
+		expect((root!.textContent || '')).not.toContain('WECHAT_MONITOR');
+		expect((root!.textContent || '')).not.toContain('EXPORT_AND_SKILL');
 	});
 });

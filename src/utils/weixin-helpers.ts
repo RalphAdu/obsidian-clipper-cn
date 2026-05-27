@@ -269,6 +269,16 @@ export function normalizeMdniceChapterHeadings(root: ParentNode): void {
 		if (!deco) return;
 		const decoStyle = deco.getAttribute('style') || '';
 		if (!/color:\s*rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0?\.0\d/.test(decoStyle)) return;
+		// Inner-section guard: if a descendant <section> also has the 120px decoration,
+		// defer to it (process inner-most first so we don't replace outer + leave inner
+		// as detached subtree). Same pattern as normalizeMdniceCodeBlocks.
+		const innerDeco = Array.from(el.querySelectorAll('section')).some(s => {
+			if (s === el) return false;
+			const d = (s as Element).querySelector('span[style*="font-size:120px"]');
+			if (!d) return false;
+			return /color:\s*rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0?\.0\d/.test(d.getAttribute('style') || '');
+		});
+		if (innerDeco) return;
 		const candidates = el.querySelectorAll('section');
 		let title: Element | null = null;
 		let subtitle: Element | null = null;
@@ -320,6 +330,15 @@ export function normalizeMdniceSubHeadings(root: ParentNode): void {
 		if (!bar) return;
 		const barStyle = bar.getAttribute('style') || '';
 		if (!/width:\s*[123]px/.test(barStyle)) return;
+		// Inner-section guard: defer to nested sub-heading section.
+		const innerBar = Array.from(el.querySelectorAll('section')).some(s => {
+			if (s === el) return false;
+			return Array.from((s as Element).querySelectorAll('span')).some(b => {
+				const bs = (b as Element).getAttribute('style') || '';
+				return /#ab59ff/i.test(bs) && /width:\s*[123]px/.test(bs);
+			});
+		});
+		if (innerBar) return;
 		const sections = el.querySelectorAll('section');
 		let title: Element | null = null;
 		let subtitle: Element | null = null;
@@ -409,7 +428,7 @@ function isMdniceLangBadge(el: Element): boolean {
 		/font-size:\s*10px/.test(style) &&
 		/letter-spacing:\s*1\.2px/.test(style) &&
 		/text-transform:\s*uppercase/.test(style) &&
-		/color:\s*#ab59ff/i.test(style) &&
+		/color:\s*(?:#ab59ff|rgba\(\s*171\s*,\s*89\s*,\s*255\s*,)/i.test(style) &&
 		/font-weight:\s*(?:700|800|900|bold)/.test(style)
 	);
 }
@@ -466,17 +485,47 @@ export function normalizeMdniceCodeBlocks(root: ParentNode): void {
 			return childSecs.length === 0;
 		});
 
-		if (leafLines.length === 0) continue;
-		const codeText = leafLines.map(s => ((s as Element).textContent || '').trim()).join('\n');
+		// Layout B fallback: mdnice may split the code block into a header
+		// <section> (badges only) and a sibling body <section> (code lines only).
+		// In that case leafLines is empty here and the code lines live in a
+		// sibling section of `sec` inside `sec.parentElement`.
+		let container: Element = sec as Element;
+		let resolvedLeafLines = leafLines;
+		if (leafLines.length === 0) {
+			const parent = (sec as Element).parentElement;
+			if (parent && parent.tagName === 'SECTION') {
+				// Collect code lines from all sibling sections (not the badge section).
+				const siblingLineSections = Array.from(parent.querySelectorAll('section')).filter(s => {
+					// Must not be sec itself or a descendant of sec.
+					if ((sec as Element).contains(s as Element)) return false;
+					const t = ((s as Element).textContent || '').trim();
+					if (!t) return false;
+					if (badgeTexts.has(t)) return false;
+					if (Array.from((s as Element).querySelectorAll('span')).some(x => isMdniceLangBadge(x as Element))) return false;
+					return true;
+				});
+				const siblingLeafLines = siblingLineSections.filter(s => {
+					const childSecs = Array.from((s as Element).children).filter(c => (c as Element).tagName === 'SECTION');
+					return childSecs.length === 0;
+				});
+				if (siblingLeafLines.length > 0) {
+					resolvedLeafLines = siblingLeafLines;
+					container = parent;
+				}
+			}
+		}
 
-		const ownerDoc = sec.ownerDocument;
+		if (resolvedLeafLines.length === 0) continue;
+		const codeText = resolvedLeafLines.map(s => ((s as Element).textContent || '').trim()).join('\n');
+
+		const ownerDoc = (container as Element).ownerDocument;
 		if (!ownerDoc) continue;
 		const pre = ownerDoc.createElement('pre');
 		const code = ownerDoc.createElement('code');
 		code.setAttribute('class', `language-${lang}`);
 		code.textContent = codeText;
 		pre.appendChild(code);
-		sec.replaceWith(pre);
+		container.replaceWith(pre);
 	}
 }
 
@@ -592,4 +641,35 @@ export function normalizeMdniceFootnotes(root: ParentNode): void {
 		div.appendChild(p);
 	}
 	(target as Element).appendChild(div);
+}
+
+/**
+ * One-shot entry point that runs all mdnice sub-normalizers in
+ * dependency order. Call this on a cloned article DOM before turndown.
+ *
+ * Order rationale:
+ *   1. javascriptLinks — strip first, so code-block lang badges /
+ *      heading subtitles don't contain dangling <a> elements.
+ *   2. sectionCards — delete decoration cards (Reading Time meta +
+ *      column anchors) so they don't pollute later heading detection.
+ *   3. chapterHeadings, subHeadings — promote to <h1>/<h2>.
+ *   4. footnotes — must run BEFORE smallHeadings, because it looks for
+ *      a raw <p>Sources</p> small-heading <p> as anchor.
+ *   5. smallHeadings — promote remaining small-heading <p>s to <h3>.
+ *   6. codeBlocks — convert pseudo code-block sections to <pre><code>.
+ *   7. imageCaptions — last image-related step, so DOM siblings of
+ *      <img> are stable.
+ *   8. inlineBold — last, so headings are already <h1>/<h2>/<h3> and
+ *      we can correctly skip spans inside headings.
+ */
+export function normalizeMdniceArticle(root: ParentNode): void {
+	normalizeMdniceJavascriptLinks(root);
+	normalizeMdniceSectionCards(root);
+	normalizeMdniceChapterHeadings(root);
+	normalizeMdniceSubHeadings(root);
+	normalizeMdniceFootnotes(root);
+	normalizeMdniceSmallHeadings(root);
+	normalizeMdniceCodeBlocks(root);
+	normalizeMdniceImageCaptions(root);
+	normalizeMdniceInlineBold(root);
 }

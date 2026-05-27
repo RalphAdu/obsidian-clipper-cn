@@ -1855,6 +1855,51 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 
 ---
 
+### 6.26 docs.qq.com /doc/ 类型 extractor（**已完成 2026-05-27**，commits `a278a94..579e55d`，15 commits on `worktree-docs-qq-extractor`）
+
+**触发**：阿杜验收一个腾讯文档 URL 后确认 Defuddle 默认通路对 docs.qq.com SPA + contenteditable 渲染产物极差（跟早期飞书同类）。立项做专项 extractor。
+
+**方案**：cookie 路径 + 导出 .docx 异步接口 + mammoth.js 转 HTML + 现有 turndown pipeline。content.ts 页面 runtime 调（自动带 cookie + Referer），错误一律 throw 由 content.ts catch 进 `extractorWarnings[]` 显示 banner。
+
+**4 个 endpoint**（reconnaissance 实测，详见 `docs/superpowers/specs/2026-05-26-docs-qq-extractor-recon.md`）：
+1. `GET /cgi-go/padinfo/getpadinfo?encodePadId=<token>&infoKeys=[1,2]&xsrf=<csrf>` → title + globalPadId
+2. `POST /v1/export/export_office` form-urlencoded body（docId=globalPadId）→ operationId
+3. `GET /v1/export/query_progress?operationId=<id>` 每 1s 轮询 → status: Processing/Done/Failed; Done 时含 file_url (腾讯云 COS signed URL 30 min 过期)
+4. `GET <COS file_url>` credentials='omit' → docx ArrayBuffer
+
+**关键事故修正（reconnaissance 漏 + e2e 暴露）**：
+
+1. **CSRF token 真实来源 = cookie `TOK`，不是 `xsrf`** — recon 阶段误以为 cookie 字段叫 xsrf（实际是 URL query param 名）。前端 JS 读 TOK cookie 拼成 `?xsrf=` query。`getXsrfFromCookies` 改读 TOK + fallback xsrf。
+2. **mammoth 动态分包在 chrome extension content script 不 work** — webpack splitChunks 产 async chunk，但 content script 无法通过 `<script>` 注入加载 extension origin 之外的 async chunk（chrome MV3 限制 + web_accessible_resources 白名单刚性）。**spec §9 设计动态 import → 实际改 static import**。代价：`dist/content.js` 体积 2.5MB → 3.3MB（+800KB mammoth + jszip）。
+3. **content.ts bridge origin 白名单漏 docs.qq.com** — e2e bridge 的 origin regex 没包 docs.qq.com → bridge 沉默 no-op。修补加入并 anchor 紧（`^docs\.qq\.com$`）。
+4. **webpack content script publicPath 检测 fallback 到页面 script origin** — content script 没 currentScript，webpack auto-detect 拿到 docs.gtimg.com 等页面 script URL → 动态 chunk 加载 404。`ContentScriptPublicPathPlugin` 在构建期 patch 自动检测块改 `chrome.runtime.getURL('')`。
+
+**ship gate**：
+- ✅ T5-1 vitest 单测 41 (docs-qq) + 901 (baseline pre-existing) 全 PASS
+- ✅ T5-2 e2e `runRealClip` 5/5 assertion PASS，阿杜原始 URL `DQmZvdEFOR0RFWU9t`（10 小时长文，27MB docx），clip duration 23s，markdown 37MB / hydratedHtml 1.4MB
+- ✅ T5-3 `npm run build:chrome` 成功，dist/content.js 3.3MB（mammoth static inline）
+- ⏳ T5-4 阿杜手工真 URL 验收 → Obsidian.app 看产物（要阿杜在 ship gate 阶段做）
+
+**MVP 范围**（v2 优化）：
+- 仅 /doc/<token> 类型；sheet/slide/form/flowchart/mind/pdf 等留 v2
+- `author / createTime / modifyTime / wordCount` 都返回空（getpadinfo 不返回，wordCount 由 estimateWordCount 兜底）— v2 从 docx zip 内 `docProps/core.xml` 取
+- 评论（腾讯文档侧栏批注）暂不抓
+- 嵌入子文档、历史版本不处理
+
+**相关文件**：
+- spec: `docs/superpowers/specs/2026-05-26-docs-qq-extractor-design.md`（含 2026-05-27 §9 实测修正 note）
+- plan: `docs/superpowers/plans/2026-05-26-docs-qq-extractor.md`
+- recon: `docs/superpowers/specs/2026-05-26-docs-qq-extractor-recon.md`（含 2026-05-27 §CSRF 实测修正 note）
+- code: `src/utils/docs-qq-extractor.ts` (~600 行) + `src/utils/docs-qq-extractor.test.ts` (41 unit) + `src/utils/docs-qq-extractor.e2e.test.ts` (1 fixture)
+- 集成: `src/content.ts` (URL routing + ContentResponse cascade) + `webpack.config.js` (ContentScriptPublicPathPlugin)
+
+**经验沉淀**（影响未来 extractor）：
+- **chrome extension content script 不能 dynamic import async chunk** — 任何 mammoth/pdf-lib/big-vendor 都得 static inline content.js，预算 content.js +几 MB
+- **reconnaissance 看 cookie 字段名 vs URL query param 名 — 同名 `xsrf` 不同位置含义不同**，须实测 `document.cookie` 字符串才能确认
+- **content.ts bridge origin 白名单 + source union 是新 extractor 必改的两处** — 加新 extractor 时 grep `mp\\.weixin\\.qq\\.com` 找现有 pattern 跟着加
+
+---
+
 ## 7. 代码内 TODO 注释
 
 | 文件:行 | 内容 | 优先级 |

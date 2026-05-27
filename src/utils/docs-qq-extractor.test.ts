@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata, requestExportTask, pollExportStatus, fetchDocxFile, convertDocxToHtml, postProcessHtml } from './docs-qq-extractor';
+import { parseDocsQQUrl, isDocsQQDocUrl, fetchDocMetadata, requestExportTask, pollExportStatus, fetchDocxFile, convertDocxToHtml, postProcessHtml, extractDocsQQContent } from './docs-qq-extractor';
 import {
   DocsQQAuthError,
   DocsQQNotFoundError,
@@ -375,5 +375,72 @@ describe('postProcessHtml', () => {
     const result = await fn(html);
     expect(result).toContain('<h1>Title</h1>');
     expect(result).toContain('<p>Plain text</p>');
+  });
+});
+
+describe('extractDocsQQContent (orchestration)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.stubGlobal('document', { cookie: 'xsrf=2f43999878bb37d0' });
+  });
+
+  it('runs full pipeline: meta → export → poll → download → mammoth → postProcess', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    // 1. fetchGlobalPadId
+    spy.mockResolvedValueOnce(new Response(JSON.stringify({
+      retcode: 0, msg: '成功',
+      data: {
+        padInfo: { localPadId: 'BfotANGDEYOm', domainId: '300000000', globalPadId: '300000000$BfotANGDEYOm' },
+        privilegeAttribute: { can_export: 1 },
+        title: 'My Doc',
+      },
+    }), { status: 200 }));
+    // 2. fetchDocMetadata (same endpoint, but extractor 内部可能 2 次调或合并为 1 次)
+    spy.mockResolvedValueOnce(new Response(JSON.stringify({
+      retcode: 0,
+      data: {
+        padInfo: { globalPadId: '300000000$BfotANGDEYOm' },
+        privilegeAttribute: { can_export: 1 },
+        title: 'My Doc',
+      },
+    }), { status: 200 }));
+    // 3. requestExportTask
+    spy.mockResolvedValueOnce(new Response(JSON.stringify({
+      ret: 0, operationId: 'op-1',
+    }), { status: 200 }));
+    // 4. pollExportStatus
+    spy.mockResolvedValueOnce(new Response(JSON.stringify({
+      ret: 0, status: 'Done', progress: 100, file_url: 'https://cdn/x.docx',
+    }), { status: 200 }));
+    // 5. fetchDocxFile
+    spy.mockResolvedValueOnce(new Response(new ArrayBuffer(64), { status: 200 }));
+
+    vi.doMock('mammoth', () => ({
+      default: {
+        convertToHtml: vi.fn().mockResolvedValue({ value: '<p>Body</p>', messages: [] }),
+        images: { imgElement: (_h: unknown) => 'X' },
+      },
+    }));
+
+    const result = await extractDocsQQContent({
+      token: 'DQmZvdEFOR0RFWU9t',
+      url: 'https://docs.qq.com/doc/DQmZvdEFOR0RFWU9t',
+      doc: globalThis.document as unknown as Document,
+    });
+
+    expect(result.title).toBe('My Doc');
+    expect(result.author).toBe('');
+    expect(result.published).toBe('');
+    expect(result.content).toContain('<p>Body</p>');
+    expect(typeof result.wordCount).toBe('number');
+
+    vi.doUnmock('mammoth');
+  });
+
+  it('propagates DocsQQAuthError from first fetch', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 401 }));
+    await expect(extractDocsQQContent({
+      token: 'X', url: 'https://docs.qq.com/doc/X', doc: globalThis.document as unknown as Document,
+    })).rejects.toBeInstanceOf(DocsQQAuthError);
   });
 });

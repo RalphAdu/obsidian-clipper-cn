@@ -354,3 +354,52 @@ export async function postProcessHtml(rawHtml: string): Promise<string> {
 
 	return document.body.innerHTML;
 }
+
+// ============================================
+// 主入口：extractDocsQQContent 编排
+// ============================================
+
+function estimateWordCount(html: string): number {
+	// 剥 HTML tags 后统计 CJK 字符 + ASCII 词数
+	const text = html.replace(/<[^>]*>/g, '');
+	const cjk = (text.match(/[一-鿿]/g) || []).length;
+	const words = (text.match(/[a-zA-Z0-9]+/g) || []).length;
+	return cjk + words;
+}
+
+export async function extractDocsQQContent(
+	opts: DocsQQExtractOpts,
+): Promise<DocsQQStructuredContent> {
+	const { token } = opts;
+
+	// ① 拿 metadata + globalPadId (2 次同 endpoint 调用合并为 1 次 — fetchGlobalPadId 内部)
+	// 但本 task 用 fetchDocMetadata + fetchGlobalPadId 都 export 着，让 task 11 也用 — 2 次调用接受 (重复 endpoint 调用是 minor perf 问题，v2 优化合并)
+	const meta = await fetchDocMetadata(token);
+	const globalPadId = await fetchGlobalPadId(token);
+
+	// ② 发起导出任务
+	const operationId = await requestExportTask(globalPadId, token);
+
+	// ③ 轮询任务
+	const fileUrl = await pollExportStatus(operationId, token, {
+		timeoutMs: 30_000,
+		intervalMs: 1_000,
+	});
+
+	// ④ 下载 docx
+	const arrayBuffer = await fetchDocxFile(fileUrl);
+
+	// ⑤ mammoth 转 HTML
+	const rawHtml = await convertDocxToHtml(arrayBuffer);
+
+	// ⑥ 后处理 (MathML→LaTeX + 清理)
+	const html = await postProcessHtml(rawHtml);
+
+	return {
+		title: meta.title,
+		author: meta.author,
+		published: meta.modifyTime,
+		content: html,
+		wordCount: meta.wordCount || estimateWordCount(html),
+	};
+}

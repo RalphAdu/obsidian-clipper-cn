@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions, normalizeMdniceChapterHeadings, normalizeMdniceSubHeadings } from './weixin-helpers';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions, normalizeMdniceChapterHeadings, normalizeMdniceSubHeadings, normalizeMdniceCodeBlocks } from './weixin-helpers';
 
 const fixturePath = join(__dirname, 'fixtures', 'weixin-SPLTD-hFAsyYAA7V1lU8OA.html');
 const fixtureHtml = readFileSync(fixturePath, 'utf-8');
@@ -387,5 +387,76 @@ describe('normalizeMdniceSubHeadings', () => {
 		`);
 		normalizeMdniceSubHeadings(doc);
 		expect(doc.querySelector('h2')).toBeNull();
+	});
+});
+
+describe('normalizeMdniceCodeBlocks', () => {
+	it('converts mdnice terminal-style pseudo code block to <pre><code class="language-text">', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section style="padding:20px 0 24px;">
+						<span style="display:inline-block;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#ab59ff;font-weight:700"><span leaf="">terminal</span></span>
+						<span style="display:inline-block;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#ab59ff;font-weight:700"><span leaf="">TEXT</span></span>
+						<section><span leaf="">1. 首先登录平台</span></section>
+						<section><span leaf="">2. 然后获取对应的 API 密钥</span></section>
+						<section><span leaf="">3. 把密钥交给 HermesAgent</span></section>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceCodeBlocks(doc);
+		const pre = doc.querySelector('pre');
+		expect(pre).not.toBeNull();
+		const code = pre!.querySelector('code');
+		expect(code?.getAttribute('class')).toBe('language-text');
+		expect(code?.textContent).toBe('1. 首先登录平台\n2. 然后获取对应的 API 密钥\n3. 把密钥交给 HermesAgent');
+	});
+
+	it('uses lang badge when it is a recognizable language (e.g. python, javascript)', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section>
+						<span style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#ab59ff;font-weight:700"><span leaf="">script.py</span></span>
+						<span style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#ab59ff;font-weight:700"><span leaf="">PYTHON</span></span>
+						<section><span leaf="">print('hi')</span></section>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceCodeBlocks(doc);
+		expect(doc.querySelector('code')?.getAttribute('class')).toBe('language-python');
+	});
+
+	it('handles file-name lang badge (kebab-case dot ext like wechat-mp-monitor)', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section>
+						<span style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#ab59ff;font-weight:700"><span leaf="">wechat-mp-monitor</span></span>
+						<span style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#ab59ff;font-weight:700"><span leaf="">TEXT</span></span>
+						<section><span leaf="">wechat-mp-monitor/</span></section>
+						<section><span leaf="">├── SKILL.md</span></section>
+					</section>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceCodeBlocks(doc);
+		const code = doc.querySelector('code');
+		expect(code?.getAttribute('class')).toBe('language-text');
+		expect(code?.textContent).toContain('├── SKILL.md');
+	});
+
+	it('does NOT touch sections without lang badge', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<p>just a paragraph in a section</p>
+				</section>
+			</body></html>
+		`);
+		normalizeMdniceCodeBlocks(doc);
+		expect(doc.querySelector('pre')).toBeNull();
 	});
 });

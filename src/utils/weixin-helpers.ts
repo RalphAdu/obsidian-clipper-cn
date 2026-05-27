@@ -383,3 +383,99 @@ export function normalizeMdniceImageCaptions(root: ParentNode): void {
 		el.remove();
 	});
 }
+
+// Lang badges that look like an explicit code language (case-insensitive).
+const KNOWN_LANGS = new Set([
+	'bash', 'shell', 'sh', 'zsh',
+	'js', 'javascript', 'ts', 'typescript', 'json',
+	'python', 'py',
+	'go', 'rust', 'java', 'kotlin',
+	'html', 'css', 'xml', 'yaml', 'yml', 'toml',
+	'sql', 'c', 'cpp', 'csharp',
+	'php', 'ruby', 'swift',
+	'markdown', 'md',
+]);
+
+/**
+ * Match mdnice's "lang badge" span: small uppercase letter-spaced purple
+ * text inside the code-block header. We use these tight constraints
+ * (font-size:10px + letter-spacing:1.2px + uppercase + #ab59ff +
+ * font-weight≥700) because the same purple appears throughout mdnice
+ * decoration and we must not catch non-code badges.
+ */
+function isMdniceLangBadge(el: Element): boolean {
+	const style = el.getAttribute('style') || '';
+	return (
+		/font-size:\s*10px/.test(style) &&
+		/letter-spacing:\s*1\.2px/.test(style) &&
+		/text-transform:\s*uppercase/.test(style) &&
+		/color:\s*#ab59ff/i.test(style) &&
+		/font-weight:\s*(?:700|800|900|bold)/.test(style)
+	);
+}
+
+/**
+ * Convert mdnice "pseudo code block" containers into <pre><code>. The
+ * template uses a header row of 1-2 purple uppercase badges (file name +
+ * lang, or just lang) followed by per-line <section> elements rendered
+ * in a monospace-ish look.
+ *
+ * Strategy:
+ *   1. Find the deepest <section> that contains a lang badge but has no
+ *      nested section also containing a lang badge — that's the code
+ *      block container.
+ *   2. Collect all lang badges; pick the last one's text as candidate
+ *      lang. If it's in KNOWN_LANGS use it; otherwise fall back to "text".
+ *   3. Collect all <section> children that are NOT badge containers and
+ *      treat their textContent as one code line. Join with "\n".
+ *   4. Replace the container with <pre><code class="language-X">…</code></pre>.
+ */
+export function normalizeMdniceCodeBlocks(root: ParentNode): void {
+	const allSections = Array.from(root.querySelectorAll('section'));
+	for (const sec of allSections) {
+		const badges = Array.from(sec.querySelectorAll('span')).filter(s => isMdniceLangBadge(s as Element)) as Element[];
+		if (badges.length === 0) continue;
+		// Nested-section guard: skip if a descendant section also has a badge
+		// (we'll process the inner one).
+		const inner = Array.from(sec.querySelectorAll('section')).some(child => {
+			if (child === sec) return false;
+			return Array.from((child as Element).querySelectorAll('span')).some(s => isMdniceLangBadge(s as Element));
+		});
+		if (inner) continue;
+
+		// lang detection: take last badge's text, lowercase.
+		const langRaw = (badges[badges.length - 1].textContent || '').trim().toLowerCase();
+		const lang = KNOWN_LANGS.has(langRaw) ? langRaw : 'text';
+
+		// Collect code-line sections — direct or nested <section> children
+		// whose textContent is NOT the badge label.
+		const badgeTexts = new Set(badges.map(b => (b.textContent || '').trim()));
+		const lineSections = Array.from(sec.querySelectorAll('section')).filter(s => {
+			const t = ((s as Element).textContent || '').trim();
+			if (!t) return false;
+			if (badgeTexts.has(t)) return false;
+			if (Array.from((s as Element).querySelectorAll('span')).some(x => isMdniceLangBadge(x as Element))) return false;
+			return true;
+		});
+		// Deduplicate: a code line may appear in multiple `<section>` nestings
+		// (mdnice often wraps each line in an extra `<section>`). Pick the
+		// innermost — sections whose children include OTHER `<section>` are
+		// wrappers, not leaf lines.
+		const leafLines = lineSections.filter(s => {
+			const childSecs = Array.from((s as Element).children).filter(c => (c as Element).tagName === 'SECTION');
+			return childSecs.length === 0;
+		});
+
+		if (leafLines.length === 0) continue;
+		const codeText = leafLines.map(s => ((s as Element).textContent || '').trim()).join('\n');
+
+		const ownerDoc = sec.ownerDocument;
+		if (!ownerDoc) continue;
+		const pre = ownerDoc.createElement('pre');
+		const code = ownerDoc.createElement('code');
+		code.setAttribute('class', `language-${lang}`);
+		code.textContent = codeText;
+		pre.appendChild(code);
+		sec.replaceWith(pre);
+	}
+}

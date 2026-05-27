@@ -284,6 +284,21 @@ function getXsrfFromCookies(): string {
 
 **实测**：腾讯文档登录后 cookie 含 `xsrf=<16 字符 hex>`，值跟当前 session 绑定，刷新页面也不变（baseline + export 段抓到的 xsrf 值都是 `2f43999878bb37d0`）。
 
+**⚠️ 2026-05-27 实测修正**: 上面写 "cookie 字段 `xsrf`" 是 reconnaissance 阶段误读 — 实际**腾讯文档没有名为 `xsrf` 的 cookie 字段**。真正的 CSRF token 来源是 **cookie 字段 `TOK`**，前端 JS 读 TOK 后作为 `?xsrf=<value>` query param 拼装到 URL 上 (所以 URL 里看到的 `xsrf=2f43999878bb37d0` 是这么来的)。
+
+正确实现 (见 src/utils/docs-qq-extractor.ts getXsrfFromCookies):
+
+```ts
+function getXsrfFromCookies(): string {
+	// 真实来源是 TOK cookie，xsrf 是历史误命名 (保留 fallback)
+	const tokMatch = document.cookie.match(/(?:^|;\s*)TOK=([^;]+)/);
+	if (tokMatch) return tokMatch[1];
+	const xsrfMatch = document.cookie.match(/(?:^|;\s*)xsrf=([^;]+)/);
+	if (xsrfMatch) return xsrfMatch[1];
+	throw new DocsQQAuthError('cookie 缺 TOK token，请先登录腾讯文档');
+}
+```
+
 ---
 
 ## Mammoth 转换验证 (spike)

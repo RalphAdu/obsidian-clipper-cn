@@ -295,6 +295,14 @@ ls dist/  # 应该看到 mammoth.<hash>.js 单独文件
 # content.js 大小不应该 +250KB
 ```
 
+**⚠️ 2026-05-27 实测修正**: 动态分包设计在 chrome extension content script runtime 不 work — async chunk 无法通过 `<script>` 注入加载（不在 `web_accessible_resources` 白名单的 chunk 被 chrome 拦）。**实际实现改为 static import** `import mammoth from 'mammoth'`。代价：`content.js` 体积 +800KB（从 2.5MB 变 3.3MB）。
+
+替代方案考虑过：
+- 把 mammoth 移到 background service worker — 但 background↔content 跨 runtime 传 ArrayBuffer 复杂且慢
+- 把 chunk 加进 `web_accessible_resources` — 需 hardcode chunk hash，每次 build 变化，fragile
+
+最终选 static import 因为简单稳定。splitChunks 配置保留在 webpack.config.js (mammoth cacheGroup) 是 dead config 不影响构建。
+
 ## 10. 测试策略
 
 ### 10.1 Unit test (`docs-qq-extractor.test.ts`, vitest)

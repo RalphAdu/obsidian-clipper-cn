@@ -209,3 +209,74 @@ export function normalizeMdniceSmallHeadings(root: ParentNode): void {
 		p.replaceWith(h3);
 	});
 }
+
+/**
+ * Wrap mdnice "inline emphasis" spans in <strong>. mdnice uses
+ * `<span style="display:inline; color:#ab59ff; font-weight:600">...</span>`
+ * to emphasize phrases (e.g. "标题、封面、发布时间、原文链接。"). turndown
+ * has no rule for inline-CSS-encoded bold, so without this normalizer the
+ * emphasis is silently lost in markdown.
+ *
+ * Constraints to avoid false positives:
+ *   - Must be `display: inline` in inline style.
+ *   - font-weight ≥ 600 (covers 600/700/800/900/bold/bolder).
+ *   - textContent length ≥ 2 (single chars are usually decoration glyphs).
+ *   - Not inside a heading element (heading already conveys emphasis).
+ */
+export function normalizeMdniceInlineBold(root: ParentNode): void {
+	const spans = root.querySelectorAll('span');
+	spans.forEach(span => {
+		const style = span.getAttribute('style') || '';
+		if (!/display\s*:\s*inline\b/.test(style)) return;
+		if (!/font-weight\s*:\s*(?:600|700|800|900|bold|bolder)\b/.test(style)) return;
+		const text = (span.textContent || '').trim();
+		if (text.length < 2) return;
+		// Walk ancestors to check for heading containment.
+		let cur: Element | null = span.parentElement;
+		while (cur) {
+			const t = cur.tagName;
+			if (t === 'H1' || t === 'H2' || t === 'H3' || t === 'H4' || t === 'H5' || t === 'H6') return;
+			cur = cur.parentElement;
+		}
+		const ownerDoc = span.ownerDocument;
+		if (!ownerDoc) return;
+		const strong = ownerDoc.createElement('strong');
+		strong.textContent = text;
+		span.replaceWith(strong);
+	});
+}
+
+/**
+ * Remove duplicate image captions emitted by mdnice. Pattern:
+ *
+ *   <img alt="信息过滤" src="…">
+ *   <section>信息过滤</section>   ← duplicate caption
+ *
+ * Without this normalizer the markdown becomes:
+ *
+ *   ![信息过滤](url)
+ *   信息过滤
+ *
+ * with caption repeated twice (alt + standalone paragraph). After
+ * normalization only `![信息过滤](url)` remains; markdown alt already
+ * conveys the caption semantically.
+ */
+export function normalizeMdniceImageCaptions(root: ParentNode): void {
+	const imgs = root.querySelectorAll('img');
+	imgs.forEach(img => {
+		const alt = (img.getAttribute('alt') || '').trim();
+		if (!alt) return;
+		// Walk forward over whitespace-only text nodes to find the next element.
+		let next: Node | null = img.nextSibling;
+		while (next && next.nodeType === 3 /* text */) {
+			if ((next.textContent || '').trim() !== '') return;
+			next = next.nextSibling;
+		}
+		if (!next || next.nodeType !== 1) return;
+		const el = next as Element;
+		if (el.tagName !== 'SECTION' && el.tagName !== 'P') return;
+		const captionText = (el.textContent || '').trim();
+		if (captionText !== alt) return;
+		el.remove();
+	});
+}

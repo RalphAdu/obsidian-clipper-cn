@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings } from './weixin-helpers';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions } from './weixin-helpers';
 
 const fixturePath = join(__dirname, 'fixtures', 'weixin-SPLTD-hFAsyYAA7V1lU8OA.html');
 const fixtureHtml = readFileSync(fixturePath, 'utf-8');
@@ -184,5 +184,107 @@ describe('normalizeMdniceSmallHeadings', () => {
 		);
 		normalizeMdniceSmallHeadings(doc);
 		expect(doc.querySelectorAll('h3').length).toBe(0);
+	});
+});
+
+describe('normalizeMdniceInlineBold', () => {
+	it('wraps inline span with font-weight:600 in <strong>', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<p>普通文字 <span style="display:inline;color:#ab59ff;font-weight:600">重点强调</span> 又普通</p>
+			</body></html>
+		`);
+		normalizeMdniceInlineBold(doc);
+		expect(doc.querySelector('strong')?.textContent).toBe('重点强调');
+	});
+
+	it('also matches font-weight:bold / 700+', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><span style="display:inline;font-weight:700">bold</span></body></html>'
+		);
+		normalizeMdniceInlineBold(doc);
+		expect(doc.querySelector('strong')?.textContent).toBe('bold');
+	});
+
+	it('does not wrap spans inside <h1>/<h2>/<h3>', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><h1><span style="display:inline;font-weight:600">in heading</span></h1></body></html>'
+		);
+		normalizeMdniceInlineBold(doc);
+		expect(doc.querySelector('strong')).toBeNull();
+	});
+
+	it('does not touch spans without display:inline or with weight < 600', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><span style="font-weight:500">light</span><span style="display:block;font-weight:700">block</span></body></html>'
+		);
+		normalizeMdniceInlineBold(doc);
+		expect(doc.querySelector('strong')).toBeNull();
+	});
+
+	it('skips empty or single-char spans (likely decorations)', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><span style="display:inline;font-weight:600">x</span></body></html>'
+		);
+		normalizeMdniceInlineBold(doc);
+		expect(doc.querySelector('strong')).toBeNull();
+	});
+});
+
+describe('normalizeMdniceImageCaptions', () => {
+	it('removes <section> caption that equals <img alt> exactly', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<img alt="信息过滤" src="https://example.com/x.png">
+				<section>信息过滤</section>
+			</body></html>
+		`);
+		normalizeMdniceImageCaptions(doc);
+		expect(doc.querySelector('section')).toBeNull();
+		expect(doc.querySelector('img')?.getAttribute('alt')).toBe('信息过滤');
+	});
+
+	it('removes <p> caption that equals alt with surrounding whitespace', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<img alt="信息卡片" src="https://example.com/y.png">
+				<p>  信息卡片  </p>
+			</body></html>
+		`);
+		normalizeMdniceImageCaptions(doc);
+		expect(doc.querySelector('p')).toBeNull();
+	});
+
+	it('does NOT remove caption when text differs from alt', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<img alt="cover" src="https://example.com/z.png">
+				<p>different caption</p>
+			</body></html>
+		`);
+		normalizeMdniceImageCaptions(doc);
+		expect(doc.querySelector('p')).not.toBeNull();
+	});
+
+	it('does NOT remove anything when alt is empty', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<img alt="" src="https://example.com/z.png">
+				<p></p>
+			</body></html>
+		`);
+		normalizeMdniceImageCaptions(doc);
+		expect(doc.querySelectorAll('p').length).toBe(1);
+	});
+
+	it('skips text nodes between img and caption', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<img alt="测试" src="https://example.com/a.png">
+				<section>测试</section>
+			</body></html>
+		`);
+		normalizeMdniceImageCaptions(doc);
+		expect(doc.querySelector('section')).toBeNull();
 	});
 });

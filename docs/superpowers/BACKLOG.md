@@ -2701,3 +2701,93 @@ build 完 → rsync -a --delete dist/ <main 检出 dist/> → 3s 内扩展自动
 修复：新增 `image_unresolved` 桶扫 `feishu-image://[A-Za-z0-9_-]+`。
 
 **沉淀**：bug 修完后必问 "audit 之前为什么没抓到这个？" — 如果是盲区，必须**补桶**。修一个 bug 不补一个 audit 桶，下次同类回归还会再来一次。本会话 wiki 修复总共补了 3 个桶（image_mime_invalid / image_unresolved / frontmatter_field_empty），覆盖三个原本完全无监控的产物层。
+
+
+## 2026-05-27 反思：weixin mdnice 模板正则化 ship
+
+[`docs/superpowers/specs/2026-05-27-weixin-mdnice-normalization-design.md`](specs/2026-05-27-weixin-mdnice-normalization-design.md) +
+[`plans/2026-05-27-weixin-mdnice-normalize.md`](plans/2026-05-27-weixin-mdnice-normalize.md)
+
+触发：用户报 `https://mp.weixin.qq.com/s/HCBkgfIZkL939cQR67quEg` 采集产物结构平了 — 章节标题、代码块、inline 粗体、脚注、栏目 anchor 全识别失败。该 URL 是 [mdnice](https://www.mdnice.com/) 编辑器排版，**inline CSS style 编码 markdown 语义**（font-size+font-weight+color 当 heading 标识符），turndown 见到散页面 `<section>/<span>` 拍平为纯段落。
+
+### 改动总览：10 helper DOM rewrite pipeline
+
+`src/utils/weixin-helpers.ts` 新增 10 个 normalize 函数（按调用顺序）：
+
+| # | helper | 识别 → 输出 |
+|---|---|---|
+| 1 | `normalizeMdniceJavascriptLinks` | `<a href="javascript:..">` → 纯文本 |
+| 2 | `normalizeMdniceSectionCards` | Reading Time meta card / 全大写栏目 anchor SECTION → 删 |
+| 3 | `normalizeMdniceChapterHeadings` | `<section>` 含 120px 装饰大字 + 26px 标题 → `<h1>` + 17px italic 副标 `<p><em>` |
+| 4 | `normalizeMdniceSubHeadings` | `<section>` 含紫色 3px 条 + 24px 标题 → `<h2>` + 10px uppercase 副标 `<p><em>` |
+| 5 | `normalizeMdniceFootnotes` | `<sup>[N]</sup>` → text `[^N]`; `Sources` 块 → `<div data-mdnice-footnotes>` 内 `<p>[^N]: title — url</p>` |
+| 6 | `normalizeMdniceSmallHeadings` | `<p>` 10/11px + letter-spacing + uppercase + #ab59ff + 700 → `<h3>` |
+| 7 | `normalizeMdniceCodeBlocks` | `<section>` 含 lang badge `<span>` + 后续 leaf `<section>` 行 → `<pre><code class="language-X">` |
+| 8 | `normalizeMdniceImageCaptions` | `<img alt="X">` 邻居/祖父级邻居 `<section>X</section>` → 删（去重） |
+| 9 | `normalizeMdniceInlineBold` | `<span display:inline font-weight:600+>` → `<strong>`（不在 H1-H6 内）|
+| 0 | `normalizeMdniceArticle` | 总入口按 1→9 顺序调用 |
+
+Pipeline：`content.ts:extractWeChatArticleContent` 在 `normalizePreBlockLineBreaks` 之前调 `normalizeMdniceArticle(articleClone)`。朴素 mp.weixin 文章（无 mdnice 装饰）所有 helper silent no-op，行为不变。
+
+### 1. e2e 暴露的 3 个 unit-test 看不见的 bug
+
+单测全 pass（37→46→943）+ Task 7 integration test fixture pass 之后，**首跑 e2e mdnice URL 17 个断言里 9 个 fail**。逐一根因：
+
+**Bug 1：bridge path 漏调 normalizer**（`src/content.ts:687-696`）
+
+`__obsidianClipperTestExtract__` 测试桥（e2e runner 触发的路径）复制了 `extractWeChatArticleContent` 的逻辑用于 simulate 主路径产物，但 Task 7 wire 时只改了主函数，没动 bridge —— **两套并行 extract code path，改一处不改另一处**。e2e 跑的是 bridge，所以 unit test 看不见。修：bridge path 同样 insert `normalizeMdniceArticle(articleClone)` call。
+
+**沉淀**：mp.weixin / 任何"inline 在 content.ts 的 extract helper"未来动逻辑时，**grep `__obsidianClipperTestExtract__`**，确认 bridge path 是否也是同一份代码。或者直接 refactor 抽公共函数（避免双 path 漂移），但**当前不做**（避免本次 spec 范围外）。后续 backlog 项。
+
+**Bug 2：image caption 是祖父级 sibling**（`normalizeMdniceImageCaptions`）
+
+我假设 mdnice caption 是 `<img>` 的 direct sibling，DOM 实测是 `<section><img></section><p>caption</p>` — **caption 是 `<img>` 的祖父级 sibling**。导致单测（fixture 用 direct sibling）pass，真实 DOM fail。修：从 `<img>` 起向上爬最多 4 级 ancestor，每级检查 nextElementSibling 是否是 `<section>/<p>` 且 textContent === alt。
+
+**沉淀**：DOM helper 设计如果做了"sibling 关系"假设，**真实 fixture 测试必须用 hydrated.html 完整切片**，不能只用 hand-crafted minimal HTML。本次 Task 7 集成测试用的就是真 hydrated fixture（src/utils/fixtures/weixin-mdnice-HCBkgfIZ.html），但 image caption 因为 image alt 跟 caption text 相等的 case 在 fixture 里没显式断言（fixture 只验证 H1/H2 count），所以单测全过 e2e 才暴露。**集成测试要断言 normalize 应该"消除"的 anti-pattern 0 次出现**，不能只断言"semantic output ≥ N 次"。
+
+**Bug 3：turndown escape `[^N]:` 的方式跟想象不同**（`markdown-post-process.ts`）
+
+我在 spec 写："turndown by default doesn't escape `[^…]`"。实测产物：`\[^1\]:`（`[` 跟 `]` 被 escape，`^` 没动）。我以为是 `\[\^N\]` 三处 escape，regex 写错。修：把 footnote unescape regex 从 `/\\\[\\\^(\d+)\\\]/g` 改成 `/\\\[\^(\d+)\\\]/g`（只 unescape `[` 和 `]`）。
+
+**沉淀**：写 post-processor 替换 regex 前，**先 hex-dump 实际产物 1 行确认 escape 模式**。spec assumption 直接 → 测试 fail 浪费一轮迭代。markdown-post-process 类工具应该有"实际产物字节序列"作为单测 fixture，不是凭想象写。
+
+### 2. GitHub push protection 拦 secret → filter-repo rewrite history
+
+ship merge 完 push 时 GitHub `GH013` 拒 push — commit `7257df5 (docs(recon): docs.qq.com endpoint reconnaissance)` 含 Tencent Cloud Secret ID (`AKID8Gw...Hya`)。token 实际是腾讯云 COS 临时签名 URL 里的 Credential（30 min lifetime，commit @ 06:02，push @ 16:30 已过期 10h+）—— **GitHub 按 pattern 扫，不看是否过期**。
+
+选项：(a) rewrite history 抹掉、(b) GitHub allowlist URL 一次性放行。选 (a)：
+```bash
+brew install git-filter-repo
+echo 'AKID8Gw...Hya==>AKID<REDACTED>' > /tmp/secret-replace.txt
+git filter-repo --replace-text /tmp/secret-replace.txt --force
+# filter-repo 删 remotes，重加
+git remote add adu git@github.com:RalphAdu/obsidian-clipper-cn.git
+git push adu main --force
+```
+
+1578 commits 全 rewrite（因 7257df5 在 history 中段，所有后续 commit ancestry 链 SHA 都变了）。adu/main push protection 不再拦（已 redacted 整 history）。
+
+**踩坑**：第一次 force push 起来 SSH 进程 hang 25 分钟无 TCP 连接 — `git push adu main --force` 的子进程 `/usr/bin/ssh` 处于 sleeping state 但没 TCP socket（网络早断了 git 没察觉）。kill -9 后重跑 `GIT_TRACE=1 GIT_SSH_COMMAND="ssh -v -o ConnectTimeout=15" git push adu main --force` 11 秒就完了（14MB）。**git push 走 ssh 时网络断开不会自动 timeout**—— 用 `ConnectTimeout` env 强制限制；hung 太久直接 kill。
+
+**沉淀给 spec/plan 文档纪律**：
+- **recon/audit 类 spec 凡涉及 OAuth/COS signed URL/API key 的真实捕获**，写之前**先用 `sed -i 's/AKID[A-Za-z0-9]\+/AKID<REDACTED>/g'` 这类 redact pipeline 过一遍**
+- 这种 token "过期了不安全也不重要" 是直觉错觉 — **GitHub secret scanner 不看过期**。pattern 一旦 push，所有强制 push 协议都得走 filter-repo
+- `docs/superpowers/specs/` 现在 tracked into git（[[feedback_specs_plans_local_only]]），这一节风险升一级：**recon spec 落 git 前必须 redact**
+
+### 3. 沉淀给共享 util / API 设计的规则
+
+**3.1 一个 extractor 的 entry function 只能有一处**（避免本次 Bug 1 类问题）
+
+content.ts:66 `extractWeChatArticleContent` 是主入口，685+ bridge path inline 复制了它的逻辑。这是历史遗留 — 早期 bridge 想"独立 simulate" 主路径，但导致每次主路径改 bridge 没同步漂移。**MVP fix**：本次只补 bridge 调用，**未做 refactor**。**Backlog**：把主路径抽公共 `function buildWeChatContent(doc): string | null` 让 bridge + getPageContent 都 call 它。同样 pattern 可能在 scys/feishu 也有（待 grep）。
+
+**3.2 normalize 函数遇 nested 同模式必须有 inner-guard**
+
+Task 7 集成测试暴露 `normalizeMdniceChapterHeadings` + `normalizeMdniceSubHeadings` 老 bug：`forEachDescendant` 自顶向下访问所有 SECTION，outer 匹配后 `replaceWith` 产生 fragment，nested inner section 在 detached subtree 里继续被访问、它的 `replaceWith` 跑成 no-op。修：每个匹配前先 `Array.from(el.querySelectorAll('section')).some(s => s !== el && ...)` 检查 inner 同 pattern，存在则 defer。本仓库这是第二次踩到这个 — `normalizeMdniceCodeBlocks` Task 5 已有 inner-guard，Task 4 我抄了结构没抄 guard。**新规则**：从 `normalizeMdnice*` 系列 copy-paste 时**必带 inner-guard pattern**。
+
+**3.3 mdnice 模板色值同时有 hex + rgba 两种**
+
+`isMdniceLangBadge` 只匹 `color:#ab59ff`，真实 DOM 用 `color:rgba(171,89,255,0.62)`。修：扩 regex 接受两种。**沉淀**：mdnice 紫色不只有一种序列化形式，对 mdnice DOM 用 color 做特征签名时同时匹 hex + rgba 两种。
+
+**3.4 e2e bridge path 必须跟主路径双 wire**
+
+memory 已加 [[feedback_extractor_acceptance]] 强调 ship gate 必须含 e2e 跑通；本次踩坑后**还需要加**："凡是 e2e bridge path（content.ts 内 `__obsidianClipperTestExtract__`）复制了主 extract 逻辑的，主路径加 normalize/transform 时**必须同步改 bridge**"。这是 silent-divergence 高发地带。

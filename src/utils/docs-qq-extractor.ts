@@ -300,3 +300,57 @@ export async function convertDocxToHtml(arrayBuffer: ArrayBuffer): Promise<strin
 		throw new DocsQQConvertError(`mammoth 转换失败: ${(e as Error).message}`);
 	}
 }
+
+// ============================================
+// HTML 后处理 (MathML → LaTeX + 清理)
+// ============================================
+
+export async function postProcessHtml(rawHtml: string): Promise<string> {
+	// linkedom 兼容 vitest node 环境 + browser runtime (DOMParser-shape API)
+	const { parseHTML } = await import('linkedom');
+	const { document } = parseHTML(`<!DOCTYPE html><html><body>${rawHtml}</body></html>`);
+
+	// 1. MathML → LaTeX
+	if (document.querySelector('math')) {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		let mathmlToLatex: ((xml: string) => string) | null = null;
+		try {
+			const mod = await import('mathml-to-latex');
+			mathmlToLatex = ((mod as { default?: (xml: string) => string }).default || mod) as (xml: string) => string;
+		} catch {
+			// 模块加载失败，跳过公式转换
+		}
+
+		if (mathmlToLatex) {
+			for (const math of Array.from(document.querySelectorAll('math'))) {
+				try {
+					const latex = mathmlToLatex(math.outerHTML);
+					const isBlock = math.getAttribute('display') === 'block';
+					const wrapped = isBlock ? `$$${latex}$$` : `$${latex}$`;
+					math.replaceWith(document.createTextNode(wrapped));
+				} catch {
+					// 单条转换失败保留 MathML 原标签
+				}
+			}
+		}
+	}
+
+	// 2. 清理空段落
+	for (const p of Array.from(document.querySelectorAll('p'))) {
+		if (!p.textContent?.trim() && !p.querySelector('img,video,br')) {
+			p.remove();
+		}
+	}
+
+	// 3. 折叠连续 <br> (保留 1 个)
+	for (const br of Array.from(document.querySelectorAll('br'))) {
+		let next = br.nextSibling;
+		while (next && next.nodeName === 'BR') {
+			const toRemove = next;
+			next = next.nextSibling;
+			toRemove.parentNode?.removeChild(toRemove);
+		}
+	}
+
+	return document.body.innerHTML;
+}

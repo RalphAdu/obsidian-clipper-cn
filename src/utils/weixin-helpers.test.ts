@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions, normalizeMdniceChapterHeadings, normalizeMdniceSubHeadings, normalizeMdniceCodeBlocks } from './weixin-helpers';
+import { extractWeChatPublishedFromDocument, normalizePreBlockLineBreaks, normalizeMdniceJavascriptLinks, normalizeMdniceSectionCards, normalizeMdniceSmallHeadings, normalizeMdniceInlineBold, normalizeMdniceImageCaptions, normalizeMdniceChapterHeadings, normalizeMdniceSubHeadings, normalizeMdniceCodeBlocks, normalizeMdniceFootnotes } from './weixin-helpers';
 
 const fixturePath = join(__dirname, 'fixtures', 'weixin-SPLTD-hFAsyYAA7V1lU8OA.html');
 const fixtureHtml = readFileSync(fixturePath, 'utf-8');
@@ -458,5 +458,61 @@ describe('normalizeMdniceCodeBlocks', () => {
 		`);
 		normalizeMdniceCodeBlocks(doc);
 		expect(doc.querySelector('pre')).toBeNull();
+	});
+});
+
+describe('normalizeMdniceFootnotes', () => {
+	it('rewrites inline <sup>[N]</sup> markers to text "[^N]"', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<p>正文 <sup style="font-size:11px;color:#ab59ff;font-weight:700"><span leaf="">[1]</span></sup> 继续</p>
+			</body></html>
+		`);
+		normalizeMdniceFootnotes(doc);
+		expect(doc.body.textContent).toContain('[^1]');
+		expect(doc.body.textContent).not.toContain('[1]');
+		expect(doc.querySelector('sup')).toBeNull();
+	});
+
+	it('collects Sources block into footnote definitions appended at body end', () => {
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<p>正文 <sup><span leaf="">[1]</span></sup> 引用一</p>
+				<p>正文 <sup><span leaf="">[2]</span></sup> 引用二</p>
+				<p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#ab59ff;font-weight:700"><span leaf="">Sources</span></p>
+				<p>
+					<span style="padding:0 6px;border-radius:6px"><span leaf="">[1]</span></span>
+					<span leaf="">wechat-article-exporter</span>
+				</p>
+				<p>
+					<span leaf="">https://github.com/wechat-article/wechat-article-exporter</span>
+				</p>
+				<p>
+					<span style="padding:0 6px;border-radius:6px"><span leaf="">[2]</span></span>
+					<span leaf="">wechat-article-exporter-api</span>
+				</p>
+				<p>
+					<span leaf="">https://down.mptext.top/dashboard/api</span>
+				</p>
+			</body></html>
+		`);
+		normalizeMdniceFootnotes(doc);
+		expect(doc.body.textContent).not.toContain('Sources');
+		const badges = doc.querySelectorAll('span[style*="padding:0 6px"]');
+		expect(badges.length).toBe(0);
+		const fnDiv = doc.querySelector('div[data-mdnice-footnotes]');
+		expect(fnDiv).not.toBeNull();
+		const txt = fnDiv!.textContent || '';
+		expect(txt).toContain('[^1]: wechat-article-exporter — https://github.com/wechat-article/wechat-article-exporter');
+		expect(txt).toContain('[^2]: wechat-article-exporter-api — https://down.mptext.top/dashboard/api');
+	});
+
+	it('is a no-op when no <sup> and no Sources block', () => {
+		const { document: doc } = parseHTML(
+			'<html><body><p>normal paragraph</p></body></html>'
+		);
+		normalizeMdniceFootnotes(doc);
+		expect(doc.body.innerHTML).toContain('<p>normal paragraph</p>');
+		expect(doc.querySelector('div[data-mdnice-footnotes]')).toBeNull();
 	});
 });

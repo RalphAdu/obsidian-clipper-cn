@@ -479,3 +479,117 @@ export function normalizeMdniceCodeBlocks(root: ParentNode): void {
 		sec.replaceWith(pre);
 	}
 }
+
+/**
+ * Rewrite mdnice footnote markup so it survives turndown as standard
+ * markdown footnotes (`[^N]` inline + `[^N]: …` definitions).
+ *
+ * Two stages:
+ *
+ *   Stage 1 — inline markers. `<sup>` elements containing text like
+ *     "[N]" are replaced with a text node "[^N]". The brackets must
+ *     pass through turndown unescaped; we rely on the upstream caller
+ *     to NOT escape `[^…]` (turndown by default doesn't).
+ *
+ *   Stage 2 — Sources block. Locate a small-heading-style <p> whose
+ *     text equals "Sources" (or its lowercase variant). After it,
+ *     mdnice emits one <p> per footnote — first <p> has a rounded badge
+ *     `[N]` span + title, next <p> has the URL. We pair them by [N]
+ *     number and emit `[^N]: title — url` lines into a trailing
+ *     `<div data-mdnice-footnotes>`.
+ *
+ * After this normalizer, turndown produces:
+ *
+ *     正文 [^1] 引用一
+ *
+ *     [^1]: wechat-article-exporter — https://github.com/.../exporter
+ *
+ * which Obsidian renders as a proper footnote with backlinks.
+ */
+export function normalizeMdniceFootnotes(root: ParentNode): void {
+	const ownerDoc =
+		(root as Element).ownerDocument ||
+		((root as any).nodeType === 9 ? (root as Document) : null);
+	if (!ownerDoc) return;
+
+	// ---- Stage 1: <sup>[N]</sup> → text "[^N]" ----
+	const sups = root.querySelectorAll('sup');
+	sups.forEach(sup => {
+		const text = (sup.textContent || '').trim();
+		const m = text.match(/^\[(\d+)\]$/);
+		if (!m) return;
+		sup.replaceWith(ownerDoc.createTextNode(`[^${m[1]}]`));
+	});
+
+	// ---- Stage 2: locate Sources block + collect footnotes ----
+	const allP = Array.from(root.querySelectorAll('p'));
+	const sourcesIdx = allP.findIndex(p => {
+		const style = p.getAttribute('style') || '';
+		const text = (p.textContent || '').trim().toLowerCase();
+		if (text !== 'sources') return false;
+		return /font-size:\s*1[01]px/.test(style) && /color:\s*#ab59ff/i.test(style);
+	});
+	if (sourcesIdx < 0) return;
+
+	type Foot = { num: string; title: string; url: string };
+	const collected: Foot[] = [];
+	let current: Partial<Foot> | null = null;
+	for (let i = sourcesIdx + 1; i < allP.length; i++) {
+		const p = allP[i];
+		const style = p.getAttribute('style') || '';
+		if (/text-transform:\s*uppercase/.test(style) && /letter-spacing/.test(style)) break;
+
+		const badge = Array.from(p.querySelectorAll('span')).find(s => {
+			const sStyle = (s as Element).getAttribute('style') || '';
+			const sText = ((s as Element).textContent || '').trim();
+			return /padding:\s*0\s*6px/.test(sStyle) && /^\[\d+\]$/.test(sText);
+		}) as Element | undefined;
+
+		if (badge) {
+			if (current && current.num && current.title && current.url) {
+				collected.push(current as Foot);
+			}
+			const num = (badge.textContent || '').trim().match(/\d+/)?.[0] || '';
+			const fullText = (p.textContent || '').trim();
+			const title = fullText.replace(/\[\d+\]/, '').trim();
+			current = { num, title, url: '' };
+		} else if (current) {
+			const text = (p.textContent || '').trim();
+			if (/^https?:\/\//i.test(text)) {
+				current.url = text;
+			}
+		}
+	}
+	if (current && current.num && current.title && current.url) {
+		collected.push(current as Foot);
+	}
+	if (collected.length === 0) return;
+
+	const sourcesP = allP[sourcesIdx];
+	sourcesP.remove();
+	for (let i = sourcesIdx + 1; i < allP.length; i++) {
+		const p = allP[i];
+		const style = p.getAttribute('style') || '';
+		if (/text-transform:\s*uppercase/.test(style) && /letter-spacing/.test(style)) break;
+		const hasBadge = Array.from(p.querySelectorAll('span')).some(s => {
+			const sStyle = (s as Element).getAttribute('style') || '';
+			return /padding:\s*0\s*6px/.test(sStyle);
+		});
+		const text = (p.textContent || '').trim();
+		const isUrl = /^https?:\/\//i.test(text);
+		if (hasBadge || isUrl) p.remove();
+	}
+
+	const target =
+		(root as any).body ||
+		(root as Element).querySelector?.('body') ||
+		root;
+	const div = ownerDoc.createElement('div');
+	div.setAttribute('data-mdnice-footnotes', 'true');
+	for (const f of collected) {
+		const p = ownerDoc.createElement('p');
+		p.textContent = `[^${f.num}]: ${f.title} — ${f.url}`;
+		div.appendChild(p);
+	}
+	(target as Element).appendChild(div);
+}

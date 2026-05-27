@@ -26,7 +26,7 @@ Headers:
 
 **变量**：
 - `<token>` — URL path 里的 doc token，例如 `DQmZvdEFOR0RFWU9t`
-- `<xsrf_token>` — CSRF token，从 cookie 字段 `xsrf` 读取（baseline 抓包看到值 `2f43999878bb37d0`）
+- `<xsrf_token>` — CSRF token，从 cookie 字段 `xsrf` 读取（baseline 抓包看到值 `<csrf_token>`）
 
 ### Response (200 JSON)
 
@@ -92,7 +92,7 @@ exportType=0&switches=%7B%22embedFonts%22%3Afalse%7D&exportSource=client&docId=3
 ```json
 {
   "ret": 0,
-  "operationId": "144115212181264209_5a7a263e-ba8d-9c6b-4bf9-19cded663c22"
+  "operationId": "<user_uid>_5a7a263e-ba8d-9c6b-4bf9-19cded663c22"
 }
 ```
 
@@ -135,7 +135,7 @@ Headers:
   "ret": 0,
   "status": "Done",
   "progress": 100,
-  "file_url": "https://docs-import-export-1251316161.cos.ap-guangzhou.myqcloud.com/export/docx/BfotANGDEYOm/version_17247_144115212181264209.json.docx?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&X-Amz-Signature=...",
+  "file_url": "https://docs-import-export-1251316161.cos.ap-guangzhou.myqcloud.com/export/docx/BfotANGDEYOm/version_17247_<user_uid>.json.docx?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&X-Amz-Signature=...",
   "file_name": "望岳投资250618十小时全文.docx",
   "file_size": 28167079,
   "attachments": [],
@@ -175,9 +175,9 @@ GET <file_url>
 **URL 实例**：
 ```
 https://docs-import-export-1251316161.cos.ap-guangzhou.myqcloud.com/export/docx/
-BfotANGDEYOm/version_17247_144115212181264209.json.docx?
+BfotANGDEYOm/version_17247_<user_uid>.json.docx?
 X-Amz-Algorithm=AWS4-HMAC-SHA256&
-X-Amz-Credential=AKID<REDACTED>%2F20260527%2Fap-guangzhou%2Fs3%2Faws4_request&
+X-Amz-Credential=<cos_credential>%2F20260527%2Fap-guangzhou%2Fs3%2Faws4_request&
 X-Amz-Date=20260527T060249Z&
 X-Amz-Expires=1800&    # 30 分钟过期
 X-Amz-SignedHeaders=host&
@@ -282,9 +282,9 @@ function getXsrfFromCookies(): string {
 }
 ```
 
-**实测**：腾讯文档登录后 cookie 含 `xsrf=<16 字符 hex>`，值跟当前 session 绑定，刷新页面也不变（baseline + export 段抓到的 xsrf 值都是 `2f43999878bb37d0`）。
+**实测**：腾讯文档登录后 cookie 含 `xsrf=<16 字符 hex>`，值跟当前 session 绑定，刷新页面也不变（baseline + export 段抓到的 xsrf 值都是 `<csrf_token>`）。
 
-**⚠️ 2026-05-27 实测修正**: 上面写 "cookie 字段 `xsrf`" 是 reconnaissance 阶段误读 — 实际**腾讯文档没有名为 `xsrf` 的 cookie 字段**。真正的 CSRF token 来源是 **cookie 字段 `TOK`**，前端 JS 读 TOK 后作为 `?xsrf=<value>` query param 拼装到 URL 上 (所以 URL 里看到的 `xsrf=2f43999878bb37d0` 是这么来的)。
+**⚠️ 2026-05-27 实测修正**: 上面写 "cookie 字段 `xsrf`" 是 reconnaissance 阶段误读 — 实际**腾讯文档没有名为 `xsrf` 的 cookie 字段**。真正的 CSRF token 来源是 **cookie 字段 `TOK`**，前端 JS 读 TOK 后作为 `?xsrf=<value>` query param 拼装到 URL 上 (所以 URL 里看到的 `xsrf=<csrf_token>` 是这么来的)。
 
 正确实现 (见 src/utils/docs-qq-extractor.ts getXsrfFromCookies):
 

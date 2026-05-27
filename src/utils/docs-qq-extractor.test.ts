@@ -99,7 +99,7 @@ describe('fetchDocMetadata', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     // mock document.cookie with TOK (= xsrf token) via vi.stubGlobal (node env has no document)
-    vi.stubGlobal('document', { cookie: 'TOK=2f43999878bb37d0; other=foo' });
+    vi.stubGlobal('document', { cookie: 'TOK=0000000000000000; other=foo' });
   });
 
   it('returns parsed metadata on 200', async () => {
@@ -405,7 +405,7 @@ describe('postProcessHtml', () => {
 describe('extractDocsQQContent (orchestration)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.stubGlobal('document', { cookie: 'TOK=2f43999878bb37d0' });
+    vi.stubGlobal('document', { cookie: 'TOK=0000000000000000' });
   });
 
   it('runs full pipeline: meta → export → poll → download → mammoth → postProcess', async () => {

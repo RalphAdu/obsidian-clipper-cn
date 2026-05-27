@@ -238,3 +238,28 @@ export async function pollExportStatus(
 
 	throw new DocsQQTransientError(`pollExportStatus: 超过 ${opts.timeoutMs}ms 仍未完成`);
 }
+
+// ============================================
+// Endpoint: docx 文件下载 (COS signed URL)
+// ============================================
+
+const DOWNLOAD_SIZE_LIMIT = 50 * 1024 * 1024;  // 50MB
+
+export async function fetchDocxFile(fileUrl: string): Promise<ArrayBuffer> {
+	const response = await fetchWithTimeout(fileUrl, {
+		method: 'GET',
+		credentials: 'omit',
+	});
+
+	if (response.status === 404) {
+		throw new DocsQQTransientError(`fetchDocxFile: CDN 文件已失效 (HTTP 404, URL 可能过期)`);
+	}
+	throwForStatus(response.status, 'fetchDocxFile');
+
+	const contentLength = response.headers.get('Content-Length');
+	if (contentLength && Number(contentLength) > DOWNLOAD_SIZE_LIMIT) {
+		throw new DocsQQTransientError(`fetchDocxFile: 文件过大 ${contentLength} bytes > ${DOWNLOAD_SIZE_LIMIT}`);
+	}
+
+	return await response.arrayBuffer();
+}

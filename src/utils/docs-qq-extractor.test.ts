@@ -235,3 +235,40 @@ describe('pollExportStatus', () => {
     ).rejects.toBeInstanceOf(DocsQQTransientError);
   });
 });
+
+describe('fetchDocxFile', () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it('returns ArrayBuffer on 200', async () => {
+    const fakeBuffer = new TextEncoder().encode('PK\x03\x04...').buffer;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(fakeBuffer, { status: 200 })
+    );
+    const buf = await fetchDocxFile('https://example.com/file.docx');
+    expect(buf).toBeInstanceOf(ArrayBuffer);
+    expect(buf.byteLength).toBeGreaterThan(0);
+  });
+
+  it('throws DocsQQTransientError on 404 (CDN gone)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 404 }));
+    await expect(fetchDocxFile('https://example.com/x.docx')).rejects.toBeInstanceOf(DocsQQTransientError);
+  });
+
+  it('throws DocsQQTransientError if Content-Length > 50MB', async () => {
+    const resp = new Response(new ArrayBuffer(0), {
+      status: 200,
+      headers: { 'Content-Length': String(51 * 1024 * 1024) },
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(resp);
+    await expect(fetchDocxFile('https://example.com/big.docx')).rejects.toBeInstanceOf(DocsQQTransientError);
+  });
+
+  it('uses credentials: omit (no cookie sent to CDN)', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(new ArrayBuffer(8), { status: 200 })
+    );
+    await fetchDocxFile('https://example.com/x.docx');
+    const init = spy.mock.calls[0][1] as RequestInit;
+    expect(init.credentials).toBe('omit');
+  });
+});

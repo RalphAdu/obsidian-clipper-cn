@@ -388,18 +388,27 @@ export function normalizeMdniceImageCaptions(root: ParentNode): void {
 	imgs.forEach(img => {
 		const alt = (img.getAttribute('alt') || '').trim();
 		if (!alt) return;
-		// Walk forward over whitespace-only text nodes to find the next element.
-		let next: Node | null = img.nextSibling;
-		while (next && next.nodeType === 3 /* text */) {
-			if ((next.textContent || '').trim() !== '') return;
-			next = next.nextSibling;
+		// The caption can be either an immediate sibling of <img>, or a sibling
+		// of an ancestor — mdnice often wraps <img> in a styled <section>, and
+		// places the caption <p> as the next sibling of THAT wrapper. Walk up
+		// at most 4 levels; at each level check the next element sibling.
+		let cur: Element | null = img;
+		for (let depth = 0; depth < 4 && cur; depth++) {
+			// Skip whitespace-only text nodes at this level.
+			let next: Node | null = cur.nextSibling;
+			while (next && next.nodeType === 3 /* text */ && (next.textContent || '').trim() === '') {
+				next = next.nextSibling;
+			}
+			if (next && next.nodeType === 1) {
+				const el = next as Element;
+				if ((el.tagName === 'SECTION' || el.tagName === 'P') &&
+					(el.textContent || '').trim() === alt) {
+					el.remove();
+					return;
+				}
+			}
+			cur = cur.parentElement;
 		}
-		if (!next || next.nodeType !== 1) return;
-		const el = next as Element;
-		if (el.tagName !== 'SECTION' && el.tagName !== 'P') return;
-		const captionText = (el.textContent || '').trim();
-		if (captionText !== alt) return;
-		el.remove();
 	});
 }
 

@@ -693,6 +693,7 @@ declare global {
 					const articleClone = article.cloneNode(true) as HTMLElement;
 					normalizeImageSources(articleClone as unknown as Document);
 					articleClone.querySelectorAll('script, style').forEach(el => el.remove());
+					normalizeMdniceArticle(articleClone);
 					normalizePreBlockLineBreaks(articleClone);
 					const wxContent = articleClone.outerHTML;
 					const wxPublished = extractWeChatPublishedFromDocument(document);

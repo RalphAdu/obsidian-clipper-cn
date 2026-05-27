@@ -287,6 +287,39 @@ describe('normalizeMdniceImageCaptions', () => {
 		normalizeMdniceImageCaptions(doc);
 		expect(doc.querySelector('section')).toBeNull();
 	});
+
+	it('removes caption that is sibling of img ancestor (mdnice wraps img in <section>)', () => {
+		// Real mdnice DOM: <section><img alt="X"></section><p>X</p>
+		// Caption is NOT a sibling of <img>; it's a sibling of <img>'s parent.
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section style="border-radius:18px;background-color:rgb(223,233,244);">
+					<img alt="信息过滤" src="https://example.com/x.png">
+				</section>
+				<p>信息过滤</p>
+				<p>后续段落</p>
+			</body></html>
+		`);
+		normalizeMdniceImageCaptions(doc);
+		const ps = Array.from(doc.querySelectorAll('p')).map(p => (p.textContent || '').trim());
+		expect(ps).toEqual(['后续段落']);
+	});
+
+	it('walks up multiple ancestor levels to find caption sibling', () => {
+		// <section><section><img alt="X"></section></section><p>X</p>
+		const { document: doc } = parseHTML(`
+			<html><body>
+				<section>
+					<section>
+						<img alt="深层" src="https://example.com/y.png">
+					</section>
+				</section>
+				<p>深层</p>
+			</body></html>
+		`);
+		normalizeMdniceImageCaptions(doc);
+		expect(doc.querySelector('p')).toBeNull();
+	});
 });
 
 describe('normalizeMdniceChapterHeadings', () => {

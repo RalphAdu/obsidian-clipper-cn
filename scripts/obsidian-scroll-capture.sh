@@ -153,18 +153,62 @@ if [ "$WIN_W" -lt 100 ] || [ "$WIN_H" -lt 100 ]; then
 fi
 sleep 0.4
 
-echo "==> 4. Switch to Reading View"
-# Toggle "Reading View" by clicking the View → 阅读视图 menu item.
-# Cmd+E was tried as a "safer keyboard shortcut" but on adu's vault (vim mode
-# enabled) Cmd+E toggles Source/Live-Preview (within Editing View) instead of
-# Reading↔Editing — verified 2026-05-25 with side-by-side screenshots.
-# Caller must ensure Obsidian is in **Editing View** before invoking this
-# script (vault default may be Reading; if so, click 阅读视图 once before run
-# to flip to Editing). Toggle then flips Editing→Reading and screenshots show
-# rendered images. Restore step at end toggles back.
-osascript -e 'tell application "System Events" to tell process "Obsidian" to click menu item "阅读视图" of menu "View" of menu bar 1' >/dev/null 2>&1 || \
-	echo "[WARN] Could not click 阅读视图 menu — Obsidian menu locale may differ. Mode unchanged." >&2
-sleep 2
+echo "==> 4. Ensure Reading View (verified, not blind toggle)"
+# Old behavior was a blind menu click that assumed vault default = Editing View.
+# When the vault default was already Reading, the toggle flipped to Editing
+# and screenshots captured raw markdown source instead of rendered content.
+# New behavior: take a pre-flight screenshot, OCR it, detect source-view
+# fingerprints (frontmatter `---`/`title:`/`source:`/`audioUrl:` lines visible
+# — those are always present in our notes and Reading View completely hides
+# them). If source view detected, toggle 阅读视图 menu, sleep, re-check. Up
+# to 3 attempts; if still not in Reading View, exit 8.
+
+in_reading_view() {
+	local SHOT="/tmp/obs-preflight-$$.png"
+	screencapture -x -R"${WIN_X},${WIN_Y},${WIN_W},${WIN_H}" -o "$SHOT" 2>/dev/null
+	local SZ
+	SZ=$(stat -f %z "$SHOT" 2>/dev/null || echo 0)
+	if [ "$SZ" -lt 100000 ]; then
+		echo "  [verify] Pre-flight frame too small ($SZ bytes) — viewport likely blank" >&2
+		rm -f "$SHOT"
+		return 1
+	fi
+	local OCR
+	OCR=$("$VISION_OCR_BIN" "$SHOT" 2>/dev/null || echo "")
+	rm -f "$SHOT"
+	# Reading View hides the YAML frontmatter entirely (or renders it as a
+	# Properties callout block that has NO --- markers and NO `key: value`
+	# raw lines visible). Source/Live-Preview shows the raw frontmatter text.
+	# Match patterns that ONLY appear in source view of our test notes:
+	#   ^---$       frontmatter delimiter
+	#   ^title:     YAML key
+	#   ^source:    YAML key
+	#   ^audioUrl:  xiaoyuzhou-specific YAML key
+	if echo "$OCR" | grep -qE '^---$|^title:|^source:|^audioUrl:'; then
+		return 1
+	fi
+	return 0
+}
+
+READING_OK=0
+TOGGLES_DONE=0
+for try in 1 2 3; do
+	if in_reading_view; then
+		echo "  [verify] In Reading View (attempt $try, total toggles: $TOGGLES_DONE)"
+		READING_OK=1
+		break
+	fi
+	echo "  [verify] Source View detected — toggling 阅读视图 menu (attempt $try)"
+	osascript -e 'tell application "System Events" to tell process "Obsidian" to click menu item "阅读视图" of menu "View" of menu bar 1' >/dev/null 2>&1 || \
+		echo "[WARN] Could not click 阅读视图 menu — Obsidian menu locale may differ" >&2
+	TOGGLES_DONE=$((TOGGLES_DONE + 1))
+	sleep 2.5
+done
+if [ "$READING_OK" -eq 0 ]; then
+	echo "[FAIL] Could not enter Reading View after 3 toggle attempts" >&2
+	echo "[FAIL] Check Obsidian menu locale or vault state manually" >&2
+	exit 8
+fi
 # Scroll to top of note. Cmd+Home (key code 115) works in Editing View but
 # Reading View ignores it (discovered during v3 Task 6 — Obsidian restored
 # mid-article scroll position, frame 001 captured middle of article instead
@@ -243,10 +287,16 @@ if [ "$FIRST_SIZE" -lt 150000 ]; then
 	echo "[WARN] Re-toggle manually (Cmd+E) and re-run, or change vault default view to Editing." >&2
 fi
 
-# Restore mode: toggle the "阅读视图" menu one more time to flip back to
-# Editing View (assuming we entered Reading View at start by toggling from
-# Editing View, this brings us back to Editing View).
-osascript -e 'tell application "System Events" to tell process "Obsidian" to click menu item "阅读视图" of menu "View" of menu bar 1' >/dev/null 2>&1 || true
+# Restore mode: replay the same number of 阅读视图 toggles we did in step 4
+# so net change = 0 (vault returns to whatever view it started in). Old logic
+# was always one toggle, which corrupted state when the vault default was
+# already Reading View (we didn't toggle in, but restore would still toggle
+# out → flips to Editing).
+echo "==> Restoring original view (replaying $TOGGLES_DONE toggle(s))"
+for ((r=0; r<TOGGLES_DONE; r++)); do
+	osascript -e 'tell application "System Events" to tell process "Obsidian" to click menu item "阅读视图" of menu "View" of menu bar 1' >/dev/null 2>&1 || true
+	sleep 0.6
+done
 
 if [ "$HIT_BOTTOM" -eq 1 ]; then
 	echo "==> Done. Touched bottom at frame $FINAL_I. Output: $OUT_DIR"

@@ -8,7 +8,10 @@ import {
   normalizeDate,
   parseEpisodeNumber,
   rewriteTimestamps,
+  parseComments,
+  buildCommentsHtml,
 } from './xiaoyuzhou-extractor';
+import type { XiaoyuzhouComment } from './xiaoyuzhou-extractor';
 
 describe('isXiaoyuzhouEpisodeUrl', () => {
   it('matches www.xiaoyuzhoufm.com/episode/<id>', () => {
@@ -152,5 +155,122 @@ describe('rewriteTimestamps', () => {
     const article = document.querySelector('article')!;
     rewriteTimestamps(article, audioUrl);
     expect(article.querySelector('a.timestamp')!.getAttribute('href')).toBeNull();
+  });
+});
+
+describe('parseComments', () => {
+  it('parses top-level comment with metadata', () => {
+    const html = `<section>
+      <div class="jsx-x comment">
+        <div class="jsx-x info">
+          <a class="jsx-x name">厚望</a>
+          <div class="jsx-x pub-time">2025.12.12</div>
+          <a class="jsx-x like"><div class="jsx-x count">25</div></a>
+        </div>
+        <div class="jsx-x pinned">置顶</div>
+        <div class="jsx-x text-wrap">帮老南吆喝一声：望岳投资招聘</div>
+      </div>
+    </section>`;
+    const { document } = parseHTML(html);
+    const result = parseComments(document.querySelector('section')!);
+    expect(result).toHaveLength(1);
+    expect(result[0].user).toBe('厚望');
+    expect(result[0].publishedAt).toBe('2025-12-12');
+    expect(result[0].likeCount).toBe(25);
+    expect(result[0].pinned).toBe(true);
+    expect(result[0].body).toContain('帮老南吆喝');
+  });
+
+  it('parses nested replies', () => {
+    const html = `<section>
+      <div class="jsx-x comment">
+        <div class="jsx-x info">
+          <a class="name">吞不须</a>
+          <div class="pub-time">2025.6.18</div>
+          <a class="like"><div class="count">468</div></a>
+        </div>
+        <div class="text-wrap">你还卷</div>
+        <div class="replies">
+          <div class="jsx-x comment">
+            <div class="jsx-x info">
+              <a class="name">猫咪麻麻</a>
+              <div class="pub-time">2025.6.18</div>
+              <a class="like"><div class="count">10</div></a>
+            </div>
+            <div class="text-wrap">你也卷</div>
+          </div>
+        </div>
+      </div>
+    </section>`;
+    const { document } = parseHTML(html);
+    const result = parseComments(document.querySelector('section')!);
+    expect(result).toHaveLength(1);
+    expect(result[0].user).toBe('吞不须');
+    expect(result[0].replies).toHaveLength(1);
+    expect(result[0].replies[0].user).toBe('猫咪麻麻');
+    expect(result[0].replies[0].body).toContain('你也卷');
+  });
+
+  it('handles missing fields gracefully', () => {
+    const html = `<section><div class="comment"><div class="text-wrap">orphan</div></div></section>`;
+    const { document } = parseHTML(html);
+    const result = parseComments(document.querySelector('section')!);
+    expect(result[0]).toMatchObject({
+      user: '',
+      publishedAt: '',
+      likeCount: 0,
+      pinned: false,
+    });
+  });
+
+  it('returns empty for no comments', () => {
+    const { document } = parseHTML('<section></section>');
+    expect(parseComments(document.querySelector('section')!)).toEqual([]);
+  });
+});
+
+describe('buildCommentsHtml', () => {
+  it('generates h2 + blockquote', () => {
+    const tree: XiaoyuzhouComment[] = [{
+      user: '厚望', publishedAt: '2025-12-12', likeCount: 25, pinned: true,
+      body: '帮老南吆喝一声', replies: []
+    }];
+    const html = buildCommentsHtml(tree);
+    expect(html).toContain('<h2>评论</h2>');
+    expect(html).toContain('<blockquote>');
+    expect(html).toContain('📌 置顶');
+    expect(html).toContain('<strong>📌 置顶 厚望</strong>');
+    expect(html).toContain('2025-12-12');
+    expect(html).toContain('👍 25');
+    expect(html).toContain('帮老南吆喝一声');
+  });
+
+  it('renders nested blockquote for replies', () => {
+    const tree: XiaoyuzhouComment[] = [{
+      user: '吞不须', publishedAt: '2025-06-18', likeCount: 468, pinned: false,
+      body: '你还卷',
+      replies: [{
+        user: '猫咪麻麻', publishedAt: '2025-06-18', likeCount: 10, pinned: false,
+        body: '你也卷', replies: []
+      }]
+    }];
+    const html = buildCommentsHtml(tree);
+    // outer blockquote contains inner blockquote (nesting)
+    expect(html).toMatch(/<blockquote>[\s\S]*<blockquote>[\s\S]*猫咪麻麻[\s\S]*<\/blockquote>[\s\S]*<\/blockquote>/);
+  });
+
+  it('returns empty when no comments', () => {
+    expect(buildCommentsHtml([])).toBe('');
+  });
+
+  it('escapes HTML in body / username', () => {
+    const tree: XiaoyuzhouComment[] = [{
+      user: '<script>', publishedAt: '2025-01-01', likeCount: 0, pinned: false,
+      body: 'a & b <i>', replies: []
+    }];
+    const html = buildCommentsHtml(tree);
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('&amp;');
   });
 });

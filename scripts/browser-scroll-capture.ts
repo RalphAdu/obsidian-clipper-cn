@@ -44,6 +44,12 @@ import { createHash } from 'node:crypto';
 
 const BOTTOM_RUN = 3;
 const MIN_FRAMES = 5;
+// Size tolerance for "same frame" detection — Strict md5 equality fails on
+// pages with running animations (e.g. xiaoyuzhou audio player progress bar
+// alternates 1-3 bytes per frame at the bottom). 500-byte band catches the
+// player widget pixel jitter while still rejecting any real content scroll
+// (which typically changes 10KB+).
+const BOTTOM_SIZE_TOLERANCE = 500;
 
 const args = process.argv.slice(2);
 let url = '';
@@ -178,6 +184,7 @@ console.log(`==> Output dir: ${outDir}`);
 	// 2. viewport PageDown frames
 	console.log(`==> 2. PageDown frames (auto-stop at bottom, max=${maxPages}, run=${BOTTOM_RUN}, min=${MIN_FRAMES})`);
 	let prevHash = '';
+	let prevSize = 0;
 	let run = 0;
 	let final = 0;
 	let hitBottom = false;
@@ -213,7 +220,11 @@ console.log(`==> Output dir: ${outDir}`);
 		const hash = createHash('md5').update(buf).digest('hex');
 		const sz = buf.length;
 
-		if (prevHash && hash === prevHash) run++; else run = 0;
+		// "Same frame" = identical hash OR size within tolerance band. Tolerance
+		// captures running animations (audio player progress); strict hash
+		// captures byte-perfect identical frames (true bottom plateau).
+		const sameAsPrev = !!prevHash && (hash === prevHash || (prevSize > 0 && Math.abs(sz - prevSize) <= BOTTOM_SIZE_TOLERANCE));
+		if (sameAsPrev) run++; else run = 0;
 
 		if (i >= MIN_FRAMES && run >= BOTTOM_RUN - 1) {
 			console.log(`   ${idx}. ${path} (${sz} bytes) [BOTTOM — run of ${BOTTOM_RUN} identical frames]`);
@@ -230,6 +241,7 @@ console.log(`==> Output dir: ${outDir}`);
 		}
 		await page.waitForTimeout(500);
 		prevHash = hash;
+		prevSize = sz;
 		final = i;
 	}
 

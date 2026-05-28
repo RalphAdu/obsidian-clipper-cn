@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseHTML } from 'linkedom';
 import {
   isXiaoyuzhouEpisodeUrl,
   parseXiaoyuzhouUrl,
@@ -6,6 +7,7 @@ import {
   formatDuration,
   normalizeDate,
   parseEpisodeNumber,
+  rewriteTimestamps,
 } from './xiaoyuzhou-extractor';
 
 describe('isXiaoyuzhouEpisodeUrl', () => {
@@ -92,5 +94,63 @@ describe('parseEpisodeNumber', () => {
   });
   it('returns empty when no prefix', () => {
     expect(parseEpisodeNumber('随便一个标题')).toBe('');
+  });
+});
+
+describe('rewriteTimestamps', () => {
+  const audioUrl = 'https://media.example.com/x.m4a';
+
+  it('adds href to timestamp anchors with data-timestamp', () => {
+    const { document } = parseHTML(
+      '<article><span><a class="timestamp" data-timestamp="14">00:14</a> 标题</span></article>'
+    );
+    const article = document.querySelector('article')!;
+    rewriteTimestamps(article, audioUrl);
+    const a = article.querySelector('a.timestamp')!;
+    expect(a.getAttribute('href')).toBe(`${audioUrl}#t=14`);
+    expect(a.textContent).toBe('00:14');
+  });
+
+  it('handles multiple timestamps', () => {
+    const { document } = parseHTML(`<article>
+      <a class="timestamp" data-timestamp="14">00:14</a>
+      <a class="timestamp" data-timestamp="330">05:30</a>
+      <a class="timestamp" data-timestamp="3600">01:00:00</a>
+    </article>`);
+    const article = document.querySelector('article')!;
+    rewriteTimestamps(article, audioUrl);
+    const anchors = Array.from(article.querySelectorAll('a.timestamp'));
+    expect(anchors.map(a => a.getAttribute('href'))).toEqual([
+      `${audioUrl}#t=14`,
+      `${audioUrl}#t=330`,
+      `${audioUrl}#t=3600`,
+    ]);
+  });
+
+  it('skips anchors without data-timestamp', () => {
+    const { document } = parseHTML(
+      '<article><a class="timestamp">00:14</a></article>'
+    );
+    const article = document.querySelector('article')!;
+    rewriteTimestamps(article, audioUrl);
+    expect(article.querySelector('a.timestamp')!.getAttribute('href')).toBeNull();
+  });
+
+  it('skips when audioUrl empty', () => {
+    const { document } = parseHTML(
+      '<article><a class="timestamp" data-timestamp="14">00:14</a></article>'
+    );
+    const article = document.querySelector('article')!;
+    rewriteTimestamps(article, '');
+    expect(article.querySelector('a.timestamp')!.getAttribute('href')).toBeNull();
+  });
+
+  it('skips invalid data-timestamp values', () => {
+    const { document } = parseHTML(
+      '<article><a class="timestamp" data-timestamp="abc">x</a></article>'
+    );
+    const article = document.querySelector('article')!;
+    rewriteTimestamps(article, audioUrl);
+    expect(article.querySelector('a.timestamp')!.getAttribute('href')).toBeNull();
   });
 });

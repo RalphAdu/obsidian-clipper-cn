@@ -69,3 +69,13 @@ export function parseEpisodeNumber(title: string): string {
   const m = title.match(/^([Ee][Pp]?\d+)[.\s．。]/);
   return m ? m[1] : '';
 }
+
+export function rewriteTimestamps(articleEl: Element, audioUrl: string): void {
+  if (!audioUrl) return;
+  const anchors = Array.from(articleEl.querySelectorAll('a.timestamp'));
+  for (const el of anchors) {
+    const sec = el.getAttribute('data-timestamp');
+    if (!sec || !/^\d+$/.test(sec)) continue;
+    el.setAttribute('href', `${audioUrl}#t=${sec}`);
+  }
+}

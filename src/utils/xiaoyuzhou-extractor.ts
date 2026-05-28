@@ -80,6 +80,23 @@ export function rewriteTimestamps(articleEl: Element, audioUrl: string): void {
   }
 }
 
+// 小宇宙 SSR DOM 里 article 包含装饰元素：订阅播客按钮、头像等都被
+// 包成 <a href=""><img></a>。turndown 把这种结构转成 [](src) 空 markdown
+// 链接（因为 alt 字段为空或转后丢失）。提前 unwrap 拆成裸 <img>，
+// 让 turndown 出 ![alt](src) 或 ![](src) 但不再产生显式的 [](url)。
+// 注意：必须在 rewriteTimestamps 之后调用，否则会误拆 timestamp anchor
+// （timestamp anchor 没有 img 子元素，所以即便顺序反了也不会被这个函数误判，
+// 但稳定起见保持 timestamp → unwrap 的顺序）。
+export function unwrapAnchorImages(articleEl: Element): void {
+  const anchors = Array.from(articleEl.querySelectorAll('a'));
+  for (const a of anchors) {
+    const children = Array.from(a.children);
+    if (children.length === 1 && children[0].tagName === 'IMG') {
+      a.replaceWith(children[0]);
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Comment parsing
 // ---------------------------------------------------------------------------
@@ -280,7 +297,10 @@ export async function extractXiaoyuzhouStructuredContent(
 
   // 改写 article 内的 timestamp
   const article = doc.querySelector('article');
-  if (article) rewriteTimestamps(article, audioUrl);
+  if (article) {
+    rewriteTimestamps(article, audioUrl);
+    unwrapAnchorImages(article);
+  }
 
   // 评论根 = body（评论散落在 body 各处，但都有 .comment 类）
   const commentsRoot = doc.body || doc;

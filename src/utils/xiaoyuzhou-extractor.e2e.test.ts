@@ -51,6 +51,8 @@ describe('xiaoyuzhou e2e — episode 6850d2ed', () => {
 	});
 
 	it('no empty markdown links leaked from unhandled anchors', () => {
-		expect(clip.markdown).not.toMatch(/\[\]\([^)]*\)/);
+		// 排除前导 `!` 的 image embed —— `![](url)` (alt 为空的 image) 是合法 markdown，
+		// 此处只断言"裸链接" `[](url)`（外层 <a> 包裹被 turndown 出空 alt 的产物）
+		expect(clip.markdown).not.toMatch(/(?<!!)\[\]\([^)]*\)/);
 	});
 });

@@ -793,6 +793,14 @@ declare global {
 			// content/title override — bug 2026-05-16). Comments here would be a
 			// good place to add other extractor-specific dict entries if any branch
 			// re-introduces the pattern.
+			if (source === 'xiaoyuzhou' && result) {
+				const r = result as any;
+				if (r.audioUrl) simulatedExtractedContent.audioUrl = r.audioUrl;
+				if (r.duration) simulatedExtractedContent.duration = r.duration;
+				if (r.podcast) simulatedExtractedContent.podcast = r.podcast;
+				if (r.podcastUrl) simulatedExtractedContent.podcastUrl = r.podcastUrl;
+				if (r.episodeNumber) simulatedExtractedContent.episodeNumber = r.episodeNumber;
+			}
 			const simulatedVars = sharedMod.buildVariables({
 				title: result?.title || '',
 				author: (result as any)?.author || '',
@@ -825,6 +833,17 @@ declare global {
 			const fmDescription = fmEscape(simulatedVars['{{description}}'] || '');
 			const fmAuthor = fmEscape(simulatedVars['{{author}}'] || '');
 			const fmPublished = fmEscape(simulatedVars['{{published}}'] || '');
+			// xiaoyuzhou-specific frontmatter extension (e2e bridge mirror; real
+			// users would write their own template referencing {{audioUrl}} etc.)
+			const fmExtra: string[] = [];
+			if (source === 'xiaoyuzhou') {
+				const r = result as any;
+				if (r?.audioUrl) fmExtra.push(`audioUrl: ${r.audioUrl}`);
+				if (r?.duration) fmExtra.push(`duration: ${r.duration}`);
+				if (r?.podcast) fmExtra.push(`podcast: ${r.podcast}`);
+				if (r?.podcastUrl) fmExtra.push(`podcastUrl: ${r.podcastUrl}`);
+				if (r?.episodeNumber) fmExtra.push(`episodeNumber: ${r.episodeNumber}`);
+			}
 			const obsidianNote = [
 				'---',
 				`title: "${fmTitle}"`,
@@ -835,6 +854,7 @@ declare global {
 				`description: ${fmDescription ? `"${fmDescription}"` : ''}`,
 				`tags:`,
 				`  - "clippings"`,
+				...fmExtra,
 				'---',
 				popupMarkdown,
 			].join('\n');

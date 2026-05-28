@@ -10,6 +10,7 @@ import {
   normalizeDate,
   parseEpisodeNumber,
   rewriteTimestamps,
+  unwrapAnchorImages,
   parseComments,
   buildCommentsHtml,
   extractXiaoyuzhouStructuredContent,
@@ -158,6 +159,38 @@ describe('rewriteTimestamps', () => {
     const article = document.querySelector('article')!;
     rewriteTimestamps(article, audioUrl);
     expect(article.querySelector('a.timestamp')!.getAttribute('href')).toBeNull();
+  });
+});
+
+describe('unwrapAnchorImages', () => {
+  it('unwraps <a><img></a> into bare <img>', () => {
+    const { document } = parseHTML(
+      '<article><a href="" class="subscribe"><img src="https://x/y.svg" alt="面基"/></a></article>'
+    );
+    const article = document.querySelector('article')!;
+    unwrapAnchorImages(article);
+    expect(article.querySelector('a')).toBeNull();
+    const img = article.querySelector('img')!;
+    expect(img.getAttribute('src')).toBe('https://x/y.svg');
+    expect(img.getAttribute('alt')).toBe('面基');
+  });
+
+  it('leaves anchors with text or other children untouched', () => {
+    const { document } = parseHTML(
+      '<article><a href="https://e.com">text</a><a href="https://e.com"><img src="x.png"/><span>x</span></a></article>'
+    );
+    const article = document.querySelector('article')!;
+    unwrapAnchorImages(article);
+    expect(article.querySelectorAll('a')).toHaveLength(2);
+  });
+
+  it('leaves timestamp anchors untouched (rewriteTimestamps already added href; they have no img children)', () => {
+    const { document } = parseHTML(
+      '<article><a class="timestamp" href="audio#t=14">00:14</a> 标题</article>'
+    );
+    const article = document.querySelector('article')!;
+    unwrapAnchorImages(article);
+    expect(article.querySelector('a.timestamp')).not.toBeNull();
   });
 });
 

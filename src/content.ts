@@ -366,6 +366,17 @@ declare global {
 				// Remove all script and style elements
 				doc.querySelectorAll('script, style').forEach(el => el.remove());
 
+				// IMPORTANT: extract weChat article content BEFORE the doc-wide
+				// style-attribute strip below. The mdnice normalizers inside
+				// extractWeChatArticleContent depend on inline-style signatures
+				// (font-size:120px / color:#ab59ff / font-weight:600 etc.) to
+				// detect mdnice template DOM. extractWeChatArticleContent uses
+				// cloneNode(true), so its produced HTML string is independent
+				// of the subsequent doc-wide style stripping.
+				const weChatArticleContent = isWeChatArticleUrl(document.URL)
+					? extractWeChatArticleContent(doc)
+					: null;
+
 				// Remove style attributes from all elements
 				doc.querySelectorAll('*').forEach(el => el.removeAttribute('style'));
 
@@ -399,9 +410,8 @@ declare global {
 
 				// Get the modified HTML without scripts, styles, and style attributes
 				const cleanedHtml = doc.documentElement.outerHTML;
-				const weChatArticleContent = isWeChatArticleUrl(document.URL)
-					? extractWeChatArticleContent(doc)
-					: null;
+				// weChatArticleContent extracted above (before style-attribute
+				// strip) so mdnice inline-style signatures are still intact.
 				// Walk live <script> nodes' textContent — do NOT route through
 				// documentElement.outerHTML. Empirical browser-runtime behavior:
 				// the outerHTML serializer can omit inline <script> bodies

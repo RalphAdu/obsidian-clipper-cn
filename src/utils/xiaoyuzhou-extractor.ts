@@ -151,3 +151,154 @@ export function buildCommentsHtml(comments: XiaoyuzhouComment[]): string {
   if (!comments.length) return '';
   return ['<h2>评论</h2>', ...comments.map(renderCommentHtml)].join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// JSON-LD helpers
+// ---------------------------------------------------------------------------
+
+interface JsonLdPodcastEpisode {
+  '@type'?: string;
+  name?: string;
+  description?: string;
+  datePublished?: string;
+  timeRequired?: string;
+  url?: string;
+  associatedMedia?: { contentUrl?: string };
+  partOfSeries?: { name?: string; url?: string };
+}
+
+function parseJsonLd(doc: ParentNode): JsonLdPodcastEpisode | null {
+  const scripts = Array.from(doc.querySelectorAll('script[type="application/ld+json"]'));
+  for (const s of scripts) {
+    try {
+      const data = JSON.parse(s.textContent || '');
+      if (data && (data['@type'] === 'PodcastEpisode' || data.associatedMedia)) {
+        return data;
+      }
+    } catch {
+      // skip malformed
+    }
+  }
+  return null;
+}
+
+function getMetaContent(doc: ParentNode, key: string): string {
+  const el = doc.querySelector(`meta[property="${key}"], meta[name="${key}"]`);
+  return el?.getAttribute('content') || '';
+}
+
+function truncate(s: string, n: number): string {
+  if (!s) return '';
+  if (s.length <= n) return s;
+  return s.slice(0, n);
+}
+
+function getDocUrl(doc: Document): string {
+  return (doc.URL as string) || (doc as any).location?.href || '';
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+async function expandAllComments(doc: Document): Promise<void> {
+  // 浏览器 runtime 才跑；测试环境（linkedom）没有 window.scrollTo，跳过
+  if (typeof window === 'undefined' || typeof (doc as any).body?.scrollHeight !== 'number') return;
+  let prev = 0;
+  for (let i = 0; i < 10; i++) {
+    try { window.scrollTo(0, document.body.scrollHeight); } catch {}
+    await sleep(800);
+    const count = doc.querySelectorAll('.comment').length;
+    if (count === prev) break;
+    prev = count;
+  }
+  // 点击「共 X 条回复」展开按钮
+  const expanders = Array.from(doc.querySelectorAll('*')).filter(el => {
+    const t = el.textContent?.trim() || '';
+    return /^共\d+条回复$/.test(t) && typeof (el as HTMLElement).click === 'function';
+  });
+  const max = Math.min(expanders.length, 100);
+  for (let i = 0; i < max; i++) {
+    try { (expanders[i] as HTMLElement).click(); } catch {}
+    await sleep(300);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main extractor interface + function
+// ---------------------------------------------------------------------------
+
+export interface XiaoyuzhouStructuredContent {
+  // 通用字段（参与 ContentResponse fallback chain）
+  title: string;
+  author: string;
+  description: string;
+  published: string;
+  image: string;
+  site: string;
+  source: string;
+  content: string;
+  wordCount: number;
+
+  // 专有字段（注入 extractedContent，用户模板可用）
+  audioUrl: string;
+  duration: string;
+  podcast: string;
+  podcastUrl: string;
+  episodeNumber: string;
+}
+
+export async function extractXiaoyuzhouStructuredContent(
+  doc: Document
+): Promise<XiaoyuzhouStructuredContent> {
+  const url = getDocUrl(doc);
+
+  const ld = parseJsonLd(doc);
+  if (!ld) {
+    throw new Error('Xiaoyuzhou: JSON-LD PodcastEpisode not found');
+  }
+
+  // 通用字段
+  const title = ld.name || getMetaContent(doc, 'og:title') || doc.title || '';
+  const podcastName = ld.partOfSeries?.name || '';
+  const author = podcastName;
+  const description = truncate((ld.description || '').trim(), 200);
+  const published = ld.datePublished || '';
+  const image = getMetaContent(doc, 'og:image') || '';
+  const site = '小宇宙';
+  const source = canonicalizeUrl(url);
+
+  // 专有字段
+  const audioUrl = ld.associatedMedia?.contentUrl || getMetaContent(doc, 'og:audio') || '';
+  const duration = formatDuration(ld.timeRequired || '');
+  const podcast = podcastName;
+  const podcastUrl = ld.partOfSeries?.url || '';
+  const episodeNumber = parseEpisodeNumber(title);
+
+  // 展开 + parse 评论（仅浏览器 runtime）
+  await expandAllComments(doc);
+
+  // 改写 article 内的 timestamp
+  const article = doc.querySelector('article');
+  if (article) rewriteTimestamps(article, audioUrl);
+
+  // 评论根 = body（评论散落在 body 各处，但都有 .comment 类）
+  const commentsRoot = doc.body || doc;
+  const comments = parseComments(commentsRoot as Element);
+  const commentsHtml = buildCommentsHtml(comments);
+
+  // 组装 structuredHtml
+  const audioEmbed = audioUrl ? `<p><img src="${escapeHtml(audioUrl)}" alt="" /></p>` : '';
+  const articleHtml = article ? article.outerHTML : '';
+  const content = [audioEmbed, articleHtml, commentsHtml].filter(Boolean).join('\n');
+
+  // wordCount: article + comments 的纯文本长度
+  const articleText = article?.textContent || '';
+  const commentsText = comments.map(c => c.body + c.replies.map(r => r.body).join('')).join('');
+  const wordCount = (articleText + commentsText).length;
+
+  return {
+    title, author, description, published, image, site, source, content, wordCount,
+    audioUrl, duration, podcast, podcastUrl, episodeNumber,
+  };
+}

@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { parseHTML } from 'linkedom';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   isXiaoyuzhouEpisodeUrl,
   parseXiaoyuzhouUrl,
@@ -10,6 +12,7 @@ import {
   rewriteTimestamps,
   parseComments,
   buildCommentsHtml,
+  extractXiaoyuzhouStructuredContent,
 } from './xiaoyuzhou-extractor';
 import type { XiaoyuzhouComment } from './xiaoyuzhou-extractor';
 
@@ -272,5 +275,82 @@ describe('buildCommentsHtml', () => {
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
     expect(html).toContain('&amp;');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration tests with real fixture
+// ---------------------------------------------------------------------------
+
+const fixturePath = path.join(__dirname, 'fixtures/xiaoyuzhou-episode-6850d2ed.html');
+
+describe('extractXiaoyuzhouStructuredContent (integration with fixture)', () => {
+  let doc: Document;
+  beforeAll(() => {
+    const html = fs.readFileSync(fixturePath, 'utf-8');
+    doc = parseHTML(html).document as unknown as Document;
+    Object.defineProperty(doc, 'URL', { value: 'https://www.xiaoyuzhoufm.com/episode/6850d2ed4abe6e29cb814160', configurable: true });
+  });
+
+  it('extracts title with E112 prefix preserved', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.title).toMatch(/^E112\./);
+    expect(result.title).toContain('喜欢投资和求真的听友');
+  });
+
+  it('extracts podcast metadata', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.podcast).toBe('面基');
+    expect(result.author).toBe('面基');
+    expect(result.episodeNumber).toBe('E112');
+    expect(result.podcastUrl).toMatch(/^https:\/\/www\.xiaoyuzhoufm\.com\/podcast\//);
+  });
+
+  it('extracts audio URL and duration', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.audioUrl).toMatch(/^https:\/\/media\.xyzcdn\.net\/.+\.m4a$/);
+    expect(result.duration).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('canonicalizes source URL (strip query)', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.source).toBe('https://www.xiaoyuzhoufm.com/episode/6850d2ed4abe6e29cb814160');
+  });
+
+  it('description truncated to 200 chars', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.description.length).toBeLessThanOrEqual(200);
+    expect(result.description.length).toBeGreaterThan(0);
+  });
+
+  it('site is 小宇宙', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.site).toBe('小宇宙');
+  });
+
+  it('content contains audio embed + article + comments h2', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.content).toContain('<img src="https://media.xyzcdn.net');
+    expect(result.content).toContain('<h2>评论</h2>');
+    expect(result.content).toContain('<blockquote>');
+  });
+
+  it('article timestamps rewritten with href', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    // structuredHtml 中 timestamp anchor 现在应有 href=audio#t=...
+    expect(result.content).toMatch(/<a[^>]+href="https:\/\/media\.xyzcdn\.net\/[^"]+#t=\d+"[^>]*class="[^"]*timestamp/);
+  });
+
+  it('wordCount > 0', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    expect(result.wordCount).toBeGreaterThan(100);
+  });
+});
+
+describe('extractXiaoyuzhouStructuredContent error paths', () => {
+  it('throws when JSON-LD missing', async () => {
+    const { document } = parseHTML('<html><body></body></html>');
+    Object.defineProperty(document, 'URL', { value: 'https://www.xiaoyuzhoufm.com/episode/x', configurable: true });
+    await expect(extractXiaoyuzhouStructuredContent(document as unknown as Document)).rejects.toThrow(/JSON-LD/i);
   });
 });

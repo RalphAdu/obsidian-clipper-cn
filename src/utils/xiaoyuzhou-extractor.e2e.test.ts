@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { runRealClip, type ClipResult } from '../../scripts/e2e-clip-runner';
+import { auditXiaoyuzhouClip, formatReport } from '../../scripts/xiaoyuzhou-visual-audit';
 
 const URL = 'https://www.xiaoyuzhoufm.com/episode/6850d2ed4abe6e29cb814160';
 
@@ -54,5 +55,11 @@ describe('xiaoyuzhou e2e — episode 6850d2ed', () => {
 		// 排除前导 `!` 的 image embed —— `![](url)` (alt 为空的 image) 是合法 markdown，
 		// 此处只断言"裸链接" `[](url)`（外层 <a> 包裹被 turndown 出空 alt 的产物）
 		expect(clip.markdown).not.toMatch(/(?<!!)\[\]\([^)]*\)/);
+	});
+
+	it('full content audit: shownote + comments (0 mismatch)', () => {
+		const report = auditXiaoyuzhouClip(clip.hydratedHtml, clip.markdown);
+		console.log(formatReport(report));
+		expect(report.mismatches.length, formatReport(report)).toBe(0);
 	});
 });

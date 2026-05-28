@@ -378,6 +378,22 @@ export async function postProcessHtml(rawHtml: string): Promise<string> {
 		h.remove();
 	}
 
+	// 5. 解包 heading 内顶层 <strong> / <b> — docx 源头 H2 段落整体加粗 →
+	// `<h2><strong>...</strong></h2>` → turndown `## **...**`. heading 本身已加粗，
+	// 重复 bold markup 在 Obsidian 里渲染语义冗余。
+	for (const h of Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))) {
+		// 仅当 heading 唯一 child 是 <strong>/<b> 才解包；mixed inline 不动
+		const children = Array.from(h.childNodes).filter(n => n.nodeType === 1 || (n.nodeType === 3 && (n.textContent ?? '').trim() !== ''));
+		if (children.length !== 1) continue;
+		const only = children[0] as Element;
+		if (only.nodeType !== 1) continue;
+		const tag = only.tagName.toLowerCase();
+		if (tag !== 'strong' && tag !== 'b') continue;
+		// 把 strong/b 的子节点直接挂回 heading
+		while (only.firstChild) h.insertBefore(only.firstChild, only);
+		only.remove();
+	}
+
 	return document.body.innerHTML;
 }
 

@@ -423,6 +423,31 @@ describe('postProcessHtml', () => {
     expect(result).toContain('Section:');
     expect(result).toMatch(/<img[^>]*alt="icon"/);
   });
+
+  it('unwraps <strong> wrapping the entire heading (docx H2 整段加粗)', async () => {
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<h2><strong>节目的缘起</strong></h2>';
+    const result = await fn(html);
+    expect(result).toContain('<h2>节目的缘起</h2>');
+    expect(result).not.toMatch(/<h2><strong>/);
+  });
+
+  it('unwraps <b> wrapping the entire heading', async () => {
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<h3><b>Section Title</b></h3>';
+    const result = await fn(html);
+    expect(result).toContain('<h3>Section Title</h3>');
+    expect(result).not.toMatch(/<h3><b>/);
+  });
+
+  it('keeps mixed-inline heading untouched (only partial <strong> not full-wrap)', async () => {
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<h2>Plain <strong>bold</strong> text</h2>';
+    const result = await fn(html);
+    // 部分加粗 — 不能解包，否则 'bold' 失去 emphasis
+    expect(result).toContain('<strong>bold</strong>');
+    expect(result).toContain('<h2>');
+  });
 });
 
 describe('extractDocsQQContent (orchestration)', () => {

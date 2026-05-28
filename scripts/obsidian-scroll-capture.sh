@@ -176,15 +176,44 @@ in_reading_view() {
 	local OCR
 	OCR=$("$VISION_OCR_BIN" "$SHOT" 2>/dev/null || echo "")
 	rm -f "$SHOT"
-	# Reading View hides the YAML frontmatter entirely (or renders it as a
-	# Properties callout block that has NO --- markers and NO `key: value`
-	# raw lines visible). Source/Live-Preview shows the raw frontmatter text.
-	# Match patterns that ONLY appear in source view of our test notes:
-	#   ^---$       frontmatter delimiter
-	#   ^title:     YAML key
-	#   ^source:    YAML key
-	#   ^audioUrl:  xiaoyuzhou-specific YAML key
+
+	# Multi-fingerprint detection of source/Live-Preview view.
+	# Reading View hides ALL of these; if any appears → not Reading View.
+	#
+	# (a) Frontmatter YAML markers (^---$ / ^title: / ^source: / ^audioUrl:)
+	#     — Reading View hides frontmatter or renders as Properties callout
+	#     without raw markers. NOTE: Live Preview ALSO hides frontmatter, so
+	#     this alone is insufficient (catches Source View only).
+	# (b) Image/audio markdown source (`![](url)` half-width or `！［］（url）`
+	#     full-width). Reading View renders these as inline <img>/<audio>;
+	#     Live Preview still shows the markdown syntax when the cursor isn't
+	#     on the line, which is the case in screenshots.
+	# (c) Blockquote source markers (`> **` or `>>` lines). Reading View
+	#     renders nested blockquotes as indented quote blocks WITHOUT `>`.
+	# (d) Line-number column (≥5 monotonically-increasing integer lines).
+	#     Live Preview / Source View have a left gutter showing line numbers.
+	#     Reading View has no gutter.
+
+	# (a) frontmatter
 	if echo "$OCR" | grep -qE '^---$|^title:|^source:|^audioUrl:'; then
+		echo "  [verify] OCR has frontmatter markers → source view" >&2
+		return 1
+	fi
+	# (b) image/audio markdown source — half-width or full-width parens/brackets
+	if echo "$OCR" | grep -qE '!\s*\[[^]]*\]\s*\(|！\s*［[^］]*］\s*（|\.(m4a|mp3|mp4|png|jpg|jpeg|gif|webp|svg)\)|\.(m4a|mp3|mp4|png|jpg|jpeg|gif|webp|svg)）'; then
+		echo "  [verify] OCR has image/audio markdown source → not Reading View" >&2
+		return 1
+	fi
+	# (c) blockquote source markers
+	if echo "$OCR" | grep -qE '^> \*\*|^>>|^> >'; then
+		echo "  [verify] OCR has blockquote source markers → not Reading View" >&2
+		return 1
+	fi
+	# (d) line-number column — 5+ integer-only lines
+	local LINE_NUM_COUNT
+	LINE_NUM_COUNT=$(echo "$OCR" | grep -cE '^[0-9]{1,4}$' || true)
+	if [ "$LINE_NUM_COUNT" -ge 5 ]; then
+		echo "  [verify] OCR has $LINE_NUM_COUNT line-number-like rows → not Reading View" >&2
 		return 1
 	fi
 	return 0

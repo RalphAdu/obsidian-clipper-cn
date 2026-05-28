@@ -51,6 +51,7 @@ let profileDir: string | undefined;
 let maxPages = 1000;
 let scrollSelector: string | undefined;
 let contentSelector: string | null = null;
+const preClicks: string[] = [];
 
 for (let i = 0; i < args.length; i++) {
 	const a = args[i];
@@ -58,11 +59,12 @@ for (let i = 0; i < args.length; i++) {
 	else if (a === '--max') maxPages = Number(args[++i]);
 	else if (a === '--scroll-selector') scrollSelector = args[++i];
 	else if (a === '--content-selector') contentSelector = args[++i];
+	else if (a === '--pre-click') preClicks.push(args[++i]);
 	else if (!url) url = a;
 }
 
 if (!url) {
-	console.error('Usage: browser-scroll-capture.ts <url> [--profile <dir>] [--max <n>]');
+	console.error('Usage: browser-scroll-capture.ts <url> [--profile <dir>] [--max <n>] [--pre-click <css-or-text>]...');
 	process.exit(2);
 }
 
@@ -96,6 +98,21 @@ console.log(`==> Output dir: ${outDir}`);
 		await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 	});
 	await page.waitForTimeout(2000);
+
+	// Pre-click expanders BEFORE lazy-load scroll. Some sites (xiaoyuzhou)
+	// fold the shownote behind a "展开 Show Notes" button — without
+	// clicking, only ~250px of article is visible and grid comparison
+	// against the full Obsidian render becomes meaningless.
+	// Accepts both CSS (`.expand-wrap`) and playwright text (`text=展开`).
+	for (const sel of preClicks) {
+		console.log(`==> Pre-click: ${sel}`);
+		try {
+			await page.locator(sel).first().click({ timeout: 5_000 });
+			await page.waitForTimeout(800);
+		} catch (e) {
+			console.warn(`[WARN] pre-click "${sel}" failed: ${(e as Error).message}`);
+		}
+	}
 
 	// String-based evaluate so tsx/esbuild __name helper doesn't leak into the page context.
 	console.log(`==> Scrolling to bottom in chunks to trigger lazy-load (max 60s)${scrollSelector ? ` [inner=${scrollSelector}]` : ''}`);

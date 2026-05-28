@@ -2855,3 +2855,68 @@ Task 7 集成测试暴露 `normalizeMdniceChapterHeadings` + `normalizeMdniceSub
 **3.4 e2e bridge path 必须跟主路径双 wire**
 
 memory 已加 [[feedback_extractor_acceptance]] 强调 ship gate 必须含 e2e 跑通；本次踩坑后**还需要加**："凡是 e2e bridge path（content.ts 内 `__obsidianClipperTestExtract__`）复制了主 extract 逻辑的，主路径加 normalize/transform 时**必须同步改 bridge**"。这是 silent-divergence 高发地带。
+
+
+## 2026-05-28 hotfix 反思：popup path 在调 extractor helper 前 strip 了 inline style
+
+weixin mdnice ship (2026-05-27) 当晚阿杜真 chrome 裁剪测试发现产物**部分 normalize 生效部分不生效**：
+- ✅ 图片 caption 去重 / WECHAT_MONITOR 装饰 anchor 删（不依赖 inline style 的 normalizer）
+- ❌ 顶部 Reading Time meta / 章节标题 H1 / 小标题 H2 / inline 粗体（依赖 inline style 的 normalizer 全 silent no-op）
+
+但 e2e bridge 跑 17/17 PASS 没暴露这个 bug。同一份 dist/content.js 两条路径**真行为不同**。
+
+### Root cause：popup path 的 caller pipeline mutates doc
+
+`src/content.ts:253 getPageContent handler` 在调 `extractWeChatArticleContent(doc)` **之前**做了一连串 doc-wide DOM mutation：
+
+```ts
+const doc = parser.parseFromString(document.documentElement.outerHTML, 'text/html');
+normalizeImageSources(doc);
+doc.querySelectorAll('script, style').forEach(el => el.remove());
+doc.querySelectorAll('*').forEach(el => el.removeAttribute('style'));   // ← BUG SOURCE
+// ... [src][href] absolute URL conversion ...
+const cleanedHtml = doc.documentElement.outerHTML;
+const weChatArticleContent = isWeChatArticleUrl(document.URL)            // ← 调 extractor
+    ? extractWeChatArticleContent(doc)                                    // ← 但 doc 已经没 style 了
+    : null;
+```
+
+第 370 行 `removeAttribute('style')` 把 doc 所有元素的 inline style 清掉了，然后第 402 行才调 `extractWeChatArticleContent(doc)`。但 `extractWeChatArticleContent` 内部 `article.cloneNode(true)` 拿到的 article 已经没 style 了，cloneNode 副本也没 style，所有 `normalizeMdnice*` 走 style-based 签名识别全部 fail。
+
+**只有不依赖 style 的 normalizer 工作**（看 alt/textContent/href 等 attribute），所以产物部分 normalize 部分不 normalize 这种诡异状态。
+
+### Fix（2 个 commit）
+
+**699868a fix(weixin)**：把第 402 行 `extractWeChatArticleContent(doc)` 提前到第 370 行 `removeAttribute('style')` **之前**。`extractWeChatArticleContent` 用 cloneNode(true)，产生的 HTML string 独立于后续 doc-wide style strip；cleanedHtml（第 401 行，fullHtml for ContentResponse）仍在 strip 之后计算，非 weChat 页面不受影响。
+
+**6667a11 test(weixin)**：bridge weChat 分支改成**镜像 popup-path 完整 transform pipeline**（DOMParser → script/style 删 → extractWeChatArticleContent → style attribute strip）。bridge 之前 inline 复制是简化版（直接 article.cloneNode + normalize），不含 popup 的 DOM-wide style mutation，所以 e2e bridge 走 happy path 不 catch 这种 caller-side bug。
+
+### 为什么 e2e 之前没抓到这个
+
+bridge 的 inline 复制 **没复制 caller 的 DOM mutation**，只复制了 extractor helper 函数本身。helper `(doc) => content string` 单独跑是对的，但 popup caller 在 helper 调用前做了 doc-wide attr strip，bridge 不复制这个 strip 就无法重现 popup 视角下 helper 真实行为。
+
+[[feedback_e2e_bridge_path_double_wire]] 已升级规则："bridge 镜像主路径**不只复制 extractor helper 函数本身**，还要复制 caller 周围的 DOM mutation"。这是 "caller pipeline silent-divergence"，比 "helper missing call" 更隐蔽。
+
+### 沉淀给基础设施的规则
+
+**1. 给 helper 写 unit test 不够 — 必须验证 caller-side DOM precondition**
+
+`extractWeChatArticleContent` 有 46 个 unit test 验证 helper 本身正确。但 helper 的真实工作环境是 popup path 的 caller — caller pipeline 改了 DOM 后 helper 被传入的 doc/article 已不是 fixture 假设的状态。单测 fixture 一般是 hand-crafted minimal HTML（保留 style），unit test 永远不能 reproduce "caller 先 strip 了所有 style attribute" 这种 caller-side mutation。
+
+**修法（短期）**：bridge 镜像 caller 的完整 pipeline，e2e 跑 bridge 等于跑 caller。
+
+**修法（长期）**：把 caller 的 transform pipeline 抽成 exported helper（`buildPopupCleanedAndExtract`），让 onMessage handler + bridge 都 call。从根上消除"caller 跟 bridge inline 双复制"的漂移源。
+
+**2. inline-style 签名 normalizer 必须 ship 时 audit "调它的 caller 有没有 strip style"**
+
+凡是 normalizer 依赖 inline style 工作的（heading / bold / code-block / decoration card），写 spec / plan 时**audit 这条**：
+
+> 这个 normalizer 跑的时候 input doc 还会有 inline style 吗？
+
+具体到本仓库：`content.ts:370` doc-wide `removeAttribute('style')` 是 cleanedHtml 路径的固有行为（content extractor 把 style 当噪音去掉），weChat extract 必须在 strip 之前跑。其他 extractor（feishu/scys/zsxq/docsqq）是 import call 不在 cleanedHtml 路径里，不受影响。
+
+**3. ship checklist T5-3 "Manual clip" 不能省**
+
+本次 ship 我自动化跑了 T5-3：cp e2e 产物到 vault 当作"manual clip" 替代。这跳过了**真 chrome popup 路径**，导致 popup 真路径 bug 没被 catch，阿杜亲手裁剪时才发现。
+
+[[feedback_extractor_acceptance]] T5-3 字面是"Manual clip in browser"——本次"自动化跳过"是违规。**新规则**：T5-3 必须是真 chrome 装 dist + 用户/我自己手动点扩展裁剪，不能用 e2e bridge 产物 cp 到 vault 替代。e2e bridge 走的代码路径跟 popup 不一致是已知问题（[[feedback_e2e_bridge_path_double_wire]]），T5-3 就是为了 catch 这种漂移。

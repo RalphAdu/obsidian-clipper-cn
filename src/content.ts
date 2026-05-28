@@ -721,28 +721,37 @@ declare global {
 				source = 'docsqq';
 			} else if (isWeChatArticleUrl(document.URL)) {
 				// mp.weixin uses inline helpers in main getPageContent path
-				// (not a dedicated extractor function). Replicate that path
-				// here so bridge produces equivalent result shape.
-				const article = document.querySelector('#js_content');
-				if (article) {
-					const articleClone = article.cloneNode(true) as HTMLElement;
-					normalizeImageSources(articleClone as unknown as Document);
-					articleClone.querySelectorAll('script, style').forEach(el => el.remove());
-					normalizeMdniceArticle(articleClone);
-					normalizePreBlockLineBreaks(articleClone);
-					const wxContent = articleClone.outerHTML;
-					const wxPublished = extractWeChatPublishedFromDocument(document);
-					const titleEl = document.querySelector('h2.rich_media_title, h1.rich_media_title, title');
-					const wxTitle = (titleEl?.textContent || '').trim().replace(/\s+/g, ' ');
-					const authorEl = document.querySelector('#js_name');
-					const wxAuthor = (authorEl?.textContent || '').trim();
-					result = { title: wxTitle, content: wxContent, author: wxAuthor, published: wxPublished };
-					source = 'wechat';
-				}
-				if (!result) {
+				// (not a dedicated extractor function). Mirror the popup
+				// path's transform pipeline EXACTLY — including the
+				// DOMParser + script/style element removal + (after weChat
+				// extract) doc-wide style-attribute strip — so that any
+				// bug only reachable via popup-path DOM mutation is also
+				// reachable via this bridge.
+				//
+				// CRITICAL: extractWeChatArticleContent must run BEFORE the
+				// style-attribute strip, because mdnice normalizers in it
+				// depend on inline-style signatures (font-size:120px etc.).
+				// Order mirrors content.ts getPageContent handler lines
+				// ~360-410 verbatim. If the popup pipeline order changes,
+				// update here too. See [[feedback_e2e_bridge_path_double_wire]]
+				// for the refactor task to fold both paths into one helper.
+				const parser = new DOMParser();
+				const popupDoc = parser.parseFromString(document.documentElement.outerHTML, 'text/html');
+				normalizeImageSources(popupDoc);
+				popupDoc.querySelectorAll('script, style').forEach(el => el.remove());
+				const wxContent = extractWeChatArticleContent(popupDoc) || '';
+				popupDoc.querySelectorAll('*').forEach(el => el.removeAttribute('style'));
+				const wxPublished = extractWeChatPublishedFromDocument(document);
+				const titleEl = document.querySelector('h2.rich_media_title, h1.rich_media_title, title');
+				const wxTitle = (titleEl?.textContent || '').trim().replace(/\s+/g, ' ');
+				const authorEl = document.querySelector('#js_name');
+				const wxAuthor = (authorEl?.textContent || '').trim();
+				if (!wxContent) {
 					localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'mp.weixin #js_content not found' }));
 					return;
 				}
+				result = { title: wxTitle, content: wxContent, author: wxAuthor, published: wxPublished };
+				source = 'wechat';
 			} else {
 				localStorage.setItem(key, JSON.stringify({ status: 'error', error: 'unsupported url for bridge' }));
 				return;

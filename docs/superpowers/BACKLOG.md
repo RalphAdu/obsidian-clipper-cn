@@ -1855,7 +1855,7 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 
 ---
 
-### 6.26 docs.qq.com /doc/ 类型 extractor（**已完成 2026-05-27**，commits `a278a94..579e55d`，15 commits on `worktree-docs-qq-extractor`）
+### 6.26 docs.qq.com /doc/ 类型 extractor（**已完成 2026-05-28**，commits `f7af4df..2d879e1`，19 commits ship 进 adu/main）
 
 **触发**：阿杜验收一个腾讯文档 URL 后确认 Defuddle 默认通路对 docs.qq.com SPA + contenteditable 渲染产物极差（跟早期飞书同类）。立项做专项 extractor。
 
@@ -1875,10 +1875,27 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 4. **webpack content script publicPath 检测 fallback 到页面 script origin** — content script 没 currentScript，webpack auto-detect 拿到 docs.gtimg.com 等页面 script URL → 动态 chunk 加载 404。`ContentScriptPublicPathPlugin` 在构建期 patch 自动检测块改 `chrome.runtime.getURL('')`。
 
 **ship gate**：
-- ✅ T5-1 vitest 单测 41 (docs-qq) + 901 (baseline pre-existing) 全 PASS
+- ✅ T5-1 vitest 单测 45 (docs-qq, 含 2 个 post-audit fix 单测) + 901 (baseline pre-existing) 全 PASS
 - ✅ T5-2 e2e `runRealClip` 5/5 assertion PASS，阿杜原始 URL `DQmZvdEFOR0RFWU9t`（10 小时长文，27MB docx），clip duration 23s，markdown 37MB / hydratedHtml 1.4MB
-- ✅ T5-3 `npm run build:chrome` 成功，dist/content.js 3.3MB（mammoth static inline）
-- ⏳ T5-4 阿杜手工真 URL 验收 → Obsidian.app 看产物（要阿杜在 ship gate 阶段做）
+- ✅ T5-2.audit `audit-extractor-ship` 13 subagent visual audit → 找到 1 major + 1 warn bug 修复 (见下 "post-audit fix" 节)
+- ✅ T5-3 `npm run build:chrome` 成功，dist/content.js 3.3MB（mammoth static inline）；vault md 阿杜验收 "通过"
+- ✅ T5-4 BACKLOG + memory 更新 + ship 上 main → adu/main HEAD `2d879e1`
+
+**2 个 post-audit fix（audit-extractor-ship 发现 → ship 前修复）**：
+
+1. **L499 image-in-H3 (commit `a033181`)** — docx 源把 image-only 段落误标 Heading style，mammoth 忠实输出 `<h3><img/></h3>` → turndown `### ![](data:...)` 破坏大纲结构。
+   - `postProcessHtml` step 4: 检测 heading 含 `<img>` + textContent 为空 → 提 img 到独立 `<p>`，删空 heading。
+   - 真实 37MB markdown 重跑后 `^#{1,6} ![` instances = 0。
+
+2. **H2 `## **bold**` 重复 bold (commit `2d879e1`)** — docx 源 H2 段落整体加粗，mammoth 输出 `<h2><strong>...</strong></h2>` → turndown `## **...**`。heading 已加粗，重复 bold markup 语义冗余。
+   - `postProcessHtml` step 5: heading 唯一直接 child 是 `<strong>/<b>` → 解包。保护 mixed-inline (`<h2>plain <strong>bold</strong></h2>`) 不动。
+   - 真实 37MB markdown 重跑后 5 处 PART/缘起 章节正确变 `## 节目的缘起` 等无重复 `**`。
+
+**已知 acceptable 行为（非 bug，不修）**：
+- **mid-CJK italic asterisk** (e.g. `幸运*连击...?*`)：docx 源 partial italic，mammoth 正确反映。
+- **Date metadata paragraph**：docx 元数据 mammoth → `<p>2025年06月28日 ...`，保留对用户有用 info。
+- **颜色高亮丢失**：markdown 格式限制，HTML span embed 破坏 pure-markdown portability。
+- **`\[Music\]` literal text**：turndown 正确 escape。
 
 **MVP 范围**（v2 优化）：
 - 仅 /doc/<token> 类型；sheet/slide/form/flowchart/mind/pdf 等留 v2
@@ -1897,6 +1914,8 @@ v2 在同一 URL 跑：44 grid / 9 slice 全 PASS / 0 diff / 0 unknown / audit-s
 - **chrome extension content script 不能 dynamic import async chunk** — 任何 mammoth/pdf-lib/big-vendor 都得 static inline content.js，预算 content.js +几 MB
 - **reconnaissance 看 cookie 字段名 vs URL query param 名 — 同名 `xsrf` 不同位置含义不同**，须实测 `document.cookie` 字符串才能确认
 - **content.ts bridge origin 白名单 + source union 是新 extractor 必改的两处** — 加新 extractor 时 grep `mp\\.weixin\\.qq\\.com` 找现有 pattern 跟着加
+- **docx → mammoth → turndown 输出 quirk**: docx 源把 image / 整段加粗误标 Heading style，mammoth 忠实输出会让 turndown 产 `### ![](...)` / `## **bold**`。新 extractor 用 mammoth 时 postProcessHtml 必须有"heading 内只含 img → 拆"+"heading 唯一 child 是 strong/b → 解包"两个 step
+- **audit-extractor-ship 找出真 bug 的能力**: 13 subagent × 7 grid visual audit 跑 37MB markdown 找到 L499 image-in-H3（subagent 报 major 严重）+ H2 bold（warn）+ 工具 grid byte-identical 基础设施 bug（13 subagent 中 7 个 affected）。**ship gate T5-2.audit 不能跳过 — 即使 audit 慢且工具有 bug，文本 audit 仍能发现真问题**
 
 ---
 

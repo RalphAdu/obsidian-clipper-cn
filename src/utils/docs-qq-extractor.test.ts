@@ -400,6 +400,29 @@ describe('postProcessHtml', () => {
     expect(result).toContain('<h1>Title</h1>');
     expect(result).toContain('<p>Plain text</p>');
   });
+
+  it('unwraps <img> from heading-only-image (docx style bug)', async () => {
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<p>before</p><h3><img alt="x" src="data:image/png;base64,Z" /></h3><p>after</p>';
+    const result = await fn(html);
+    // heading 已删除
+    expect(result).not.toMatch(/<h3>/);
+    // img 提到独立 <p>
+    expect(result).toMatch(/<p><img[^>]*alt="x"[^>]*\/?>\s*<\/p>/);
+    // 上下文 paragraph 保留
+    expect(result).toContain('<p>before</p>');
+    expect(result).toContain('<p>after</p>');
+  });
+
+  it('keeps heading containing both image AND text untouched (only no-text image is unwrapped)', async () => {
+    const { postProcessHtml: fn } = await import('./docs-qq-extractor');
+    const html = '<h3>Section: <img alt="icon" src="data:image/png;base64,Y" /></h3>';
+    const result = await fn(html);
+    // heading 不动 — 因为还有 'Section:' 文本
+    expect(result).toContain('<h3>');
+    expect(result).toContain('Section:');
+    expect(result).toMatch(/<img[^>]*alt="icon"/);
+  });
 });
 
 describe('extractDocsQQContent (orchestration)', () => {

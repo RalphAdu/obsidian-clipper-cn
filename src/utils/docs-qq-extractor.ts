@@ -362,6 +362,22 @@ export async function postProcessHtml(rawHtml: string): Promise<string> {
 		}
 	}
 
+	// 4. 拆 heading 内仅含 <img>（docx 源头 bug — 腾讯文档把图片段落误标 Heading style）
+	// 否则 turndown 输出 `### ![](data:...)` 破坏大纲；audit FAIL 路径
+	for (const h of Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))) {
+		const imgs = Array.from(h.querySelectorAll('img'));
+		if (imgs.length === 0) continue;
+		if ((h.textContent ?? '').trim() !== '') continue;
+		const parent = h.parentNode;
+		if (!parent) continue;
+		for (const img of imgs) {
+			const p = document.createElement('p');
+			p.appendChild(img);
+			parent.insertBefore(p, h);
+		}
+		h.remove();
+	}
+
 	return document.body.innerHTML;
 }
 

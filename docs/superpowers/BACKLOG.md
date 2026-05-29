@@ -2920,3 +2920,89 @@ bridge 的 inline 复制 **没复制 caller 的 DOM mutation**，只复制了 ex
 本次 ship 我自动化跑了 T5-3：cp e2e 产物到 vault 当作"manual clip" 替代。这跳过了**真 chrome popup 路径**，导致 popup 真路径 bug 没被 catch，阿杜亲手裁剪时才发现。
 
 [[feedback_extractor_acceptance]] T5-3 字面是"Manual clip in browser"——本次"自动化跳过"是违规。**新规则**：T5-3 必须是真 chrome 装 dist + 用户/我自己手动点扩展裁剪，不能用 e2e bridge 产物 cp 到 vault 替代。e2e bridge 走的代码路径跟 popup 不一致是已知问题（[[feedback_e2e_bridge_path_double_wire]]），T5-3 就是为了 catch 这种漂移。
+
+---
+
+## 2026-05-29 反思：xiaoyuzhou-extractor ship — 5 轮验收 + Obsidian PC virtualization 平台限制确认
+
+**Ship 概况**：xiaoyuzhou-extractor 从 brainstorm 到 ship 5 轮验收，共 17 个 commit。功能：podcast 元数据 frontmatter + 时间戳 markdown 链接 + 评论嵌套 blockquote + 顶部 sticky audio embed。
+
+### 5 轮验收揪出的真 bug
+
+| 轮次 | bug | 修法 commit |
+|---|---|---|
+| 1 | T5-3 / T5-4 流程不严：我把"抽 N 张视觉对比"压缩成"抽 3 张"；frame 1 没看（漏掉 audio 破图标）；评论 body 跟 reply preview 拼接成一段 inline；折叠回复全丢；点 .replies-count 引流页 | `746b990` |
+| 2 | published 字段 ISO datetime vs created date-only 格式不一致；audio embed 滚出 viewport PC Obsidian 暂停 | `a83cadf` |
+| 3 | sticky CSS revert 误判（手机端实际是 work 的）→ 两端都退回原 bug | `023683e` |
+| 4 | iframe srcdoc 深度调研尝试 → chromium 引擎实测证伪 → 接受 PC 限制 | `10ad1c0` |
+
+### 关键经验沉淀
+
+**1. iframe sub-document 在 chromium 引擎级别**不**survive parent detach**（实测证伪）
+
+写一个 sandbox：`/tmp/iframe-lifecycle-test.html` —— iframe 内 setInterval 100ms postMessage，parent.removeChild 3s 后 re-insert SAME element。结果：
+
+- Detach 期间 0 ticks（iframe sub-doc 完全暂停/销毁）
+- Re-attach 后 counter 重置（iframe **重新 load** srcdoc，不保留状态）
+
+意味着：iframe srcdoc 永远不能作为"DOM virtualization 绕过"workaround——sub-doc lifecycle 跟 parent 绑定。下次如有类似 "把 X 放 iframe 让它 survive parent unmount" 的想法，直接否决，不浪费时间实施。
+
+**2. Obsidian PC Reading View virtualization = 平台级行为，markdown-only 无解**
+
+[forum 2024 官方](https://forum.obsidian.md/t/obsidian-reading-view-keeps-modifying-the-dom-in-long-notes/53709) 确认：
+> "the first paragraphs are unloaded from the DOM... **cannot be disabled**. A plugin could do it, but that's the only option."
+
+已实测的方案全 fail（PC 端）：
+- bare `<audio>` — 滚出即暂停
+- `<div style="position:sticky">` 包 `<audio>` — sticky 视觉 PC 失效，audio 仍跟 parent div 一起 unload
+- `<iframe srcdoc>` 包 `<audio>` — chromium 引擎级 iframe 也不 survive
+
+**Sticky `<div>` wrapper 唯一价值是 mobile**：sticky 在手机端视觉 + DOM mount 保护双生效。PC 端就接受 — markdown 改不了，让用户装 Audio Player plugin。
+
+**3. 评论 body 抽取必须用 `.text-wrap > .text` 而非 `.text-wrap`**
+
+小宇宙评论 DOM：
+```
+.comment > .text-wrap
+            ├── .text (.pinned + 评论正文 span/br)
+            └── .replies
+                ├── .reply (inline preview，仅 1-2 条)
+                ├── .reply
+                └── .replies-count <a>共37条回复</a>  ← 跳 APP 引流页
+```
+
+`.text-wrap` textContent 会把 .text + .replies 拼一段。**必须**用 `.text-wrap > .text`（剥 .pinned 子节点），单独 parse `.replies > .reply` 列表 + `.replies-count` 数字。
+
+**4. 「共 N 条回复」按钮点击 = 跳引流页**（不是展开）
+
+小宇宙网页版**没有展开 reply 的功能**。`.replies-count` 是 `<a>` 元素，点击 navigate 到 `oia.xiaoyuzhoufm.com/episode-comments/<id>?locateCommentId=<cid>` APP 引流页。如果 `expandAllComments` 调它 click，e2e bridge 后 page.evaluate 抓到 splash 页 outerHTML（48KB 无 article），audit 0 blocks scanned。
+
+Reply 完整数据只在小宇宙 mobile API（非公开），网页 SSR 只暴露 1-2 条 preview + 总数。markdown 加可见性标注「共 N 条回复（剩 X 条仅小宇宙 APP 可见）」。
+
+**5. published date-only 格式（跟 created 兼容）**
+
+JSON-LD `datePublished` 是 ISO datetime `2025-06-18T07:30:00.000Z`，Obsidian Properties 渲染为 datetime input；而 `created: 2026-05-29` 渲染为 MM/DD/YYYY date picker。两者视觉不一致。**extractor 把 published truncate 前 10 字符**，让 Obsidian 识别为 date 类型跟 created 同格式。
+
+### 违规：T5-3 / T5-4 字段定义被随手压缩
+
+阿杜在第 1 轮验收揪出我「抽 3 张视觉比对」是擅自简化。memory `feedback_extractor_acceptance` 实际写：
+
+> "抽检 N 张（开头/中间/结尾）的视觉要点"。**不是固定 3 张**——是"开头/中间/结尾 三个区段"，每段抽多少 by 判断。
+
+**字段收紧**：T5-3/T5-4 paste 截图时**必须明确"开头/中间/结尾覆盖度"**，不能用任意"3 张"代替。下次如再写"抽 N 张"必须按 region 分类填，否则违规。
+
+### 附带工具改进（不属于 extractor scope 但 ship 期间发现 + 修）
+
+| 工具 | 改进 | commit |
+|---|---|---|
+| `obsidian-scroll-capture.sh` | Reading View 多指纹 detect（行号 / image markdown 源 / blockquote markers / frontmatter 都查）+ TOGGLES_DONE replay restore | `7dc3252` / `f396342` |
+| `browser-scroll-capture.ts` | size-tolerance bottom detection（500 字节带宽容 audio player progress 进度条 jitter） | `6c53999` |
+| `audit-prepare.sh` + `browser-scroll-capture.ts` | `--pre-click <selector>` flag + xiaoyuzhou 自动 `.expand-wrap`（展开 shownote） | `e9b6529` |
+
+### 与之前反思的对照
+
+- 跟 [2026-05-27 weixin mdnice]：e2e 暴露 unit-test 看不见的 bug——本次 e2e 7/7 PASS 仍漏掉 image embed Live Preview 渲染破图标（unit 没 cover Obsidian 真渲染） + 评论 body inline 拼接（unit 走 fallback 路径但真 DOM 走 `.text-wrap > .text`）
+- 跟 [2026-05-28 popup path style strip]：bridge 跟 popup 真路径漂移 — 本次也踩了（e2e bridge 跳 expander click 改变了 hydratedHtml 状态）
+
+**两条规则在 xiaoyuzhou 也适用**：bridge 双 wire + caller pipeline mirror。本次的新增维度：**Obsidian PC virtualization 也是 ship gate 的盲区**，e2e 检测不到（e2e 不 mount audio + 滚动）。未来涉及"audio / video / 长时活动 DOM" 的 extractor 必须**实测 Obsidian PC scroll 行为**作为 ship gate 的一部分。
+

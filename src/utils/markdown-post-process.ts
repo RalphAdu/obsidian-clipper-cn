@@ -48,8 +48,26 @@ function fixFencedCodeBacktickEscapes(markdown: string): string {
 	});
 }
 
+// Obsidian's image-embed syntax `![](url)` only renders inline <img> for image
+// MIME types. Audio file URLs (.m4a/.mp3/.wav/.ogg/.webm/.flac/.3gp) hit the
+// broken-image icon + filename fallback (verified 2026-05-29 with xiaoyuzhou
+// audio embed in Live Preview view). HTML `<audio controls src="...">` is the
+// supported way to render an external audio URL as a playable widget — Obsidian
+// passes block-level HTML through to the rendered view.
+// Pattern matches markdown-on-its-own-line audio image-embed (avoiding inline
+// edge cases) and rewrites to <audio> tag. Site-agnostic but in practice only
+// triggers for xiaoyuzhou which emits .m4a embed at note top.
+const AUDIO_IMAGE_EMBED_RE = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:m4a|mp3|wav|ogg|webm|flac|3gp|opus|oga))\)$/gm;
+
+function convertAudioImageEmbedToHtml(markdown: string): string {
+	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) =>
+		`<audio controls src="${url}"></audio>`
+	);
+}
+
 export function postProcessExtractorMarkdown(markdown: string): string {
 	const calloutsFixed = markdown.replace(OBSIDIAN_CALLOUT_MARKER_RE, '[!$1]');
 	const footnotesFixed = calloutsFixed.replace(FOOTNOTE_MARKER_RE, '[^$1]');
-	return fixFencedCodeBacktickEscapes(footnotesFixed);
+	const fencesFixed = fixFencedCodeBacktickEscapes(footnotesFixed);
+	return convertAudioImageEmbedToHtml(fencesFixed);
 }

@@ -256,7 +256,54 @@ describe('parseComments', () => {
       publishedAt: '',
       likeCount: 0,
       pinned: false,
+      replyPreviews: [],
+      totalReplyCount: 0,
     });
+  });
+
+  it('extracts text from .text-wrap > .text (excludes .replies inline preview)', () => {
+    // 真实小宇宙 DOM: .text-wrap > .text + .text-wrap > .replies
+    // body 应该只含 .text 内容，不含 .replies 拼接
+    const html = `<section>
+      <div class="comment">
+        <div class="info">
+          <a class="name">厚望</a>
+          <div class="pub-time">2025.12.12</div>
+          <a class="like"><div class="count">25</div></a>
+        </div>
+        <div class="text-wrap">
+          <div class="text">
+            <div class="pinned"><span class="pinned-text">置顶</span></div>
+            <span>帮老南吆喝一声：</span>
+            <span>简历投递邮箱：nantian@hilltop-inv.com</span>
+          </div>
+          <div class="replies">
+            <div class="reply"><span class="reply-author">闫槿:</span>哪个城市啊</div>
+            <div class="reply"><span class="reply-author">orzanol:</span>您好，还能发一下ppt吗，感谢！</div>
+            <a class="replies-count">共37条回复</a>
+          </div>
+        </div>
+      </div>
+    </section>`;
+    const { document } = parseHTML(html);
+    const result = parseComments(document.querySelector('section')!);
+    expect(result).toHaveLength(1);
+    const c = result[0];
+    expect(c.user).toBe('厚望');
+    expect(c.pinned).toBe(true);
+    // body has comment text (no "置顶" tag, no reply preview)
+    expect(c.body).toContain('帮老南吆喝');
+    expect(c.body).toContain('nantian@hilltop-inv.com');
+    expect(c.body).not.toContain('置顶'); // .pinned stripped
+    expect(c.body).not.toContain('闫槿'); // reply preview NOT in body
+    expect(c.body).not.toContain('orzanol');
+    expect(c.body).not.toContain('共37条回复');
+    // Reply previews extracted separately
+    expect(c.replyPreviews).toHaveLength(2);
+    expect(c.replyPreviews[0]).toEqual({ user: '闫槿', content: '哪个城市啊' });
+    expect(c.replyPreviews[1]).toEqual({ user: 'orzanol', content: '您好，还能发一下ppt吗，感谢！' });
+    // Total count from .replies-count "共37条回复"
+    expect(c.totalReplyCount).toBe(37);
   });
 
   it('returns empty for no comments', () => {
@@ -269,7 +316,7 @@ describe('buildCommentsHtml', () => {
   it('generates h2 + blockquote', () => {
     const tree: XiaoyuzhouComment[] = [{
       user: '厚望', publishedAt: '2025-12-12', likeCount: 25, pinned: true,
-      body: '帮老南吆喝一声', replies: []
+      body: '帮老南吆喝一声', replyPreviews: [], totalReplyCount: 0, replies: []
     }];
     const html = buildCommentsHtml(tree);
     expect(html).toContain('<h2>评论</h2>');
@@ -281,13 +328,13 @@ describe('buildCommentsHtml', () => {
     expect(html).toContain('帮老南吆喝一声');
   });
 
-  it('renders nested blockquote for replies', () => {
+  it('renders nested blockquote for legacy nested replies', () => {
     const tree: XiaoyuzhouComment[] = [{
       user: '吞不须', publishedAt: '2025-06-18', likeCount: 468, pinned: false,
-      body: '你还卷',
+      body: '你还卷', replyPreviews: [], totalReplyCount: 0,
       replies: [{
         user: '猫咪麻麻', publishedAt: '2025-06-18', likeCount: 10, pinned: false,
-        body: '你也卷', replies: []
+        body: '你也卷', replyPreviews: [], totalReplyCount: 0, replies: []
       }]
     }];
     const html = buildCommentsHtml(tree);
@@ -295,19 +342,72 @@ describe('buildCommentsHtml', () => {
     expect(html).toMatch(/<blockquote>[\s\S]*<blockquote>[\s\S]*猫咪麻麻[\s\S]*<\/blockquote>[\s\S]*<\/blockquote>/);
   });
 
+  it('renders reply previews as separate paragraphs in nested blockquote', () => {
+    const tree: XiaoyuzhouComment[] = [{
+      user: '厚望', publishedAt: '2025-12-12', likeCount: 25, pinned: true,
+      body: '帮老南吆喝一声',
+      replyPreviews: [
+        { user: '闫槿', content: '哪个城市啊' },
+        { user: 'orzanol', content: '您好，还能发一下ppt吗，感谢！' },
+      ],
+      totalReplyCount: 37,
+      replies: []
+    }];
+    const html = buildCommentsHtml(tree);
+    // Reply previews are separate <p> not inline with body
+    expect(html).toContain('<strong>闫槿</strong>: 哪个城市啊');
+    expect(html).toContain('<strong>orzanol</strong>: 您好，还能发一下ppt吗，感谢！');
+    // Visibility note for hidden replies
+    expect(html).toContain('共 37 条回复（剩 35 条仅小宇宙 APP 可见）');
+    // Body should NOT contain reply preview inline (the bug we fixed)
+    const bodyPara = html.match(/<p>帮老南吆喝一声<\/p>/);
+    expect(bodyPara).not.toBeNull();
+    // Body paragraph should NOT have 闫槿 or orzanol mixed in same <p>
+    // (anchor with [^<]* so it can't cross tag boundaries)
+    expect(html).not.toMatch(/<p>帮老南吆喝一声[^<]*闫槿/);
+  });
+
+  it('omits visibility note when all replies visible', () => {
+    const tree: XiaoyuzhouComment[] = [{
+      user: 'A', publishedAt: '2025-01-01', likeCount: 1, pinned: false, body: 'x',
+      replyPreviews: [{ user: 'B', content: 'y' }],
+      totalReplyCount: 1, replies: []
+    }];
+    const html = buildCommentsHtml(tree);
+    expect(html).not.toContain('仅小宇宙 APP 可见');
+  });
+
+  it('omits reply block entirely when no replies', () => {
+    const tree: XiaoyuzhouComment[] = [{
+      user: 'A', publishedAt: '2025-01-01', likeCount: 0, pinned: false, body: 'x',
+      replyPreviews: [], totalReplyCount: 0, replies: []
+    }];
+    const html = buildCommentsHtml(tree);
+    // Outer blockquote present, but no inner blockquote (replies block)
+    expect(html).toContain('<blockquote>');
+    expect(html).not.toContain('<blockquote><blockquote>');
+    // Replies block uses nested <blockquote>, so a single comment with no replies
+    // should produce exactly one <blockquote> open tag
+    expect((html.match(/<blockquote>/g) || []).length).toBe(1);
+  });
+
   it('returns empty when no comments', () => {
     expect(buildCommentsHtml([])).toBe('');
   });
 
-  it('escapes HTML in body / username', () => {
+  it('escapes HTML in body / username / reply user', () => {
     const tree: XiaoyuzhouComment[] = [{
       user: '<script>', publishedAt: '2025-01-01', likeCount: 0, pinned: false,
-      body: 'a & b <i>', replies: []
+      body: 'a & b <i>',
+      replyPreviews: [{ user: '<bad>', content: '<x>' }],
+      totalReplyCount: 1, replies: []
     }];
     const html = buildCommentsHtml(tree);
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
     expect(html).toContain('&amp;');
+    expect(html).toContain('&lt;bad&gt;');
+    expect(html).toContain('&lt;x&gt;');
   });
 });
 
@@ -377,6 +477,18 @@ describe('extractXiaoyuzhouStructuredContent (integration with fixture)', () => 
   it('wordCount > 0', async () => {
     const result = await extractXiaoyuzhouStructuredContent(doc);
     expect(result.wordCount).toBeGreaterThan(100);
+  });
+
+  it('reply preview + totalReplyCount visibility note injected', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    // 第一条置顶评论是 厚望，含 37 条总回复，2 条 inline preview (闫槿/orzanol)
+    // body 段落不应含 reply preview 拼接
+    expect(result.content).not.toMatch(/<p>[^<]*nantian@hilltop-inv\.com[^<]*闫槿[^<]*<\/p>/);
+    // reply preview 单独段落
+    expect(result.content).toMatch(/<strong>闫槿<\/strong>: 哪个城市啊/);
+    expect(result.content).toMatch(/<strong>orzanol<\/strong>: 您好，还能发一下ppt吗，感谢！/);
+    // 可见性标注
+    expect(result.content).toMatch(/共 37 条回复（剩 35 条仅小宇宙 APP 可见）/);
   });
 });
 

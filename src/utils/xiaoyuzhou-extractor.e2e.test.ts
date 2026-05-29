@@ -33,8 +33,12 @@ describe('xiaoyuzhou e2e — episode 6850d2ed', () => {
 		expect(clip.markdown).toMatch(/^episodeNumber: E112$/m);
 	});
 
-	it('body has audio embed at top', () => {
-		expect(clip.markdown).toMatch(/!\[\]\(https:\/\/media\.xyzcdn\.net\/.+\.m4a\)/);
+	it('body has HTML audio player embed at top (not ![](url.m4a) which Obsidian renders broken)', () => {
+		// markdown-post-process converts ![](url.m4a) → <audio controls src="url"></audio>
+		// (Obsidian image-embed only renders image MIME; audio URLs need <audio> tag)
+		expect(clip.markdown).toMatch(/<audio controls src="https:\/\/media\.xyzcdn\.net\/.+\.m4a"><\/audio>/);
+		// Negative assertion: stale `![](.m4a)` form must NOT survive post-process
+		expect(clip.markdown).not.toMatch(/!\[[^\]]*\]\([^)]+\.m4a\)/);
 	});
 
 	it('timestamps are markdown links to audio#t=N', () => {

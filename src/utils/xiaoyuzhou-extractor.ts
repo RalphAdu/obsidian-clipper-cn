@@ -101,12 +101,25 @@ export function unwrapAnchorImages(articleEl: Element): void {
 // Comment parsing
 // ---------------------------------------------------------------------------
 
+export interface XiaoyuzhouReplyPreview {
+  user: string;     // reply 作者
+  content: string;  // reply 正文
+}
+
 export interface XiaoyuzhouComment {
   user: string;
   publishedAt: string;
   likeCount: number;
   pinned: boolean;
   body: string;
+  // 网页版小宇宙仅暴露顶层评论 + 每条评论 1-2 条 reply preview。
+  // 「共 N 条回复」点击跳 APP 引流页（oia.xiaoyuzhoufm.com），无展开 API。
+  // replyPreviews = 当前可见的 reply 列表；totalReplyCount = 「共 N 条回复」的 N
+  // （包含 inline preview 自身）。当 totalReplyCount > replyPreviews.length 时
+  // 渲染端会标注「剩 X 条仅 APP 可见」。
+  replyPreviews: XiaoyuzhouReplyPreview[];
+  totalReplyCount: number;
+  // replies 字段是历史 placeholder，保持兼容性（多数评论 = []）
   replies: XiaoyuzhouComment[];
 }
 
@@ -122,26 +135,72 @@ function getTextOf(el: Element | null, sel: string): string {
   return el?.querySelector(sel)?.textContent?.trim() || '';
 }
 
+// 从 .replies > .reply 抽 inline reply preview list。一条 .reply 形如：
+// <div class="reply"><span class="reply-author">用户名:</span>正文</div>
+function parseReplyPreviews(textWrap: Element | null): XiaoyuzhouReplyPreview[] {
+  if (!textWrap) return [];
+  const replyEls = Array.from(textWrap.querySelectorAll(':scope > .replies > .reply'));
+  return replyEls.map(el => {
+    const authorEl = el.querySelector('.reply-author');
+    const rawAuthor = (authorEl?.textContent || '').trim();
+    // .reply-author textContent 形如 "用户名:"，剥末尾冒号
+    const user = rawAuthor.replace(/[:：]\s*$/, '');
+    // content = .reply textContent - .reply-author textContent
+    const fullText = (el.textContent || '').trim();
+    const content = fullText.startsWith(rawAuthor)
+      ? fullText.slice(rawAuthor.length).trim()
+      : fullText;
+    return { user, content };
+  }).filter(r => r.user || r.content);
+}
+
+// 「共 N 条回复」按钮在 .text-wrap > .replies > .replies-count 里。
+// 文本形如 "共37条回复"。Returns N（无按钮 → 0）。
+function parseTotalReplyCount(textWrap: Element | null): number {
+  if (!textWrap) return 0;
+  const el = textWrap.querySelector(':scope > .replies > .replies-count');
+  const text = el?.textContent?.trim() || '';
+  const m = text.match(/共(\d+)条回复/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 function parseSingleComment(el: Element): XiaoyuzhouComment {
   const user = getTextOf(el, '.name');
   const publishedAt = normalizeDate(getTextOf(el, '.pub-time'));
   const likeText = getTextOf(el, '.like .count') || getTextOf(el, '.count');
   const likeCount = parseInt(likeText, 10) || 0;
   const pinned = !!el.querySelector('.pinned');
-  // body = .text-wrap or fallback to direct text content excluding metadata
-  let body = getTextOf(el, '.text-wrap');
+
+  // body = .text-wrap > .text textContent
+  // .text 内含 .pinned 子节点（"置顶" 文本），先剥
+  const textWrap = el.querySelector('.text-wrap');
+  const textEl = textWrap?.querySelector(':scope > .text');
+  let body = '';
+  if (textEl) {
+    const clone = textEl.cloneNode(true) as Element;
+    clone.querySelectorAll('.pinned').forEach(n => n.remove());
+    body = (clone.textContent || '').trim();
+  }
   if (!body) {
-    // fallback: clone and strip metadata nodes
+    // Fallback: clone whole comment node + strip metadata
     const clone = el.cloneNode(true) as Element;
     clone.querySelectorAll('.info, .pinned, .replies, .comment, svg, img').forEach(n => n.remove());
     body = (clone.textContent || '').trim();
   }
+
+  const replyPreviews = parseReplyPreviews(textWrap);
+  const totalReplyCount = parseTotalReplyCount(textWrap);
+
+  // Legacy: 历史上 replies = 嵌套 .comment 节点。小宇宙现役 DOM 不嵌套 .comment
+  // 在评论里（reply 用 .reply 标记），所以这里几乎总是 []。保留兼容性，未来若
+  // DOM 变化或别的播客平台复用结构时仍可生效。
   const repliesContainer = el.querySelector(':scope > .replies');
   const replyEls = repliesContainer
     ? Array.from(repliesContainer.querySelectorAll(':scope > .comment'))
     : [];
   const replies = replyEls.map(parseSingleComment);
-  return { user, publishedAt, likeCount, pinned, body, replies };
+
+  return { user, publishedAt, likeCount, pinned, body, replyPreviews, totalReplyCount, replies };
 }
 
 export function parseComments(root: Element): XiaoyuzhouComment[] {
@@ -160,8 +219,25 @@ function renderCommentHtml(c: XiaoyuzhouComment): string {
     .filter(Boolean)
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join('');
+
+  // Reply preview block — 每条 reply 单独段落，用 nested <blockquote> 让 Obsidian
+  // 渲染为额外缩进。如果 totalReplyCount > replyPreviews.length，末尾追加可见性说明。
+  let repliesBlock = '';
+  if (c.replyPreviews.length > 0 || c.totalReplyCount > 0) {
+    const replyParas = c.replyPreviews
+      .map(r => `<p><strong>${escapeHtml(r.user)}</strong>: ${escapeHtml(r.content)}</p>`)
+      .join('');
+    const hidden = c.totalReplyCount - c.replyPreviews.length;
+    const note = hidden > 0
+      ? `<p><em>共 ${c.totalReplyCount} 条回复（剩 ${hidden} 条仅小宇宙 APP 可见）</em></p>`
+      : '';
+    repliesBlock = `<blockquote>${replyParas}${note}</blockquote>`;
+  }
+
+  // 兼容历史 replies 字段（嵌套评论 — 当前 DOM 不会触发，但保留 schema）
   const childHtml = c.replies.map(renderCommentHtml).join('');
-  return `<blockquote>${header}${bodyParas}${childHtml}</blockquote>`;
+
+  return `<blockquote>${header}${bodyParas}${repliesBlock}${childHtml}</blockquote>`;
 }
 
 export function buildCommentsHtml(comments: XiaoyuzhouComment[]): string {
@@ -229,16 +305,15 @@ async function expandAllComments(doc: Document): Promise<void> {
     if (count === prev) break;
     prev = count;
   }
-  // 点击「共 X 条回复」展开按钮
-  const expanders = Array.from(doc.querySelectorAll('*')).filter(el => {
-    const t = el.textContent?.trim() || '';
-    return /^共\d+条回复$/.test(t) && typeof (el as HTMLElement).click === 'function';
-  });
-  const max = Math.min(expanders.length, 100);
-  for (let i = 0; i < max; i++) {
-    try { (expanders[i] as HTMLElement).click(); } catch {}
-    await sleep(300);
-  }
+  // CAVEAT: 网页版小宇宙的「共 N 条回复」<a class="replies-count"> 点击
+  // 跳转到 oia.xiaoyuzhoufm.com/episode-comments/<id>?locateCommentId=<cid>
+  // APP 引流页 — 不展开 reply。如果在 e2e bridge 内点击会让 page navigate
+  // 走，后续 page.evaluate(documentElement.outerHTML) 抓到 splash 页（无
+  // article、无评论），整个 audit 崩。
+  // 所以不点击 expander，只保留 lazy-load 滚动。
+  // reply 数据：每条评论 1-2 条 inline preview 已经在 SSR DOM 里（被
+  // parseSingleComment 抽到 replyPreviews 字段），剩余 N-K 条只有小宇宙
+  // APP 能看到（spec 已明示限制 + buildCommentsHtml 加可见性标注）。
 }
 
 // ---------------------------------------------------------------------------

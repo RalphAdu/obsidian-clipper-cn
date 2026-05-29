@@ -72,4 +72,44 @@ describe('postProcessExtractorMarkdown', () => {
 		const input = 'item \\[1\\] only, not a footnote';
 		expect(postProcessExtractorMarkdown(input)).toBe('item \\[1\\] only, not a footnote');
 	});
+
+	// audio embed: turndown emits ![](url.m4a) for <img> tags pointing at audio
+	// files, but Obsidian's image-embed only renders image MIME — audio URLs
+	// hit broken-image icon. Convert to <audio controls src=...> HTML so
+	// Obsidian renders an inline audio player.
+	it('converts audio image-embed to <audio> HTML (m4a)', () => {
+		const input = '![](https://media.xyzcdn.net/abc/X.m4a)';
+		expect(postProcessExtractorMarkdown(input)).toBe('<audio controls src="https://media.xyzcdn.net/abc/X.m4a"></audio>');
+	});
+
+	it('converts audio image-embed for all supported extensions', () => {
+		const exts = ['mp3', 'wav', 'ogg', 'webm', 'flac', '3gp', 'opus', 'oga'];
+		for (const ext of exts) {
+			const input = `![](https://e.com/a.${ext})`;
+			expect(postProcessExtractorMarkdown(input)).toBe(
+				`<audio controls src="https://e.com/a.${ext}"></audio>`
+			);
+		}
+	});
+
+	it('preserves alt text by ignoring it (audio embed needs URL only)', () => {
+		const input = '![my podcast](https://e.com/a.m4a)';
+		expect(postProcessExtractorMarkdown(input)).toBe('<audio controls src="https://e.com/a.m4a"></audio>');
+	});
+
+	it('does not touch image embeds (png/jpg etc)', () => {
+		const input = '![](https://e.com/a.png)';
+		expect(postProcessExtractorMarkdown(input)).toBe('![](https://e.com/a.png)');
+	});
+
+	it('does not touch inline audio embed (mid-line, not standalone)', () => {
+		// Inline audio inside a paragraph stays as image-embed (rare in practice)
+		const input = 'prefix ![](https://e.com/a.m4a) suffix';
+		expect(postProcessExtractorMarkdown(input)).toBe('prefix ![](https://e.com/a.m4a) suffix');
+	});
+
+	it('handles audio embed in multi-line markdown', () => {
+		const input = '# Title\n\n![](https://e.com/a.m4a)\n\nbody';
+		expect(postProcessExtractorMarkdown(input)).toBe('# Title\n\n<audio controls src="https://e.com/a.m4a"></audio>\n\nbody');
+	});
 });

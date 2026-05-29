@@ -967,6 +967,78 @@ Obsidian Reading View 把 outlook 渲染为 gmail 的子项，丢失 sibling 关
 
 ---
 
+### 2.25 测试里 dayjs/Date 格式化输出被 host TZ 污染：setup module + ESM import 顺序 hook（template-integration TZ pin 反思，2026-05-29）
+
+#### 现象
+
+阿杜在 main 上跑 `npm test` 看到 `template-integration.test.ts` 3 个 fail：
+- `youtube` — `created: "2025-01-15T04:00:00-08:00"` (expected) vs `"...T20:00:00+08:00"` (received)，**同一 UTC instant，offset 不同**
+- `edge-cases` / `minimal` — defuddle fallback markup 漂移（多 `<body>` wrapper + 多 "Partial conversion completed with errors" 前缀）
+
+#### Root cause 1：dayjs 时区是 module-init 时锁住的
+
+`src/utils/shared.ts:242` `formatPropertyValue` date 路径：
+
+```ts
+const d = dayjs(value);
+if (d.isValid()) {
+    return d.format(type === 'date' ? 'YYYY-MM-DD' : 'YYYY-MM-DDTHH:mm:ssZ');
+}
+```
+
+`Z` token 取的是 dayjs **module init 时** 的本地时区 offset（`Date.prototype.getTimezoneOffset()`），**不**是 `.format()` 调用时再读 `process.env.TZ`。所以：
+
+- fixture 当年在 UTC-8 机器（上游 PST CI？）上录，写死 `-08:00`
+- 现在跑在 `Asia/Shanghai` (UTC+8)，自然输出 `+08:00`
+- 任何换机器、换 CI 时区都会让 fixture 漂
+
+`vi.useFakeTimers({ now: ... })` 只冻结 UTC instant 不冻结 TZ。`process.env.TZ='UTC'` 放 `beforeAll` **晚了**—— shared.ts 在 test file import 时就 transitively pulled dayjs 进来，dayjs 那时已读完系统 TZ。
+
+#### Root cause 2：defuddle 升级改了 unparseable HTML 的 fallback
+
+edge-cases / minimal 是"故意让 defuddle 解析不出有效正文"的 fixture，覆盖 fallback 路径。新版 defuddle：
+- 给原 HTML 加 `<body>...</body>` wrapper 重新序列化（吃掉 attribute、normalize whitespace）
+- 前置 `Partial conversion completed with errors. Original HTML:` 提示语
+
+expected/*.md 还是旧版 defuddle 产出，自然字节不匹配。这是低频升级触发，**不**是格式 contract bug。
+
+#### 修复
+
+1. **`src/utils/__test-setup__/freeze-tz.ts`** (新文件)：单行 `process.env.TZ = 'UTC';`
+2. **`template-integration.test.ts` 第一行**：`import './__test-setup__/freeze-tz';`（在 `from 'vitest'` 之前）
+
+ESM 规范保证依赖模块**先 evaluate**：`freeze-tz` → `shared` (dayjs import 此刻看到 UTC) → test body。验证：重录后 `created: "2025-01-15T12:00:00+00:00"`。
+
+3. **重录 `expected/{edge-cases,minimal,youtube}.md`**：`rm` 三文件 + `UPDATE_FIXTURES=1 npx vitest run`，触发测试代码 line 143-148 `if (!expected && process.env.UPDATE_FIXTURES)` 自动生成路径。
+
+#### 踩坑过程
+
+第一版我图省事把 `process.env.TZ = 'UTC'` 放在 `beforeAll`，重录后 youtube 还是 `+08:00`。再做 Node minimal repro：
+
+```js
+// 案 A: TZ 设在 require 之前 → dayjs Z = +00:00 ✓
+process.env.TZ='UTC'; const dayjs=require('dayjs');
+console.log(dayjs('2025-01-15T12:00:00Z').format('Z'));
+
+// 案 B: dayjs require 之后再改 process.env.TZ → dayjs Z 还是 +08:00 ✗
+```
+
+确认 dayjs 在 module init 时就 cache 了 TZ offset。所以必须用 ESM import order hook。
+
+#### 教训
+
+1. **测试涉及 dayjs/Date format 必须用 setup module pin TZ**：`process.env.TZ` 必须在 dayjs 被 transitive import 之前生效，否则 fixture 被锁在录制机器的 TZ 上。Pattern：建立一个 `__test-setup__/freeze-tz.ts` 单 statement file，在 test file **第一行 import**。ESM 模块依赖顺序保证 hook 早于消费者
+2. **`vi.useFakeTimers` 不是 timezone freeze**：它冻结 UTC instant，**不**冻结输出 offset。两件事
+3. **测试的 noise red 必须根因到底**：3 个 fail 看似都是 fixture 过期，深挖才发现 youtube 是 TZ pin 缺失（**真 bug**，跨机器都会复现）、edge-cases/minimal 是 defuddle fallback 升级（**fixture 老化**）。不要混为一谈一刀切重录，要分别对待 root cause
+4. **`UPDATE_FIXTURES=1` 只在 expected 不存在时写回**：要重录必须 `rm` 老文件，否则脚本会 throw "No expected output, run with UPDATE_FIXTURES=1" 即便 env var 已设。`saveExpected` 在 `if (!expected)` 分支里
+
+#### 关联
+
+- 跟 [§2.18 vitest audit 与浏览器 runtime 等价性] 一脉相承：都是测试稳定性比"看起来跑通了"更深一层
+- 跟 [§2.16 编码 helper 必须跨 path 共享] 类似：module init 时机决定行为
+
+---
+
 ## 3. 用户偏好 / 协作约定
 
 - **语言**：中文（包含技术解释、报告）

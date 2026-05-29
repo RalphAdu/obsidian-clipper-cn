@@ -43,6 +43,7 @@ import {
   extractBuyerInfo,
   extractStats,
   extractCbexTopFields,
+  extractBdwjsHtml,
 } from './cbex-extractor';
 import { parseHTML } from 'linkedom';
 
@@ -139,5 +140,18 @@ describe('top-level field extractors', () => {
     expect(result.prices.final_price).toBe(30000);
     expect(result.stats.bid_count).toBe(265);
     expect(result.buyer.lottery_code).toBe('6035100088419');
+  });
+});
+
+describe('extractBdwjsHtml', () => {
+  it('decodes HTML-encoded content of #content_BDWJS textarea', () => {
+    const html = `<html><body><textarea id="content_BDWJS">&lt;p&gt;hello&lt;/p&gt;&lt;img src="/foo.jpg"&gt;</textarea></body></html>`;
+    const { document: doc } = parseHTML(html);
+    expect(extractBdwjsHtml(doc)).toBe('<p>hello</p><img src="/foo.jpg">');
+  });
+
+  it('returns empty string if textarea missing', () => {
+    const { document: doc } = parseHTML('<html></html>');
+    expect(extractBdwjsHtml(doc)).toBe('');
   });
 });

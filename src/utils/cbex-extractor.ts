@@ -209,3 +209,20 @@ export function extractCbexTopFields(doc: ParentNode): CbexTopFields {
 		stats: extractStats(doc),
 	};
 }
+
+export function extractBdwjsHtml(doc: ParentNode): string {
+	const ta = doc.querySelector('#content_BDWJS') as HTMLTextAreaElement | null;
+	if (!ta) return '';
+	// In a real browser, textarea.value returns decoded HTML (entities resolved).
+	// In linkedom (test env), .value is not decoded — fall back to decoding via
+	// a temp div's innerHTML→textContent trick which works in both environments.
+	const raw = ((ta as unknown as { value?: string }).value ?? ta.textContent ?? '').trim();
+	if (!raw) return '';
+	// If the content contains HTML entities, decode them using a temp element.
+	if (raw.includes('&lt;') || raw.includes('&amp;') || raw.includes('&gt;')) {
+		const d = (doc as unknown as Document).createElement('div');
+		d.innerHTML = raw;
+		return (d.textContent ?? '').trim();
+	}
+	return raw;
+}

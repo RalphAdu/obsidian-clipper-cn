@@ -3133,3 +3133,63 @@ JSON-LD `datePublished` 是 ISO datetime `2025-06-18T07:30:00.000Z`，Obsidian P
 
 **两条规则在 xiaoyuzhou 也适用**：bridge 双 wire + caller pipeline mirror。本次的新增维度：**Obsidian PC virtualization 也是 ship gate 的盲区**，e2e 检测不到（e2e 不 mount audio + 滚动）。未来涉及"audio / video / 长时活动 DOM" 的 extractor 必须**实测 Obsidian PC scroll 行为**作为 ship gate 的一部分。
 
+### 2.26 cbex 反思：extractor 必须输出 HTML（不能输出 markdown）+ Defuddle 剔 `<p><img/></p>` 装饰图 + tab UI 让标准 audit-extractor-ship 不适用（cbex/jpxkc-extractor ship 反思，2026-05-29）
+
+**Context**：北京产权交易所京牌小客车司法处置（`jpxkc.cbex.com/jpxkc/prj/detail/*.html`）专项 extractor ship，URL `522611` + `522884` 两个状态对照。17 commits / 16-task TDD plan + subagent-driven-development 执行 / 3 个 round-trip bug 修复后 1 轮验收通过。
+
+#### 教训 A：extractor 输出形态必须跟其他 extractor 对齐（HTML，不是 markdown）
+
+**踩坑**：Task 11 main entry `extractCbexStructuredContent` 一开始让我写成"直接拼 markdown body"（`# 标题\n## 关键信息\n| 项目 | 内容 |\n...`），返回 `content: markdownBody`。**测试全 pass 但 e2e clip 全坏**：
+
+- Frontmatter 渲染正常
+- Body 全部 squash 成几行长字符串：`\# 京NC6575别克牌... ## 关键信息 | 项目 | 内容 | |---|...` —— 换行被吃、`#` 被 escape、表格散架。
+
+**root cause**：downstream 两条路径（`content-extractor.ts:164` popup path + `content.ts:799` bridge path）都跑 `createMarkdownContent(content, currentUrl)` 把 `result.content` 当 HTML 喂 Defuddle 转 markdown。我们的 markdown 被 Defuddle 当文本 + escape special chars → 输出无意义。
+
+**fix**（commit `8629d532`）：rewrite `extractCbexStructuredContent` 输出 HTML body（跟 xiaoyuzhou/scys/feishu 一致）：
+- `<h1>{title}</h1>` 替换 `# 标题`
+- `<h2>关键信息</h2>` + HTML `<table>...</table>` 替换 markdown `## 关键信息 | 项目 |...`
+- ct1/ct4/ct5/ct6/ct7/ct8 直接嵌 raw HTML fragment（不做 fragment→markdown 预转换）
+- ct2 images 用 `<figure><img/></figure>` 包装（见教训 B）
+- 加一个新 helper `buildKeyInfoTableHtml(input)` 跟 markdown 版 `buildKeyInfoTable` 并存
+
+**字段收紧**：未来新 extractor 写 main entry **必须先看 xiaoyuzhou-extractor.ts 的 `extractXiaoyuzhouStructuredContent` 末尾几行**确认 `content` 字段是 HTML。spec/plan 阶段把 `content: ...` 类型显式标注 `string (HTML)` 而不是模糊的 `string (markdown)`。
+
+#### 教训 B：Defuddle 的 Readability cleaner 剔 `<p><img/></p>` 装饰图，得用 `<figure>` 才保住
+
+**踩坑**：教训 A fix 后，ct2 图片展示 section 仍然空 —— `## 图片展示\n\n## 司法处置公告` 中间什么都没有。
+
+**root cause**：Defuddle 的 Readability-style cleaner 把孤立 `<p><img src="..." alt="" /></p>` 当装饰元素 strip。我尝试加非空 alt（`alt="标的物图1"`）仍被剔。
+
+**fix**（commit `e40dc2d8`）：换 `<figure><img/></figure>` 包装 —— Defuddle 把 `<figure>` 当语义内容保留。`<figure>` + alt（不需要 figcaption）就够，最终 markdown 输出 `![标的物图1](url)` 一图一行清晰。
+
+**字段收紧**：未来 extractor 嵌图必须用 `<figure>`，不要 `<p><img/></p>` 或裸 `<img/>`。如果 Defuddle 还有别的 strip 模式（icon-only / size 阈值 / 等），现 case 没踩到但未来要警惕。
+
+#### 教训 C：tab UI（lazy load + 默认只显示一个）让标准 `audit-extractor-ship` 框架不适用
+
+**踩坑**：T5-2 跑 `audit-prepare.sh` 给 522611 + 522884 各采集 browser + obsidian + grid，**两个 audit-prepare 都 hang 10+ 分钟无输出**。
+
+**root cause**：
+- cbex 页面默认只渲染 ct1 标的物介绍 + 关键信息一个 tab，其它 tab（ct2/ct4/ct7/ct8）lazy-load click 才填充
+- browser-scroll-capture 滚整页只能看到 ct1 + 默认信息，看不到我们抽的 8 个 section 全集
+- obsidian-scroll-capture 看到 8 个 section 完整内容
+- sbs grid 比对 "obsidian 有 / browser 无" 必然全是 mismatch —— 框架"找差异"的设计在 tab UI 上不公平
+
+**fix**（这一 ship round）：跳 `audit-extractor-ship`，改做"markdown 结构 + 关键字段对照"的轻量验收 —— manually grep `^## ` / 图片数 / frontmatter / 关键信息表所有行，对照实际页面字段。两 URL 全 pass。
+
+**字段收紧**：未来如果有更多 tab-UI 类站点（产权交易所 / 政府公告 / 大企业官网），ship 时**默认跳标准 audit-extractor-ship，改做 markdown 结构对照**。除非把 browser-scroll-capture 加 `--pre-click` 把所有 tab 提前点开（类似 xiaoyuzhou 自动展开 shownote 的 `--pre-click .expand-wrap`），让 browser 跟 obsidian 都全展开比较。
+
+#### 附带工具改进
+
+| 工具 | 用途 | commit |
+|---|---|---|
+| `scripts/dump-cbex-hydrated.ts` | Playwright 抓 hydrated DOM 落本地（raw curl 不行 —— cbex 大量 class `state_mark` / `bd_detail_info` 等是客户端 JS 渲染的，curl 看不到）| `6ea6f27` |
+| `scripts/dump-cbex-xhr.ts` | hook XHR 抓 ct4/ct7/ct8 endpoint 响应作 fixture | `6ea6f27` |
+| `scripts/clip-to-vault.ts` | runRealClip + 直接写到 vault md 文件（绕开 obsidian 主进程交互，方便 audit 准备） | `df8a65f` |
+
+#### 与之前反思的对照
+
+- 跟 [2026-05-18 BACKLOG §2.18 weixin SPA hydration]：客户端 JS 渲染状态 ≠ raw curl HTML —— 本次同样踩，必须 Playwright 抓 hydrated 才能拿到 fixture 全状态
+- 跟 [2026-05-27 weixin mdnice]：bridge 双 wire（origin 白名单 + routing 分支 + frontmatter 注入）三处都要改 —— 本次也踩了，Task 14 实施者发现 bridge 漏 cbex-specific `subject_id` frontmatter 注入再补上
+- 跟 [2026-05-29 xiaoyuzhou Obsidian PC virtualization]：T5-4 还是必须开 Obsidian 真截图 —— 本次因为 cbex 没 audio/复杂动态元素，markdown 结构 + 用户手 open 验收够了
+

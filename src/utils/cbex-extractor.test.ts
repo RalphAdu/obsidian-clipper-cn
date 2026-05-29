@@ -271,3 +271,53 @@ describe('ct8 fragment to markdown', () => {
     expect(md).toContain('30,000.00');
   });
 });
+
+import { buildCbexFrontmatter } from './cbex-extractor';
+
+describe('buildCbexFrontmatter', () => {
+  it('emits all fields when complete (竞价结束成交)', () => {
+    const yaml = buildCbexFrontmatter({
+      title: '京NC6575别克牌SGM6527AT蓝小型汽车',
+      url: 'https://jpxkc.cbex.com/jpxkc/prj/detail/522611.html',
+      subject_id: '202512NC6575',
+      status: '竞价结束',
+      final_price: 30000,
+      start_price: 20000,
+      assess_price: 20000,
+      cap_price: 30000,
+      deposit: 20000,
+      bid_start: '2025-12-15 08:00',
+      signup_end: '2025-12-12 15:00',
+      bid_count: 265,
+      followers: 411,
+      views: 124477,
+      created: '2026-05-29',
+    });
+    expect(yaml).toContain('source: cbex');
+    expect(yaml).toContain('subject_id: "202512NC6575"');
+    expect(yaml).toContain('final_price: 30000');
+    expect(yaml).toContain('status: 竞价结束');
+    expect(yaml.startsWith('---\n')).toBe(true);
+    expect(yaml.endsWith('---\n')).toBe(true);
+  });
+
+  it('omits absent optional fields (报价中, no final_price/assess_price)', () => {
+    const yaml = buildCbexFrontmatter({
+      title: 'X',
+      url: 'https://jpxkc.cbex.com/jpxkc/prj/detail/123.html',
+      subject_id: '202501TEST',
+      status: '报价中',
+      start_price: 100,
+      cap_price: 200,
+      deposit: 100,
+      bid_start: '2026-01-01 08:00',
+      signup_end: '2025-12-31 15:00',
+      bid_count: 0,
+      followers: 0,
+      views: 5,
+      created: '2026-05-29',
+    });
+    expect(yaml).not.toContain('final_price');
+    expect(yaml).not.toContain('assess_price');
+  });
+});

@@ -292,3 +292,49 @@ export function ct7FragmentToMarkdown(fragment: string, baseUrl: string): string
 export function ct8FragmentToMarkdown(fragment: string, baseUrl: string): string {
 	return createMarkdownContent(fragment, baseUrl).trim();
 }
+
+// ── Frontmatter YAML builder (Task 9) ────────────────────────────────────────
+
+export interface CbexFrontmatterInput {
+	title: string;
+	url: string;
+	subject_id: string;
+	status: string;
+	start_price?: number;
+	assess_price?: number;
+	cap_price?: number;
+	deposit?: number;
+	final_price?: number;
+	bid_start: string;
+	signup_end: string;
+	bid_count: number;
+	followers: number;
+	views: number;
+	created: string;
+}
+
+function yamlEscape(s: string): string {
+	return `"${s.replace(/"/g, '\\"')}"`;
+}
+
+export function buildCbexFrontmatter(input: CbexFrontmatterInput): string {
+	const lines: string[] = ['---'];
+	lines.push(`title: ${yamlEscape(input.title)}`);
+	lines.push(`url: ${yamlEscape(input.url)}`);
+	lines.push(`source: cbex`);
+	lines.push(`subject_id: ${yamlEscape(input.subject_id)}`);
+	lines.push(`status: ${input.status}`);
+	if (input.final_price !== undefined) lines.push(`final_price: ${input.final_price}`);
+	if (input.start_price !== undefined) lines.push(`start_price: ${input.start_price}`);
+	if (input.assess_price !== undefined) lines.push(`assess_price: ${input.assess_price}`);
+	if (input.cap_price !== undefined) lines.push(`cap_price: ${input.cap_price}`);
+	if (input.deposit !== undefined) lines.push(`deposit: ${input.deposit}`);
+	lines.push(`bid_start: ${yamlEscape(input.bid_start)}`);
+	lines.push(`signup_end: ${yamlEscape(input.signup_end)}`);
+	lines.push(`bid_count: ${input.bid_count}`);
+	lines.push(`followers: ${input.followers}`);
+	lines.push(`views: ${input.views}`);
+	lines.push(`created: ${input.created}`);
+	lines.push('---');
+	return lines.join('\n') + '\n';
+}

@@ -44,6 +44,12 @@ import { createHash } from 'node:crypto';
 
 const BOTTOM_RUN = 3;
 const MIN_FRAMES = 5;
+// Size tolerance for "same frame" detection — Strict md5 equality fails on
+// pages with running animations (e.g. xiaoyuzhou audio player progress bar
+// alternates 1-3 bytes per frame at the bottom). 500-byte band catches the
+// player widget pixel jitter while still rejecting any real content scroll
+// (which typically changes 10KB+).
+const BOTTOM_SIZE_TOLERANCE = 500;
 
 const args = process.argv.slice(2);
 let url = '';
@@ -51,6 +57,7 @@ let profileDir: string | undefined;
 let maxPages = 1000;
 let scrollSelector: string | undefined;
 let contentSelector: string | null = null;
+const preClicks: string[] = [];
 
 for (let i = 0; i < args.length; i++) {
 	const a = args[i];
@@ -58,11 +65,12 @@ for (let i = 0; i < args.length; i++) {
 	else if (a === '--max') maxPages = Number(args[++i]);
 	else if (a === '--scroll-selector') scrollSelector = args[++i];
 	else if (a === '--content-selector') contentSelector = args[++i];
+	else if (a === '--pre-click') preClicks.push(args[++i]);
 	else if (!url) url = a;
 }
 
 if (!url) {
-	console.error('Usage: browser-scroll-capture.ts <url> [--profile <dir>] [--max <n>]');
+	console.error('Usage: browser-scroll-capture.ts <url> [--profile <dir>] [--max <n>] [--pre-click <css-or-text>]...');
 	process.exit(2);
 }
 
@@ -96,6 +104,21 @@ console.log(`==> Output dir: ${outDir}`);
 		await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 	});
 	await page.waitForTimeout(2000);
+
+	// Pre-click expanders BEFORE lazy-load scroll. Some sites (xiaoyuzhou)
+	// fold the shownote behind a "展开 Show Notes" button — without
+	// clicking, only ~250px of article is visible and grid comparison
+	// against the full Obsidian render becomes meaningless.
+	// Accepts both CSS (`.expand-wrap`) and playwright text (`text=展开`).
+	for (const sel of preClicks) {
+		console.log(`==> Pre-click: ${sel}`);
+		try {
+			await page.locator(sel).first().click({ timeout: 5_000 });
+			await page.waitForTimeout(800);
+		} catch (e) {
+			console.warn(`[WARN] pre-click "${sel}" failed: ${(e as Error).message}`);
+		}
+	}
 
 	// String-based evaluate so tsx/esbuild __name helper doesn't leak into the page context.
 	console.log(`==> Scrolling to bottom in chunks to trigger lazy-load (max 60s)${scrollSelector ? ` [inner=${scrollSelector}]` : ''}`);
@@ -161,6 +184,7 @@ console.log(`==> Output dir: ${outDir}`);
 	// 2. viewport PageDown frames
 	console.log(`==> 2. PageDown frames (auto-stop at bottom, max=${maxPages}, run=${BOTTOM_RUN}, min=${MIN_FRAMES})`);
 	let prevHash = '';
+	let prevSize = 0;
 	let run = 0;
 	let final = 0;
 	let hitBottom = false;
@@ -196,7 +220,11 @@ console.log(`==> Output dir: ${outDir}`);
 		const hash = createHash('md5').update(buf).digest('hex');
 		const sz = buf.length;
 
-		if (prevHash && hash === prevHash) run++; else run = 0;
+		// "Same frame" = identical hash OR size within tolerance band. Tolerance
+		// captures running animations (audio player progress); strict hash
+		// captures byte-perfect identical frames (true bottom plateau).
+		const sameAsPrev = !!prevHash && (hash === prevHash || (prevSize > 0 && Math.abs(sz - prevSize) <= BOTTOM_SIZE_TOLERANCE));
+		if (sameAsPrev) run++; else run = 0;
 
 		if (i >= MIN_FRAMES && run >= BOTTOM_RUN - 1) {
 			console.log(`   ${idx}. ${path} (${sz} bytes) [BOTTOM — run of ${BOTTOM_RUN} identical frames]`);
@@ -213,6 +241,7 @@ console.log(`==> Output dir: ${outDir}`);
 		}
 		await page.waitForTimeout(500);
 		prevHash = hash;
+		prevSize = sz;
 		final = i;
 	}
 

@@ -48,8 +48,53 @@ function fixFencedCodeBacktickEscapes(markdown: string): string {
 	});
 }
 
+// Obsidian's image-embed syntax `![](url)` only renders inline <img> for image
+// MIME types. Audio file URLs (.m4a/.mp3/.wav/.ogg/.webm/.flac/.3gp) hit the
+// broken-image icon + filename fallback. Need real playable widget — use
+// HTML <audio>, wrapped in <div style="position:sticky">.
+//
+// Why sticky <div> wrap (not bare <audio>, not <iframe srcdoc>):
+//
+// Obsidian Reading View VIRTUALIZES the DOM (official forum 2024):
+//   "the first paragraphs are unloaded from the DOM, and the later paragraphs
+//    are loaded... This is the correct behavior, and cannot be disabled.
+//    A plugin could do it, but that's the only option."
+//   https://forum.obsidian.md/t/obsidian-reading-view-keeps-modifying-the-dom-in-long-notes/53709
+//
+// When the user scrolls past the audio, Obsidian unloads its parent paragraph
+// div. Plain <audio> dies → playback pauses on BOTH mobile and PC (verified
+// 2026-05-29 by reverting to bare <audio> — both platforms regressed).
+//
+// Sticky <div> wrapper saves MOBILE Obsidian: sticky positioning visually pins
+// the player to viewport top AND keeps the DOM node in layout flow, so the
+// virtualizer doesn't unload it. On mobile both behaviors engage.
+//
+// PC Obsidian Reading View: sticky positioning visually fails (parent layout
+// in the markdown sandbox bounds sticky to its own height); the player scrolls
+// out with the paragraph and Obsidian then unloads it → playback pauses.
+// This is per-platform Obsidian behavior, not markdown-fixable.
+//
+// <iframe srcdoc> was tested 2026-05-29 as a deeper workaround (sub-document
+// independent lifecycle?). Chromium-engine sandbox test (parent.removeChild +
+// re-insert) showed iframe's setInterval STOPPED during detach (0 ticks in 3s)
+// and re-loaded on re-attach (counter reset). iframe sub-document does NOT
+// survive parent detach at the engine level — so iframe is not a fix and adds
+// complexity. Reverted.
+//
+// Canonical PC workaround: install an Audio Player plugin (per Obsidian
+// forum consensus). Not addressed in this extractor.
+const AUDIO_IMAGE_EMBED_RE = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:m4a|mp3|wav|ogg|webm|flac|3gp|opus|oga))\)$/gm;
+const AUDIO_WRAPPER_STYLE = 'position:sticky;top:0;z-index:100;background:var(--background-primary);padding:4px 0';
+
+function convertAudioImageEmbedToHtml(markdown: string): string {
+	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) =>
+		`<div style="${AUDIO_WRAPPER_STYLE}"><audio controls src="${url}" style="width:100%"></audio></div>`
+	);
+}
+
 export function postProcessExtractorMarkdown(markdown: string): string {
 	const calloutsFixed = markdown.replace(OBSIDIAN_CALLOUT_MARKER_RE, '[!$1]');
 	const footnotesFixed = calloutsFixed.replace(FOOTNOTE_MARKER_RE, '[^$1]');
-	return fixFencedCodeBacktickEscapes(footnotesFixed);
+	const fencesFixed = fixFencedCodeBacktickEscapes(footnotesFixed);
+	return convertAudioImageEmbedToHtml(fencesFixed);
 }

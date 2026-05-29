@@ -42,15 +42,29 @@ shift 3
 RUN_ID=""
 PROFILE=""
 SCROLL_SEL=""
+PRE_CLICKS=()
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--run-id) RUN_ID="$2"; shift 2 ;;
 		--profile) PROFILE="$2"; shift 2 ;;
 		--scroll-selector) SCROLL_SEL="$2"; shift 2 ;;
+		--pre-click) PRE_CLICKS+=("$2"); shift 2 ;;
 		*) echo "[FATAL] unknown flag: $1" >&2; usage ;;
 	esac
 done
 [ -n "$RUN_ID" ] || usage
+
+# Per-host default pre-clicks — xiaoyuzhou hides full shownote behind
+# "展开 Show Notes" button (article wrapped in overflow:hidden div with
+# clientHeight=250 vs scrollHeight=45000). Without click, browser grid
+# captures only first ~250px and full-content comparison is useless.
+case "$URL" in
+	*xiaoyuzhoufm.com*)
+		# .expand-wrap matches the shownote expander (jsx-hash prefix is variable,
+		# but `expand-wrap` className is stable across builds).
+		PRE_CLICKS+=(".expand-wrap")
+		;;
+esac
 
 # url-slug: lowercase + non-alnum -> '-' + trim
 URL_SLUG=$(echo "$URL" | tr '[:upper:]' '[:lower:]' | sed 's|^https\{0,1\}://||' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
@@ -84,8 +98,13 @@ else
 		*scys.com*)            CONTENT_ARG=(--content-selector ".feishu-doc-content") ;;
 		*mp.weixin.qq.com*)    CONTENT_ARG=(--content-selector "#js_content") ;;
 	esac
+	# Build pre-click flags: --pre-click <sel> repeated per selector
+	PRE_CLICK_ARGS=()
+	for sel in "${PRE_CLICKS[@]:-}"; do
+		[ -n "$sel" ] && PRE_CLICK_ARGS+=(--pre-click "$sel")
+	done
 	# browser-scroll-capture 自己生成 /tmp/browser-scroll-<ts>/，我们之后 cp 过来
-	npx tsx scripts/browser-scroll-capture.ts "$URL" ${PROFILE_ARG[@]+"${PROFILE_ARG[@]}"} ${SCROLL_ARG[@]+"${SCROLL_ARG[@]}"} ${CONTENT_ARG[@]+"${CONTENT_ARG[@]}"} 2>&1 | tee "/tmp/audit-${RUN_ID}-browser.log"
+	npx tsx scripts/browser-scroll-capture.ts "$URL" ${PROFILE_ARG[@]+"${PROFILE_ARG[@]}"} ${SCROLL_ARG[@]+"${SCROLL_ARG[@]}"} ${CONTENT_ARG[@]+"${CONTENT_ARG[@]}"} ${PRE_CLICK_ARGS[@]+"${PRE_CLICK_ARGS[@]}"} 2>&1 | tee "/tmp/audit-${RUN_ID}-browser.log"
 	# 找最新的 /tmp/browser-scroll-* 目录
 	LATEST=$(ls -td /tmp/browser-scroll-* 2>/dev/null | head -1)
 	[ -d "$LATEST" ] || { echo "[FATAL] browser-scroll-capture didn't produce output dir" >&2; exit 3; }

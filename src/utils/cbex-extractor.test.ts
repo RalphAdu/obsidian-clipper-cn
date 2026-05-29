@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isCbexPrjDetailUrl, parseCbexUrl, ct4FragmentToMarkdown, ct7FragmentToMarkdown, ct8FragmentToMarkdown, buildKeyInfoTable } from './cbex-extractor';
+import { isCbexPrjDetailUrl, parseCbexUrl, ct4FragmentToMarkdown, ct7FragmentToMarkdown, ct8FragmentToMarkdown, buildKeyInfoTable, extractCbexStructuredContent } from './cbex-extractor';
 
 describe('isCbexPrjDetailUrl', () => {
   it('matches jpxkc.cbex.com prj detail URLs', () => {
@@ -321,8 +321,6 @@ describe('buildCbexFrontmatter', () => {
     expect(yaml).not.toContain('assess_price');
   });
 });
-
-import { buildKeyInfoTable, extractCbexStructuredContent } from './cbex-extractor';
 
 describe('extractCbexStructuredContent (integration)', () => {
   it('returns structured fields + assembled markdown using fixtures', async () => {

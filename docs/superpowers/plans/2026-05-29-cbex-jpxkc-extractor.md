@@ -260,55 +260,14 @@ git commit -m "feat(cbex): extractCbexParams (bdid/cpdm/zgxj/jjcc from inline sc
 
 **Files:**
 - Modify: `src/utils/cbex-extractor.ts`
-- Test: `src/utils/cbex-extractor.test.ts`
-- Create: `src/utils/cbex-extractor.fixture.html`
+- Modify: `src/utils/cbex-extractor.test.ts`
+- Use existing fixture: `src/utils/cbex-extractor.fixture.html` (already committed — full hydrated DOM of 522611, captured via `scripts/dump-cbex-hydrated.ts`)
 
-- [ ] **Step 4.1: Capture top-level DOM fixture**
+- [ ] **Step 4.1: Use the pre-captured hydrated fixture**
 
-Save to `src/utils/cbex-extractor.fixture.html` a hand-trimmed HTML snippet covering the `.bd_detail_head` block plus the `.bd_detail_money_box`-equivalent block (you'll grep for the exact class via DevTools on the real page). Include enough text-node noise (e.g. the "报名及保证金报名费交纳截止时间：" line, "竞价开始时间：" line, "买受人摇号编码:" etc.) for the regex helpers to work against. ~300 lines is fine.
+The fixture `src/utils/cbex-extractor.fixture.html` is the full hydrated DOM of `https://jpxkc.cbex.com/jpxkc/prj/detail/522611.html` (~164KB). It was captured via `scripts/dump-cbex-hydrated.ts` after the page hydrated all client-side AJAX (so `state_mark`, `bd_detail_info` with prices, buyer info, etc. are all populated — they are NOT present in raw server HTML; this mirrors BACKLOG §2.18 weixin lesson). Do NOT re-capture or hand-trim — use as-is.
 
-**Reference page elements to include** (drawn from 522611.html DOM walk done during brainstorm):
-
-```html
-<div class="bd_detail_head">
-  <div class="bd_detail_scroll">...</div>
-  <div class="bd_detail_head_rt">
-    <div class="jp_detail_bjnum"><span>265</span></div>
-    <div class="bd_detail_title">
-      <p class="bd_detail_name">京NC6575别克牌SGM6527AT蓝小型汽车</p>
-      <p class="bd_detail_num">标的物编号：202512NC6575</p>
-    </div>
-    <div>
-      <div class="bd_detail_state_over jp_detail_state_ove">
-        <span class="state_mark">竞价结束</span>
-        <span class="fwb">结束时间：</span>
-        <span class="time_num">2025</span><span>年</span>
-        <span class="time_num">12</span><span>月</span>
-        <span class="time_num">15</span><span>日</span>
-        <span class="time_num">16</span><span>时</span>
-        <span class="time_num">00</span><span>分</span>
-        <span class="time_num">35</span><span>秒</span>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- 关键信息 block —— actual class TBD via DOM walk -->
-<div class="bd_detail_info">
-  <p>起始价：<span>¥ 20,000.00</span></p>
-  <p>评估价：<span>¥ 20,000.00</span></p>
-  <p>最高限价：<span>¥ 30,000.00</span></p>
-  <p>保证金：<span>¥ 20,000.00</span></p>
-  <p>本标的物成交价：<span>¥ 30,000.00</span></p>
-  <p>竞价开始时间：<span>2025.12.15 08:00</span></p>
-  <p>报名及保证金报名费交纳截止时间：<span>2025年12月12日15时00分（以到账为准）</span></p>
-  <p>买受人摇号申请编码：6035100088419</p>
-  <p>买受人摇号次数：87</p>
-  <p>买受人摇号注册时间：2011-01-02 13:23:21.364</p>
-  <p>关注：<span>411</span> 围观：<span>124477</span></p>
-</div>
-```
-
-(Adjust class names + text to match real DOM — open 522611.html in DevTools, copy outerHTML of relevant blocks.)
+Open the fixture and grep for the relevant class names to confirm selectors before writing helpers. E.g. `grep -nE 'bd_detail_name|state_mark|bd_detail_info|jp_detail_bjnum' src/utils/cbex-extractor.fixture.html | head -20`.
 
 - [ ] **Step 4.2: Write failing tests for each top-level extractor**
 

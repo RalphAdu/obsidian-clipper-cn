@@ -10,8 +10,9 @@
 
 **Reference URLs:**
 - Spec: `docs/superpowers/specs/2026-05-29-cbex-jpxkc-extractor-design.md`
-- Test URL #1 (status=竞价结束, 已成交): https://jpxkc.cbex.com/jpxkc/prj/detail/522611.html
-- Test URL #2 (status TBD via recon, e.g. 报价中 / 报名中): **Task 1.5 must find and document one**
+- Test URL #1 (status=竞价结束, 已成交, **有**买受人摇号信息): https://jpxkc.cbex.com/jpxkc/prj/detail/522611.html
+- Test URL #2 (status=竞价结束, 已成交, **无**买受人摇号信息): https://jpxkc.cbex.com/jpxkc/prj/detail/522884.html — covers buyer-field absence; if 报价中/报名中 URL becomes available later, add it as URL #3
+- **Currency symbol variant** discovered during recon: 522611 uses half-width `¥` (U+00A5); 522884 uses full-width `￥` (U+FFE5). The `parsePrice` regex in Task 4 must accept both (already does — the `¥?` is optional, value capture is digit-driven).
 
 **Recon Findings (frozen at 2026-05-29):**
 
@@ -1462,18 +1463,19 @@ describe('cbex extractor e2e (real chrome)', () => {
     expect(clip.markdown).toContain('成交价');
   }, 180_000);
 
-  it('clips a second-state page (报价中 / 报名中 — URL from Task 2.2)', async () => {
-    // After Task 2 fills in the second URL, paste it here.
-    const SECOND_URL = '__FILL_IN_FROM_TASK_2__';
-    if (SECOND_URL.includes('FILL_IN')) {
-      console.warn('Skipping second-state test — URL not yet recorded');
-      return;
-    }
-    const clip = await runRealClip(SECOND_URL, { wait: '.bd_detail_name', timeout: 120_000 });
+  it('clips a 竞价结束 page without buyer info (522884)', async () => {
+    const clip = await runRealClip(
+      'https://jpxkc.cbex.com/jpxkc/prj/detail/522884.html',
+      { wait: '.bd_detail_name', timeout: 120_000 },
+    );
+    expect(clip.markdown).toContain('京P61185北京现代牌BH6430AY黑色小型汽车');
+    expect(clip.markdown).toContain('subject_id: "202512P61185"');
     expect(clip.markdown).toContain('## 关键信息');
-    // 报价中 / 报名中: no final_price, no buyer rows expected
-    expect(clip.markdown).not.toContain('成交价');
+    // 成交价 present (this URL also sold), 但 buyer 字段缺省
+    expect(clip.markdown).toContain('成交价');
     expect(clip.markdown).not.toContain('买受人摇号编码');
+    expect(clip.markdown).not.toContain('买受人摇号次数');
+    expect(clip.markdown).not.toContain('买受人摇号注册时间');
   }, 180_000);
 });
 ```

@@ -28,3 +28,33 @@ describe('parseCbexUrl', () => {
     expect(parseCbexUrl('https://example.com/foo')).toBeNull();
   });
 });
+
+import { extractCbexParams } from './cbex-extractor';
+import { parseHTML } from 'linkedom';
+
+describe('extractCbexParams', () => {
+  it('extracts BDID, cpdm, zgxj, jjcc from inline scripts', () => {
+    const html = `<html><body>
+      <script>var foo = 1;
+      var bdid = "4185";
+      var cpdm = "522611";
+      var zgxj = "30000.00";
+      var jjcc = "1";
+      </script></body></html>`;
+    const { document: doc } = parseHTML(html);
+    expect(extractCbexParams(doc)).toEqual({ bdid: '4185', cpdm: '522611', zgxj: '30000.00', jjcc: '1' });
+  });
+
+  it('tolerates colon-style assignments (object literals)', () => {
+    const html = `<html><body>
+      <script>var opts = { BDID: 999, prjId: 111, cpdm: '777', zgxj: '20000.00', jjcc: '2' };</script></body></html>`;
+    const { document: doc } = parseHTML(html);
+    expect(extractCbexParams(doc)).toEqual({ bdid: '999', cpdm: '777', zgxj: '20000.00', jjcc: '2' });
+  });
+
+  it('returns null for any missing param', () => {
+    const html = `<html><body><script>var bdid = "4185";</script></body></html>`;
+    const { document: doc } = parseHTML(html);
+    expect(extractCbexParams(doc)).toBeNull();
+  });
+});

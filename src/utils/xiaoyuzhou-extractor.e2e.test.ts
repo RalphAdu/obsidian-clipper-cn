@@ -33,12 +33,12 @@ describe('xiaoyuzhou e2e — episode 6850d2ed', () => {
 		expect(clip.markdown).toMatch(/^episodeNumber: E112$/m);
 	});
 
-	it('body has HTML audio player embed at top (Obsidian renders <audio> as inline player)', () => {
-		// markdown-post-process converts ![](url.m4a) → <audio controls src="url"></audio>
-		// Mobile Obsidian plays continuously; PC Obsidian Reading View's virtual
-		// scroller may pause audio when its DOM unmounts off-screen — accept as
-		// upstream platform limitation, no inline CSS workaround.
-		expect(clip.markdown).toMatch(/<audio controls src="https:\/\/media\.xyzcdn\.net\/[^"]+\.m4a"><\/audio>/);
+	it('body has HTML audio player embed wrapped in sticky <div> (keeps DOM mounted during virtual scroll)', () => {
+		// markdown-post-process converts ![](url.m4a) → <div style="position:sticky..."><audio ...></audio></div>
+		// Sticky wrapper prevents Obsidian preview-view virtual scroller from unmounting
+		// off-screen <audio> DOM (which would pause playback). Mobile Obsidian: pins +
+		// plays; PC Obsidian: sticky may not visually engage but wrapper still helps.
+		expect(clip.markdown).toMatch(/<div style="[^"]*position:sticky[^"]*"><audio controls src="https:\/\/media\.xyzcdn\.net\/[^"]+\.m4a"[^>]*><\/audio><\/div>/);
 		// Negative assertion: stale `![](.m4a)` form must NOT survive post-process
 		expect(clip.markdown).not.toMatch(/!\[[^\]]*\]\([^)]+\.m4a\)/);
 	});

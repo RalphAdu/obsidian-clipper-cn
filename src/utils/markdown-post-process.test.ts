@@ -78,22 +78,30 @@ describe('postProcessExtractorMarkdown', () => {
 	// hit broken-image icon. Convert to <audio controls src=...> HTML so
 	// Obsidian renders an inline audio player.
 	//
-	it('converts audio image-embed to <audio> HTML (m4a)', () => {
+	// Sticky-wrapped <audio> keeps DOM mounted during virtual scroll (mobile
+	// Obsidian: visually pins + plays continuously; PC Obsidian: sticky may
+	// not visually engage but wrapper still helps audio survive scroll-out).
+	// Bare <audio> caused playback to pause on both platforms (2026-05-29 revert
+	// regression). Wrapper protects mobile playback at minimum.
+	const STICKY_WRAPPER_STYLE = 'position:sticky;top:0;z-index:100;background:var(--background-primary);padding:4px 0';
+	const wrap = (url: string) => `<div style="${STICKY_WRAPPER_STYLE}"><audio controls src="${url}" style="width:100%"></audio></div>`;
+
+	it('converts audio image-embed to wrapped <audio> HTML with sticky div (m4a)', () => {
 		const input = '![](https://media.xyzcdn.net/abc/X.m4a)';
-		expect(postProcessExtractorMarkdown(input)).toBe('<audio controls src="https://media.xyzcdn.net/abc/X.m4a"></audio>');
+		expect(postProcessExtractorMarkdown(input)).toBe(wrap('https://media.xyzcdn.net/abc/X.m4a'));
 	});
 
 	it('converts audio image-embed for all supported extensions', () => {
 		const exts = ['mp3', 'wav', 'ogg', 'webm', 'flac', '3gp', 'opus', 'oga'];
 		for (const ext of exts) {
 			const input = `![](https://e.com/a.${ext})`;
-			expect(postProcessExtractorMarkdown(input)).toBe(`<audio controls src="https://e.com/a.${ext}"></audio>`);
+			expect(postProcessExtractorMarkdown(input)).toBe(wrap(`https://e.com/a.${ext}`));
 		}
 	});
 
 	it('preserves alt text by ignoring it (audio embed needs URL only)', () => {
 		const input = '![my podcast](https://e.com/a.m4a)';
-		expect(postProcessExtractorMarkdown(input)).toBe('<audio controls src="https://e.com/a.m4a"></audio>');
+		expect(postProcessExtractorMarkdown(input)).toBe(wrap('https://e.com/a.m4a'));
 	});
 
 	it('does not touch image embeds (png/jpg etc)', () => {
@@ -109,6 +117,6 @@ describe('postProcessExtractorMarkdown', () => {
 
 	it('handles audio embed in multi-line markdown', () => {
 		const input = '# Title\n\n![](https://e.com/a.m4a)\n\nbody';
-		expect(postProcessExtractorMarkdown(input)).toBe('# Title\n\n<audio controls src="https://e.com/a.m4a"></audio>\n\nbody');
+		expect(postProcessExtractorMarkdown(input)).toBe(`# Title\n\n${wrap('https://e.com/a.m4a')}\n\nbody`);
 	});
 });

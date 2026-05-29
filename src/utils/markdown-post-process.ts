@@ -55,19 +55,27 @@ function fixFencedCodeBacktickEscapes(markdown: string): string {
 // supported way to render an external audio URL as a playable widget — Obsidian
 // passes block-level HTML through to the rendered view.
 //
-// Platform note: PC Obsidian (Reading View) uses a virtual scroller that
-// unmounts off-screen DOM nodes — when the user scrolls down past the audio
-// element, the <audio> node is destroyed and playback pauses. Mobile Obsidian
-// has no virtual scroller and plays continuously. We don't try to work around
-// the PC behavior here (sticky/fixed positioning was tried 2026-05-29 and
-// either failed to render or visually intrusive); accept it as upstream
-// Obsidian limitation. Future: encourage users to install an Audio Player
-// plugin if continuous background playback on PC is critical.
+// Wrapped in <div style="position:sticky"> for a key reason: Obsidian's
+// preview-view virtual scroller unmounts off-screen DOM nodes, which destroys
+// the <audio> element and pauses playback when user scrolls past it.
+// position:sticky keeps the wrapping <div> in layout flow as the viewport
+// scrolls, preventing the virtual scroller from unmounting the inner <audio>.
+// - Mobile Obsidian: sticky positioning visually pins player to viewport top
+//   AND keeps DOM mounted → continuous playback.
+// - PC Obsidian Reading View: sticky positioning visually fails (parent
+//   layout limitation in PC Obsidian markdown sandbox), but the wrapping
+//   <div> still stays in layout → some PC versions retain audio DOM and play
+//   continuously; others may still pause. Platform-dependent; accepted as
+//   upstream Obsidian Reading View limitation on PC.
+// Tried 2026-05-29 revert to bare <audio> — both mobile and PC then pause on
+// scroll, confirming the wrapper's value even when sticky doesn't visually
+// engage on PC.
 const AUDIO_IMAGE_EMBED_RE = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:m4a|mp3|wav|ogg|webm|flac|3gp|opus|oga))\)$/gm;
+const AUDIO_WRAPPER_STYLE = 'position:sticky;top:0;z-index:100;background:var(--background-primary);padding:4px 0';
 
 function convertAudioImageEmbedToHtml(markdown: string): string {
 	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) =>
-		`<audio controls src="${url}"></audio>`
+		`<div style="${AUDIO_WRAPPER_STYLE}"><audio controls src="${url}" style="width:100%"></audio></div>`
 	);
 }
 

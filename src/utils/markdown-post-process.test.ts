@@ -121,3 +121,101 @@ describe('postProcessExtractorMarkdown', () => {
 		expect(postProcessExtractorMarkdown(input)).toBe(`# Title\n\n${wrap('https://e.com/a.m4a')}\n\nbody`);
 	});
 });
+
+// X0nq feishu doc trigger (2026-05-29): turndown emits nested OL siblings with
+// monotonically increasing indent — the 2nd item gets an extra tab and obsidian
+// reading view renders it as a child of the 1st. Normalize back to siblings.
+describe('postProcessExtractorMarkdown — nested OL sibling indent', () => {
+	it("demotes 2nd OL sibling that turndown over-indented", () => {
+		const input = [
+			'1. outer',
+			'2. parent of nested',
+			'\t1. gmail',
+			'\t\t2. outlook',
+			'3. continue',
+		].join('\n');
+		const out = postProcessExtractorMarkdown(input);
+		expect(out).toBe([
+			'1. outer',
+			'2. parent of nested',
+			'\t1. gmail',
+			'\t2. outlook',
+			'3. continue',
+		].join('\n'));
+	});
+
+	it('demotes 3 over-indented siblings (real X0nq pattern)', () => {
+		const input = [
+			'\t1. first',
+			'\t\t2. second',
+			'\t\t3. third',
+			'\t\t4. fourth',
+		].join('\n');
+		const out = postProcessExtractorMarkdown(input);
+		expect(out).toBe([
+			'\t1. first',
+			'\t2. second',
+			'\t3. third',
+			'\t4. fourth',
+		].join('\n'));
+	});
+
+	it('preserves real nested-list start (marker resets to 1.)', () => {
+		const input = [
+			'1. parent',
+			'\t1. child first',
+			'\t2. child second',
+			'2. parent next',
+		].join('\n');
+		const out = postProcessExtractorMarkdown(input);
+		// no change — siblings are already at consistent indent
+		expect(out).toBe(input);
+	});
+
+	it('stops sequence at a non-blank non-list line', () => {
+		const input = [
+			'1. first',
+			'',
+			'paragraph between',
+			'\t2. should NOT be demoted (different sequence)',
+		].join('\n');
+		const out = postProcessExtractorMarkdown(input);
+		expect(out).toBe(input);
+	});
+
+	it('preserves blank line within a sequence', () => {
+		const input = [
+			'\t1. first',
+			'',
+			'\t\t2. second-over-indented-after-blank',
+		].join('\n');
+		const out = postProcessExtractorMarkdown(input);
+		expect(out).toBe([
+			'\t1. first',
+			'',
+			'\t2. second-over-indented-after-blank',
+		].join('\n'));
+	});
+
+	it('does not touch OL items inside fenced code blocks', () => {
+		const input = [
+			'```',
+			'1. raw',
+			'\t2. raw indented',
+			'```',
+			'',
+			'\t1. real',
+			'\t\t2. over-indented',
+		].join('\n');
+		const out = postProcessExtractorMarkdown(input);
+		expect(out).toBe([
+			'```',
+			'1. raw',
+			'\t2. raw indented',
+			'```',
+			'',
+			'\t1. real',
+			'\t2. over-indented',
+		].join('\n'));
+	});
+});

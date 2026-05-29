@@ -92,9 +92,61 @@ function convertAudioImageEmbedToHtml(markdown: string): string {
 	);
 }
 
+// Turndown emits nested OL siblings with monotonically increasing indentation:
+//   `1. first`             (indent N)
+//   `\t1. inner first`     (indent N+1)
+//   `\t\t2. inner second`  (indent N+2)  ← bug — should be N+1, same as item 1
+// Obsidian's reading-view renders the over-indented sibling as a child of the
+// first item, which loses the visual sibling relationship the source HTML
+// expressed (`<ol><li>...<ol><li>1st</li><li>2nd</li></ol></li></ol>`).
+// Normalize by demoting OL items whose marker is `prev+1` but indent is
+// greater than the previous item's: they're siblings, not children.
+//
+// Heuristic stops a sequence on any non-OL non-blank line. Fenced code blocks
+// are skipped (their indented content must not be touched).
+function normalizeNestedOlIndent(markdown: string): string {
+	const lines = markdown.split('\n');
+	let prevIndent = -1;
+	let prevNum = -1;
+	let inFence = false;
+	const fenceLine = /^(\s*)```/;
+	const olItem = /^(\t*)(\d+)\.\s/;
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (fenceLine.test(line)) {
+			inFence = !inFence;
+			prevIndent = -1;
+			prevNum = -1;
+			continue;
+		}
+		if (inFence) continue;
+
+		const m = line.match(olItem);
+		if (!m) {
+			if (line.trim() !== '') {
+				prevIndent = -1;
+				prevNum = -1;
+			}
+			continue;
+		}
+		const indent = m[1].length;
+		const num = parseInt(m[2], 10);
+		if (prevIndent >= 0 && num === prevNum + 1 && indent > prevIndent) {
+			lines[i] = '\t'.repeat(prevIndent) + line.slice(indent);
+			prevNum = num;
+		} else {
+			prevIndent = indent;
+			prevNum = num;
+		}
+	}
+	return lines.join('\n');
+}
+
 export function postProcessExtractorMarkdown(markdown: string): string {
 	const calloutsFixed = markdown.replace(OBSIDIAN_CALLOUT_MARKER_RE, '[!$1]');
 	const footnotesFixed = calloutsFixed.replace(FOOTNOTE_MARKER_RE, '[^$1]');
 	const fencesFixed = fixFencedCodeBacktickEscapes(footnotesFixed);
-	return convertAudioImageEmbedToHtml(fencesFixed);
+	const olNormalized = normalizeNestedOlIndent(fencesFixed);
+	return convertAudioImageEmbedToHtml(olNormalized);
 }

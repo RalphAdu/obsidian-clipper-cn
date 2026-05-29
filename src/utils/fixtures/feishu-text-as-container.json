@@ -1,0 +1,65 @@
+[
+  {
+    "block_id": "page",
+    "block_type": 1,
+    "page": { "elements": [], "style": { "align": 1 } },
+    "children": ["text_container", "tail_para"]
+  },
+  {
+    "block_id": "text_container",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "核心提示", "text_element_style": { "bold": true, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } },
+        { "text_run": { "content": "：top intro line.", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    },
+    "children": ["child_h2", "child_para", "child_ol"]
+  },
+  {
+    "block_id": "child_h2",
+    "block_type": 4,
+    "parent_id": "text_container",
+    "heading2": {
+      "elements": [
+        { "text_run": { "content": "Section A", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  },
+  {
+    "block_id": "child_para",
+    "block_type": 2,
+    "parent_id": "text_container",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "Plain child paragraph.", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  },
+  {
+    "block_id": "child_ol",
+    "block_type": 13,
+    "parent_id": "text_container",
+    "ordered": {
+      "elements": [
+        { "text_run": { "content": "First ordered item", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1, "folded": false, "sequence": "1" }
+    }
+  },
+  {
+    "block_id": "tail_para",
+    "block_type": 2,
+    "parent_id": "page",
+    "text": {
+      "elements": [
+        { "text_run": { "content": "Tail paragraph.", "text_element_style": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "inline_code": false } } }
+      ],
+      "style": { "align": 1 }
+    }
+  }
+]

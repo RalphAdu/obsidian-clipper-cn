@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { convertBlocksToHtml, resolveFeishuFiles, type FeishuBlock } from './feishu-extractor';
 import fixture from './fixtures/feishu-iframe-orderedlist.json';
 import sa5wFixture from './fixtures/feishu-sa5w-inline-block-source-synced.json';
+import textContainerFixture from './fixtures/feishu-text-as-container.json';
 
 const blocks = fixture as unknown as FeishuBlock[];
 
@@ -409,5 +410,35 @@ describe('resolveFeishuFiles — inline vs top-level placeholders', () => {
 		const out = resolveFeishuFiles(input, docUrl);
 		expect(out).toContain('<p>📎 <a href="https://my.feishu.cn/docx/DOC1#A">a.pdf</a></p>');
 		expect(out).toContain('<p>x <a href="https://my.feishu.cn/docx/DOC1#B">b.bat</a> y</p>');
+	});
+});
+
+// X0nq doc has a single root-level TEXT block whose own .text contains the
+// "核心提示：…" paragraph AND whose 82 children carry the rest of the doc.
+// Previously TEXT case only emitted `<p>` from its own text and silently
+// dropped children, losing ~98% of the doc.
+describe('convertBlocksToHtml — TEXT block as container (children recursion)', () => {
+	const tcBlocks = textContainerFixture as unknown as FeishuBlock[];
+
+	it("renders TEXT block's own text AND recursively renders its children", () => {
+		const html = convertBlocksToHtml(tcBlocks);
+		// Own text (with bold prefix)
+		expect(html).toContain('<p><strong>核心提示</strong>：top intro line.</p>');
+		// Children rendered after own paragraph
+		expect(html).toContain('<h2>Section A</h2>');
+		expect(html).toContain('<p>Plain child paragraph.</p>');
+		expect(html).toContain('<ol><li>First ordered item</li></ol>');
+		// Sibling (tail_para) still rendered
+		expect(html).toContain('<p>Tail paragraph.</p>');
+	});
+
+	it('preserves order: own paragraph first, then children, then siblings', () => {
+		const html = convertBlocksToHtml(tcBlocks);
+		const ownIdx = html.indexOf('top intro line');
+		const sectionIdx = html.indexOf('Section A');
+		const tailIdx = html.indexOf('Tail paragraph');
+		expect(ownIdx).toBeGreaterThan(-1);
+		expect(sectionIdx).toBeGreaterThan(ownIdx);
+		expect(tailIdx).toBeGreaterThan(sectionIdx);
 	});
 });

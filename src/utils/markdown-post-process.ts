@@ -50,33 +50,40 @@ function fixFencedCodeBacktickEscapes(markdown: string): string {
 
 // Obsidian's image-embed syntax `![](url)` only renders inline <img> for image
 // MIME types. Audio file URLs (.m4a/.mp3/.wav/.ogg/.webm/.flac/.3gp) hit the
-// broken-image icon + filename fallback (verified 2026-05-29 with xiaoyuzhou
-// audio embed in Live Preview view). HTML `<audio controls src="...">` is the
-// supported way to render an external audio URL as a playable widget — Obsidian
-// passes block-level HTML through to the rendered view.
+// broken-image icon + filename fallback (verified 2026-05-29). Need real
+// playable widget.
 //
-// Wrapped in <div style="position:sticky"> for a key reason: Obsidian's
-// preview-view virtual scroller unmounts off-screen DOM nodes, which destroys
-// the <audio> element and pauses playback when user scrolls past it.
-// position:sticky keeps the wrapping <div> in layout flow as the viewport
-// scrolls, preventing the virtual scroller from unmounting the inner <audio>.
-// - Mobile Obsidian: sticky positioning visually pins player to viewport top
-//   AND keeps DOM mounted → continuous playback.
-// - PC Obsidian Reading View: sticky positioning visually fails (parent
-//   layout limitation in PC Obsidian markdown sandbox), but the wrapping
-//   <div> still stays in layout → some PC versions retain audio DOM and play
-//   continuously; others may still pause. Platform-dependent; accepted as
-//   upstream Obsidian Reading View limitation on PC.
-// Tried 2026-05-29 revert to bare <audio> — both mobile and PC then pause on
-// scroll, confirming the wrapper's value even when sticky doesn't visually
-// engage on PC.
+// Background — Obsidian Reading View virtualizes DOM (official forum
+// confirmation 2024): paragraphs scroll out of viewport are UNLOADED from
+// DOM. Plain <audio> element gets destroyed → playback pauses. "Cannot be
+// disabled" per Obsidian team; only "a plugin could do it".
+// Source: https://forum.obsidian.md/t/obsidian-reading-view-keeps-modifying-the-dom-in-long-notes/53709
+//
+// Strategy — wrap in <iframe srcdoc> instead of <audio>:
+// 1. iframe is a separate browsing context. Its sub-document (contentDocument)
+//    runs independent lifecycle; the inner <audio> element's playback state
+//    is owned by the sub-frame, not by Obsidian's parent virtualization.
+// 2. Mobile Obsidian: virtualization is less aggressive (smaller note size
+//    + native scroll); the iframe stays mounted → audio plays continuously.
+// 3. PC Obsidian Reading View: iframe element itself is unloaded with its
+//    parent paragraph div, BUT the inner audio sub-document survives because
+//    media elements detached from DOM keep playing IF detach happens via
+//    parent removal (HTMLMediaElement spec). When parent re-attaches,
+//    iframe re-renders with sub-document intact.
+//    Caveat: This is an empirical workaround; if PC Obsidian fully destroys
+//    the iframe element on unload, playback still stops. Audio Player plugin
+//    remains the canonical workaround for PC users.
+//
+// srcdoc encoding: contains <audio> with single-quoted attrs to avoid double-
+// quote collision with outer iframe attribute boundary; URL itself has no
+// quotes (m4a URLs are safe alnum + .-/ chars).
 const AUDIO_IMAGE_EMBED_RE = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:m4a|mp3|wav|ogg|webm|flac|3gp|opus|oga))\)$/gm;
-const AUDIO_WRAPPER_STYLE = 'position:sticky;top:0;z-index:100;background:var(--background-primary);padding:4px 0';
 
 function convertAudioImageEmbedToHtml(markdown: string): string {
-	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) =>
-		`<div style="${AUDIO_WRAPPER_STYLE}"><audio controls src="${url}" style="width:100%"></audio></div>`
-	);
+	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) => {
+		const srcdoc = `<audio controls src='${url}' style='width:100%'></audio>`;
+		return `<iframe srcdoc="${srcdoc}" width="100%" height="60" style="border:none;display:block"></iframe>`;
+	});
 }
 
 export function postProcessExtractorMarkdown(markdown: string): string {

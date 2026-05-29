@@ -78,33 +78,22 @@ describe('postProcessExtractorMarkdown', () => {
 	// hit broken-image icon. Convert to <audio controls src=...> HTML so
 	// Obsidian renders an inline audio player.
 	//
-	// position:sticky keeps the player pinned to viewport top during scroll —
-	// otherwise Obsidian's virtual scroller unmounts off-screen audio and
-	// playback pauses.
-	const STICKY_STYLE = 'position:sticky;top:0;z-index:100;width:100%;background:var(--background-primary);padding:4px 0';
-
-	it('converts audio image-embed to <audio> HTML with sticky style (m4a)', () => {
+	it('converts audio image-embed to <audio> HTML (m4a)', () => {
 		const input = '![](https://media.xyzcdn.net/abc/X.m4a)';
-		expect(postProcessExtractorMarkdown(input)).toBe(
-			`<audio controls src="https://media.xyzcdn.net/abc/X.m4a" style="${STICKY_STYLE}"></audio>`
-		);
+		expect(postProcessExtractorMarkdown(input)).toBe('<audio controls src="https://media.xyzcdn.net/abc/X.m4a"></audio>');
 	});
 
 	it('converts audio image-embed for all supported extensions', () => {
 		const exts = ['mp3', 'wav', 'ogg', 'webm', 'flac', '3gp', 'opus', 'oga'];
 		for (const ext of exts) {
 			const input = `![](https://e.com/a.${ext})`;
-			expect(postProcessExtractorMarkdown(input)).toBe(
-				`<audio controls src="https://e.com/a.${ext}" style="${STICKY_STYLE}"></audio>`
-			);
+			expect(postProcessExtractorMarkdown(input)).toBe(`<audio controls src="https://e.com/a.${ext}"></audio>`);
 		}
 	});
 
 	it('preserves alt text by ignoring it (audio embed needs URL only)', () => {
 		const input = '![my podcast](https://e.com/a.m4a)';
-		expect(postProcessExtractorMarkdown(input)).toBe(
-			`<audio controls src="https://e.com/a.m4a" style="${STICKY_STYLE}"></audio>`
-		);
+		expect(postProcessExtractorMarkdown(input)).toBe('<audio controls src="https://e.com/a.m4a"></audio>');
 	});
 
 	it('does not touch image embeds (png/jpg etc)', () => {
@@ -120,8 +109,6 @@ describe('postProcessExtractorMarkdown', () => {
 
 	it('handles audio embed in multi-line markdown', () => {
 		const input = '# Title\n\n![](https://e.com/a.m4a)\n\nbody';
-		expect(postProcessExtractorMarkdown(input)).toBe(
-			`# Title\n\n<audio controls src="https://e.com/a.m4a" style="${STICKY_STYLE}"></audio>\n\nbody`
-		);
+		expect(postProcessExtractorMarkdown(input)).toBe('# Title\n\n<audio controls src="https://e.com/a.m4a"></audio>\n\nbody');
 	});
 });

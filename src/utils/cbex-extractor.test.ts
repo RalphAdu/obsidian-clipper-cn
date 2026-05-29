@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isCbexPrjDetailUrl, parseCbexUrl, ct4FragmentToMarkdown, ct7FragmentToMarkdown, ct8FragmentToMarkdown, buildKeyInfoTable, extractCbexStructuredContent } from './cbex-extractor';
+import { isCbexPrjDetailUrl, parseCbexUrl, ct4FragmentToMarkdown, ct7FragmentToMarkdown, ct8FragmentToMarkdown, buildKeyInfoTable, buildKeyInfoTableHtml, extractCbexStructuredContent } from './cbex-extractor';
 
 describe('isCbexPrjDetailUrl', () => {
   it('matches jpxkc.cbex.com prj detail URLs', () => {
@@ -345,14 +345,14 @@ describe('extractCbexStructuredContent (integration)', () => {
     expect(result.subject_id).toBe('202512NC6575');
     expect(result.status).toBe('竞价结束');
     expect(result.site).toBe('cbex');
-    expect(result.content).toContain('## 关键信息');
-    expect(result.content).toContain('## 标的物介绍');
-    expect(result.content).toContain('## 图片展示');
-    expect(result.content).toContain('## 司法处置公告');
-    expect(result.content).toContain('## 竞买须知');
-    expect(result.content).toContain('## 竞价记录');
-    expect(result.content).toContain('## 竞价结果');
-    expect(result.content).toContain('## 联系方式');
+    expect(result.content).toContain('<h2>关键信息</h2>');
+    expect(result.content).toContain('<h2>标的物介绍</h2>');
+    expect(result.content).toContain('<h2>图片展示</h2>');
+    expect(result.content).toContain('<h2>司法处置公告</h2>');
+    expect(result.content).toContain('<h2>竞买须知</h2>');
+    expect(result.content).toContain('<h2>竞价记录</h2>');
+    expect(result.content).toContain('<h2>竞价结果</h2>');
+    expect(result.content).toContain('<h2>联系方式</h2>');
   });
 
   it('throws if not a cbex URL', async () => {
@@ -413,5 +413,51 @@ describe('buildKeyInfoTable', () => {
     expect(md).not.toContain('成交价');
     expect(md).not.toContain('买受人');
     expect(md).not.toContain('评估价');
+  });
+});
+
+describe('buildKeyInfoTableHtml', () => {
+  it('renders HTML table with all rows when full state', () => {
+    const html = buildKeyInfoTableHtml({
+      subject_id: '202512NC6575',
+      status: '竞价结束',
+      start_price: 20000,
+      assess_price: 20000,
+      cap_price: 30000,
+      final_price: 30000,
+      deposit: 20000,
+      bid_start: '2025-12-15 08:00',
+      signup_end: '2025-12-12 15:00',
+      buyer: { lottery_code: '6035100088419', lottery_count: '87', lottery_registered: '2011-01-02 13:23' },
+      stats: { followers: 411, views: 124477, bid_count: 265 },
+    });
+    expect(html).toContain('<th>项目</th>');
+    expect(html).toContain('<th>内容</th>');
+    expect(html).toContain('<td>标的物编号</td><td>202512NC6575</td>');
+    expect(html).toContain('<td>起始价</td><td>¥20,000.00</td>');
+    expect(html).toContain('<td>成交价</td><td>¥30,000.00</td>');
+    expect(html).toContain('<td>买受人摇号编码</td><td>6035100088419</td>');
+    expect(html).toContain('<td>关注数</td><td>411</td>');
+    expect(html).toContain('<td>围观数</td><td>124477</td>');
+    expect(html).toContain('<td>报价次数</td><td>265</td>');
+    expect(html.startsWith('<table>')).toBe(true);
+    expect(html.endsWith('</table>')).toBe(true);
+  });
+
+  it('omits absent rows (报价中, no buyer)', () => {
+    const html = buildKeyInfoTableHtml({
+      subject_id: '202501X',
+      status: '报价中',
+      start_price: 100,
+      cap_price: 200,
+      deposit: 100,
+      bid_start: '2026-01-01 08:00',
+      signup_end: '2025-12-31 15:00',
+      buyer: {},
+      stats: { followers: 0, views: 0, bid_count: 0 },
+    });
+    expect(html).not.toContain('成交价');
+    expect(html).not.toContain('买受人');
+    expect(html).not.toContain('评估价');
   });
 });

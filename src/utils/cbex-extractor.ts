@@ -387,28 +387,19 @@ export async function extractCbexStructuredContent(
 
 	const baseUrl = new URL(url).origin;
 
-	// ct1 标的物介绍 (from hidden textarea)
+	// ct1 标的物介绍 (from hidden textarea — already HTML)
 	const ct1Html = extractBdwjsHtml(doc as unknown as ParentNode);
 	// ct2 图片展示 (from inline JS)
 	const ct2Imgs = extractTpzslist(doc as unknown as ParentNode).map((u) =>
 		u.startsWith('http') ? u : `${baseUrl}${u.startsWith('/') ? '' : '/'}${u}`,
 	);
-	// ct5 竞买须知 (already-rendered)
-	const ct5El = (doc as unknown as ParentNode).querySelector('#bd_detail_tab_ct5');
-	const ct5Html = ct5El ? (ct5El.innerHTML || '').trim() : '';
-	// ct6 联系方式 (already-rendered)
-	const ct6El = (doc as unknown as ParentNode).querySelector('#bd_detail_tab_ct6');
-	const ct6Html = ct6El ? (ct6El.innerHTML || '').trim() : '';
+	const ct2Html = ct2Imgs.map((u) => `<p><img src="${u}" alt="" /></p>`).join('\n');
+	// ct5 竞买须知 (already-rendered HTML)
+	const ct5Html = ((doc as unknown as ParentNode).querySelector('#bd_detail_tab_ct5')?.innerHTML || '').trim();
+	// ct6 联系方式 (already-rendered HTML)
+	const ct6Html = ((doc as unknown as ParentNode).querySelector('#bd_detail_tab_ct6')?.innerHTML || '').trim();
 
-	const ct1Md = ct1Html ? createMarkdownContent(ct1Html, baseUrl).trim() : '';
-	const ct4Md = ggnrRaw ? ct4FragmentToMarkdown(ggnrRaw, baseUrl) : '';
-	const ct5Md = ct5Html ? createMarkdownContent(ct5Html, baseUrl).trim() : '';
-	const ct6Md = ct6Html ? createMarkdownContent(ct6Html, baseUrl).trim() : '';
-	const ct7Md = wtListRaw ? ct7FragmentToMarkdown(wtListRaw, baseUrl) : '';
-	const ct8Md = jjjgRaw ? ct8FragmentToMarkdown(jjjgRaw, baseUrl) : '';
-	const ct2Md = ct2Imgs.map((u) => `![](${u})`).join('\n');
-
-	const keyInfoMd = buildKeyInfoTable({
+	const keyInfoHtml = buildKeyInfoTableHtml({
 		subject_id: top.subject_id,
 		status: top.status,
 		start_price: top.prices.start_price,
@@ -422,15 +413,15 @@ export async function extractCbexStructuredContent(
 		stats: top.stats,
 	});
 
-	const sections: string[] = [`# ${top.title}`, '', '## 关键信息', '', keyInfoMd];
-	if (ct1Md) sections.push('', '## 标的物介绍', '', ct1Md);
-	if (ct2Md) sections.push('', '## 图片展示', '', ct2Md);
-	if (ct4Md) sections.push('', '## 司法处置公告', '', ct4Md);
-	if (ct5Md) sections.push('', '## 竞买须知', '', ct5Md);
-	if (ct7Md) sections.push('', '## 竞价记录', '', ct7Md);
-	if (ct8Md) sections.push('', '## 竞价结果', '', ct8Md);
-	if (ct6Md) sections.push('', '## 联系方式', '', ct6Md);
-	const body = sections.join('\n');
+	const parts: string[] = [`<h1>${escapeHtml(top.title)}</h1>`, '<h2>关键信息</h2>', keyInfoHtml];
+	if (ct1Html) parts.push('<h2>标的物介绍</h2>', ct1Html);
+	if (ct2Html) parts.push('<h2>图片展示</h2>', ct2Html);
+	if (ggnrRaw) parts.push('<h2>司法处置公告</h2>', ggnrRaw);
+	if (ct5Html) parts.push('<h2>竞买须知</h2>', ct5Html);
+	if (wtListRaw) parts.push('<h2>竞价记录</h2>', wtListRaw);
+	if (jjjgRaw) parts.push('<h2>竞价结果</h2>', jjjgRaw);
+	if (ct6Html) parts.push('<h2>联系方式</h2>', ct6Html);
+	const body = parts.join('\n');
 
 	return {
 		title: top.title,
@@ -467,6 +458,10 @@ function formatYuan(n: number): string {
 	return `¥${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function escapeHtml(s: string): string {
+	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export function buildKeyInfoTable(i: KeyInfoInput): string {
 	const rows: Array<[string, string]> = [
 		['标的物编号', i.subject_id],
@@ -488,4 +483,26 @@ export function buildKeyInfoTable(i: KeyInfoInput): string {
 	const lines = ['| 项目 | 内容 |', '|---|---|'];
 	for (const [k, v] of rows) lines.push(`| ${k} | ${v} |`);
 	return lines.join('\n');
+}
+
+export function buildKeyInfoTableHtml(i: KeyInfoInput): string {
+	const rows: Array<[string, string]> = [
+		['标的物编号', i.subject_id],
+		['竞价状态', i.status],
+	];
+	if (i.start_price !== undefined) rows.push(['起始价', formatYuan(i.start_price)]);
+	if (i.assess_price !== undefined) rows.push(['评估价', formatYuan(i.assess_price)]);
+	if (i.cap_price !== undefined) rows.push(['最高限价', formatYuan(i.cap_price)]);
+	if (i.final_price !== undefined) rows.push(['成交价', formatYuan(i.final_price)]);
+	if (i.deposit !== undefined) rows.push(['保证金', formatYuan(i.deposit)]);
+	rows.push(['竞价开始时间', i.bid_start]);
+	rows.push(['报名截止时间', i.signup_end]);
+	if (i.buyer.lottery_code) rows.push(['买受人摇号编码', i.buyer.lottery_code]);
+	if (i.buyer.lottery_count) rows.push(['买受人摇号次数', i.buyer.lottery_count]);
+	if (i.buyer.lottery_registered) rows.push(['买受人摇号注册时间', i.buyer.lottery_registered]);
+	rows.push(['关注数', String(i.stats.followers)]);
+	rows.push(['围观数', String(i.stats.views)]);
+	rows.push(['报价次数', String(i.stats.bid_count)]);
+	const trs = rows.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('');
+	return `<table><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody>${trs}</tbody></table>`;
 }

@@ -78,17 +78,16 @@ describe('postProcessExtractorMarkdown', () => {
 	// hit broken-image icon. Convert to <audio controls src=...> HTML so
 	// Obsidian renders an inline audio player.
 	//
-	// Wrap <audio> in <iframe srcdoc> — iframe sub-document has independent
-	// lifecycle, audio element's playback state is owned by sub-frame and
-	// survives Obsidian Reading View virtualization that unloads parent
-	// paragraph divs (forum confirmed 2024: virtualization "cannot be
-	// disabled"). Bare <audio> paused on scroll on all platforms; sticky div
-	// wrapper protected mobile but failed PC. iframe srcdoc is the deeper
-	// workaround attempt for both.
-	const wrap = (url: string) =>
-		`<iframe srcdoc="<audio controls src='${url}' style='width:100%'></audio>" width="100%" height="60" style="border:none;display:block"></iframe>`;
+	// Sticky <div> wrapper saves mobile Obsidian playback during scroll
+	// (virtualization unloads bare <audio> → pauses). PC Obsidian: sticky
+	// fails by platform limitation (markdown sandbox bounds sticky); iframe
+	// srcdoc also fails (chromium-engine sandbox test 2026-05-29 confirmed
+	// iframe sub-doc doesn't survive parent detach). Audio Player plugin is
+	// canonical PC workaround per Obsidian forum.
+	const STICKY_WRAPPER_STYLE = 'position:sticky;top:0;z-index:100;background:var(--background-primary);padding:4px 0';
+	const wrap = (url: string) => `<div style="${STICKY_WRAPPER_STYLE}"><audio controls src="${url}" style="width:100%"></audio></div>`;
 
-	it('converts audio image-embed to iframe-wrapped <audio> (m4a)', () => {
+	it('converts audio image-embed to sticky-wrapped <audio> (m4a)', () => {
 		const input = '![](https://media.xyzcdn.net/abc/X.m4a)';
 		expect(postProcessExtractorMarkdown(input)).toBe(wrap('https://media.xyzcdn.net/abc/X.m4a'));
 	});

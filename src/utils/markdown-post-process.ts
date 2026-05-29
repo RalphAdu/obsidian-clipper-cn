@@ -50,40 +50,46 @@ function fixFencedCodeBacktickEscapes(markdown: string): string {
 
 // Obsidian's image-embed syntax `![](url)` only renders inline <img> for image
 // MIME types. Audio file URLs (.m4a/.mp3/.wav/.ogg/.webm/.flac/.3gp) hit the
-// broken-image icon + filename fallback (verified 2026-05-29). Need real
-// playable widget.
+// broken-image icon + filename fallback. Need real playable widget — use
+// HTML <audio>, wrapped in <div style="position:sticky">.
 //
-// Background — Obsidian Reading View virtualizes DOM (official forum
-// confirmation 2024): paragraphs scroll out of viewport are UNLOADED from
-// DOM. Plain <audio> element gets destroyed → playback pauses. "Cannot be
-// disabled" per Obsidian team; only "a plugin could do it".
-// Source: https://forum.obsidian.md/t/obsidian-reading-view-keeps-modifying-the-dom-in-long-notes/53709
+// Why sticky <div> wrap (not bare <audio>, not <iframe srcdoc>):
 //
-// Strategy — wrap in <iframe srcdoc> instead of <audio>:
-// 1. iframe is a separate browsing context. Its sub-document (contentDocument)
-//    runs independent lifecycle; the inner <audio> element's playback state
-//    is owned by the sub-frame, not by Obsidian's parent virtualization.
-// 2. Mobile Obsidian: virtualization is less aggressive (smaller note size
-//    + native scroll); the iframe stays mounted → audio plays continuously.
-// 3. PC Obsidian Reading View: iframe element itself is unloaded with its
-//    parent paragraph div, BUT the inner audio sub-document survives because
-//    media elements detached from DOM keep playing IF detach happens via
-//    parent removal (HTMLMediaElement spec). When parent re-attaches,
-//    iframe re-renders with sub-document intact.
-//    Caveat: This is an empirical workaround; if PC Obsidian fully destroys
-//    the iframe element on unload, playback still stops. Audio Player plugin
-//    remains the canonical workaround for PC users.
+// Obsidian Reading View VIRTUALIZES the DOM (official forum 2024):
+//   "the first paragraphs are unloaded from the DOM, and the later paragraphs
+//    are loaded... This is the correct behavior, and cannot be disabled.
+//    A plugin could do it, but that's the only option."
+//   https://forum.obsidian.md/t/obsidian-reading-view-keeps-modifying-the-dom-in-long-notes/53709
 //
-// srcdoc encoding: contains <audio> with single-quoted attrs to avoid double-
-// quote collision with outer iframe attribute boundary; URL itself has no
-// quotes (m4a URLs are safe alnum + .-/ chars).
+// When the user scrolls past the audio, Obsidian unloads its parent paragraph
+// div. Plain <audio> dies → playback pauses on BOTH mobile and PC (verified
+// 2026-05-29 by reverting to bare <audio> — both platforms regressed).
+//
+// Sticky <div> wrapper saves MOBILE Obsidian: sticky positioning visually pins
+// the player to viewport top AND keeps the DOM node in layout flow, so the
+// virtualizer doesn't unload it. On mobile both behaviors engage.
+//
+// PC Obsidian Reading View: sticky positioning visually fails (parent layout
+// in the markdown sandbox bounds sticky to its own height); the player scrolls
+// out with the paragraph and Obsidian then unloads it → playback pauses.
+// This is per-platform Obsidian behavior, not markdown-fixable.
+//
+// <iframe srcdoc> was tested 2026-05-29 as a deeper workaround (sub-document
+// independent lifecycle?). Chromium-engine sandbox test (parent.removeChild +
+// re-insert) showed iframe's setInterval STOPPED during detach (0 ticks in 3s)
+// and re-loaded on re-attach (counter reset). iframe sub-document does NOT
+// survive parent detach at the engine level — so iframe is not a fix and adds
+// complexity. Reverted.
+//
+// Canonical PC workaround: install an Audio Player plugin (per Obsidian
+// forum consensus). Not addressed in this extractor.
 const AUDIO_IMAGE_EMBED_RE = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:m4a|mp3|wav|ogg|webm|flac|3gp|opus|oga))\)$/gm;
+const AUDIO_WRAPPER_STYLE = 'position:sticky;top:0;z-index:100;background:var(--background-primary);padding:4px 0';
 
 function convertAudioImageEmbedToHtml(markdown: string): string {
-	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) => {
-		const srcdoc = `<audio controls src='${url}' style='width:100%'></audio>`;
-		return `<iframe srcdoc="${srcdoc}" width="100%" height="60" style="border:none;display:block"></iframe>`;
-	});
+	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) =>
+		`<div style="${AUDIO_WRAPPER_STYLE}"><audio controls src="${url}" style="width:100%"></audio></div>`
+	);
 }
 
 export function postProcessExtractorMarkdown(markdown: string): string {

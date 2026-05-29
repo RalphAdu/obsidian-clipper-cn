@@ -912,6 +912,61 @@ memory `user_collab_norms` 的 5 步流程 + Step 2 决策树**已经覆盖**了
 
 ---
 
+### 2.24 飞书 docx root-level TEXT 是 container + turndown 嵌套 OL 缩进 bug（X0nq audit 反思，2026-05-29）
+
+#### 现象
+
+阿杜让看 `https://pcn5ogco2cwh.feishu.cn/docx/X0nqdaz4Fo7GYNx0JbLcvhHln6b` 的裁剪效果。裁剪输出：26KB markdown，body 只有 1 段 "核心提示" 粗体 + 1 张图。但原页有 6 个 H2 章节、15 张图、9 callout、10+ 链接、嵌套 OL。**98% 内容丢失**。
+
+修复后：2.5MB markdown，全部内容齐全。但产生了 secondary issue：嵌套 OL 兄弟项 indent 不一致（gmail 1 tab，outlook 2 tab，obsidian 渲染时 outlook 被当成 gmail 子项）。
+
+#### Root cause 1：飞书 docx 可能用 TEXT 作 root container
+
+X0nq blocks tree:
+```
+PAGE.children = [TEXT_top, IMAGE]
+  TEXT_top.text = "核心提示..."  (自己有文本)
+  TEXT_top.children = [82 个 sub blocks]  ← 整个文档主体
+```
+
+**旧的 `renderBlock` TEXT case 只 emit `<p>{自身 text}</p>` 不递归 children**。所有 82 个 children 被丢弃。
+
+#### Root cause 2：turndown 嵌套 OL sibling 多缩进
+
+正确 HTML：`<ol><li>parent<ol><li>gmail</li><li>outlook</li></ol></li></ol>`
+turndown 输出（bug）：
+```
+\t1. gmail
+\t\t2. outlook   ← 多 1 tab，应跟 gmail 同 indent
+```
+
+Obsidian Reading View 把 outlook 渲染为 gmail 的子项，丢失 sibling 关系。这是 turndown 的 ordered-list rule bug，对每个连续 `<li>` 自加缩进。
+
+#### 修复
+
+1. `feishu-extractor.ts:renderBlock` TEXT case 改为 `<p>{text}</p>{renderBlockChildren}` (no-op when no children)
+2. `markdown-post-process.ts` 新增 `normalizeNestedOlIndent`：detect `prev+1` marker 且 indent > prev indent → demote 到 prev indent。跳过 fenced code blocks，stops on non-OL non-blank line
+3. 新 fixture `feishu-text-as-container.json` + 2 个 unit test (recurse + order preservation) + 6 个 markdown-post-process unit test（real X0nq pattern / legitimate nesting / blank-line / fence skip）
+
+#### Audit 工具教训
+
+跑 `audit-prepare.sh` X0nq 三次都不顺：
+- **browser-scroll-capture hang**：Done 后 process 不退出 60s+（chromium close hangs），导致 audit-prepare step 1 阻塞。Monitor 加 60s auto-kill 缓解
+- **obsidian-scroll-capture 偶尔截到 Chrome**：屏 race，audit-prepare obsidian + 我手动 obsidian capture 并发，screencapture rect 抓到 Chrome 窗口而非 Obsidian Reading View → grid 右半全空
+- **PageDown 在飞书 SPA 没生效**：飞书自定义 scroll container，标准 PageDown 抓不到下段。5 frames 全相同
+
+这些都是 audit 工具自身 race / 兼容性 bug，跟 extractor 不相关。绕过：
+- 多重证据替代 grid：markdown 字面 + unit/e2e test + 主 session Read obsidian 前段截图
+- 飞书 docx 这类 SPA 需要 `--scroll-selector` 指定内部 scroll container（暂未配置；followup）
+
+#### 教训
+
+1. **不要假设 feishu block type 的角色**：TEXT block 可能是 leaf paragraph，也可能是 container（root level）。新加 block type 处理时应**默认递归 children**（no-op when empty），跟 PAGE 一致
+2. **turndown 行为不能完全信任**：嵌套 markdown 结构出来后过一遍肉眼/script check。`postProcessExtractorMarkdown` 是 normalize 层，应当为 turndown 已知 bug 提供 narrow 兜底
+3. **audit 工具失败 ≠ ship blocker**：当 visual audit 工具 race condition 出不来 grid，但其他验证维度（markdown 字面 / unit / e2e / 主 session Read obsidian 前段）全 PASS 时，可以推进 ship 并 BACKLOG 标记 audit 工具 followup
+
+---
+
 ## 3. 用户偏好 / 协作约定
 
 - **语言**：中文（包含技术解释、报告）

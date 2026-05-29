@@ -322,7 +322,58 @@ describe('buildCbexFrontmatter', () => {
   });
 });
 
-import { buildKeyInfoTable } from './cbex-extractor';
+import { buildKeyInfoTable, extractCbexStructuredContent } from './cbex-extractor';
+
+describe('extractCbexStructuredContent (integration)', () => {
+  it('returns structured fields + assembled markdown using fixtures', async () => {
+    const fixture = readFileSync(join(__dirname, 'cbex-extractor.fixture.html'), 'utf-8');
+    const { document: doc } = parseHTML(fixture);
+    const ct4 = readFileSync(join(__dirname, 'cbex-extractor.fixture-ct4.html'), 'utf-8');
+    const ct7 = readFileSync(join(__dirname, 'cbex-extractor.fixture-ct7.html'), 'utf-8');
+    const ct8 = readFileSync(join(__dirname, 'cbex-extractor.fixture-ct8.html'), 'utf-8');
+    const fakeFetch: typeof fetch = vi.fn(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.includes('ggnr')) return new Response(ct4, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      if (path.includes('wtListPaging')) return new Response(ct7, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      if (path.includes('jjjgListPaging')) return new Response(ct8, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      return new Response('', { status: 404 });
+    }) as any;
+    const result = await extractCbexStructuredContent(
+      doc as unknown as Document,
+      'https://jpxkc.cbex.com/jpxkc/prj/detail/522611.html',
+      fakeFetch,
+    );
+    expect(result.title).toBe('京NC6575别克牌SGM6527AT蓝小型汽车');
+    expect(result.subject_id).toBe('202512NC6575');
+    expect(result.status).toBe('竞价结束');
+    expect(result.site).toBe('cbex');
+    expect(result.content).toContain('## 关键信息');
+    expect(result.content).toContain('## 标的物介绍');
+    expect(result.content).toContain('## 图片展示');
+    expect(result.content).toContain('## 司法处置公告');
+    expect(result.content).toContain('## 竞买须知');
+    expect(result.content).toContain('## 竞价记录');
+    expect(result.content).toContain('## 竞价结果');
+    expect(result.content).toContain('## 联系方式');
+  });
+
+  it('throws if not a cbex URL', async () => {
+    const { document: doc } = parseHTML('<html></html>');
+    await expect(
+      extractCbexStructuredContent(doc as unknown as Document, 'https://example.com/foo'),
+    ).rejects.toThrow(/not a cbex/);
+  });
+
+  it('throws if params cannot be extracted', async () => {
+    const { document: doc } = parseHTML('<html><body>no scripts</body></html>');
+    await expect(
+      extractCbexStructuredContent(
+        doc as unknown as Document,
+        'https://jpxkc.cbex.com/jpxkc/prj/detail/522611.html',
+      ),
+    ).rejects.toThrow(/params/);
+  });
+});
 
 describe('buildKeyInfoTable', () => {
   it('renders all rows when full state', () => {

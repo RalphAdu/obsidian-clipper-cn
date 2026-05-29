@@ -339,6 +339,114 @@ export function buildCbexFrontmatter(input: CbexFrontmatterInput): string {
 	return lines.join('\n') + '\n';
 }
 
+// ── Structured content (Task 11) ─────────────────────────────────────────────
+
+export interface CbexStructuredContent {
+	// Generic fields (participates in ContentResponse fallback chain)
+	title: string;
+	author: string;        // always '' for cbex
+	description: string;   // use subject_id
+	published: string;     // use bid_start
+	image: string;         // first image of tpzslist, absolute
+	site: string;          // 'cbex'
+	source: string;        // canonical URL
+	content: string;       // assembled markdown body (NO frontmatter — content.ts adds that)
+	wordCount: number;     // content.length
+
+	// Proprietary fields (extractedContent dict for template engine)
+	subject_id: string;
+	status: string;
+}
+
+export async function extractCbexStructuredContent(
+	doc: Document,
+	url: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<CbexStructuredContent> {
+	if (!isCbexPrjDetailUrl(url)) throw new Error(`cbex: not a cbex prj detail URL: ${url}`);
+	const parsed = parseCbexUrl(url)!;
+	const params = extractCbexParams(doc as unknown as ParentNode);
+	if (!params) throw new Error('cbex: required params (bdid/cpdm/zgxj/jjcc) not found in inline scripts');
+
+	const top = extractCbexTopFields(doc as unknown as ParentNode);
+
+	// Fetch all 3 XHR endpoints in parallel; tolerate per-endpoint failure.
+	const safeFetch = async (endpoint: string, body: string): Promise<string> => {
+		try {
+			return await fetchCbexTabContent(endpoint, body, fetchImpl);
+		} catch {
+			return '';
+		}
+	};
+
+	const [ggnrRaw, wtListRaw, jjjgRaw] = await Promise.all([
+		safeFetch('/page/jpxkc/prj/ggnr', `BDID=${params.bdid}`),
+		safeFetch('/page/jpxkc/prj/wtListPaging', `cpdm=${parsed.prjId}&zgxj=${params.zgxj}&type=all`),
+		safeFetch('/page/jpxkc/prj/jjjgListPaging', `id=${parsed.prjId}&jjcc=${params.jjcc}&pageNo=1&pageSize=10`),
+	]);
+
+	const baseUrl = new URL(url).origin;
+
+	// ct1 标的物介绍 (from hidden textarea)
+	const ct1Html = extractBdwjsHtml(doc as unknown as ParentNode);
+	// ct2 图片展示 (from inline JS)
+	const ct2Imgs = extractTpzslist(doc as unknown as ParentNode).map((u) =>
+		u.startsWith('http') ? u : `${baseUrl}${u.startsWith('/') ? '' : '/'}${u}`,
+	);
+	// ct5 竞买须知 (already-rendered)
+	const ct5El = (doc as unknown as ParentNode).querySelector('#bd_detail_tab_ct5');
+	const ct5Html = ct5El ? (ct5El.innerHTML || '').trim() : '';
+	// ct6 联系方式 (already-rendered)
+	const ct6El = (doc as unknown as ParentNode).querySelector('#bd_detail_tab_ct6');
+	const ct6Html = ct6El ? (ct6El.innerHTML || '').trim() : '';
+
+	const ct1Md = ct1Html ? createMarkdownContent(ct1Html, baseUrl).trim() : '';
+	const ct4Md = ggnrRaw ? ct4FragmentToMarkdown(ggnrRaw, baseUrl) : '';
+	const ct5Md = ct5Html ? createMarkdownContent(ct5Html, baseUrl).trim() : '';
+	const ct6Md = ct6Html ? createMarkdownContent(ct6Html, baseUrl).trim() : '';
+	const ct7Md = wtListRaw ? ct7FragmentToMarkdown(wtListRaw, baseUrl) : '';
+	const ct8Md = jjjgRaw ? ct8FragmentToMarkdown(jjjgRaw, baseUrl) : '';
+	const ct2Md = ct2Imgs.map((u) => `![](${u})`).join('\n');
+
+	const keyInfoMd = buildKeyInfoTable({
+		subject_id: top.subject_id,
+		status: top.status,
+		start_price: top.prices.start_price,
+		assess_price: top.prices.assess_price,
+		cap_price: top.prices.cap_price,
+		final_price: top.prices.final_price,
+		deposit: top.prices.deposit,
+		bid_start: top.bid_start,
+		signup_end: top.signup_end,
+		buyer: top.buyer,
+		stats: top.stats,
+	});
+
+	const sections: string[] = [`# ${top.title}`, '', '## 关键信息', '', keyInfoMd];
+	if (ct1Md) sections.push('', '## 标的物介绍', '', ct1Md);
+	if (ct2Md) sections.push('', '## 图片展示', '', ct2Md);
+	if (ct4Md) sections.push('', '## 司法处置公告', '', ct4Md);
+	if (ct5Md) sections.push('', '## 竞买须知', '', ct5Md);
+	if (ct7Md) sections.push('', '## 竞价记录', '', ct7Md);
+	if (ct8Md) sections.push('', '## 竞价结果', '', ct8Md);
+	if (ct6Md) sections.push('', '## 联系方式', '', ct6Md);
+	const body = sections.join('\n');
+
+	return {
+		title: top.title,
+		author: '',
+		description: top.subject_id,
+		published: top.bid_start,
+		image: ct2Imgs[0] || '',
+		site: 'cbex',
+		source: url,
+		content: body,
+		wordCount: body.length,
+		subject_id: top.subject_id,
+		status: top.status,
+	};
+}
+
 // ── Key-info table ────────────────────────────────────────────────────────────
 
 export interface KeyInfoInput {

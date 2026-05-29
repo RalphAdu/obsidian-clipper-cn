@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isCbexPrjDetailUrl, parseCbexUrl } from './cbex-extractor';
@@ -45,6 +45,7 @@ import {
   extractCbexTopFields,
   extractBdwjsHtml,
   extractTpzslist,
+  fetchCbexTabContent,
 } from './cbex-extractor';
 import { parseHTML } from 'linkedom';
 
@@ -181,5 +182,38 @@ describe('extractTpzslist', () => {
     const list = extractTpzslist(doc);
     expect(list.length).toBeGreaterThanOrEqual(9);
     expect(list[0]).toMatch(/^\/?editorUpload\/file\//);
+  });
+});
+
+describe('fetchCbexTabContent', () => {
+  it('POSTs form body with X-Requested-With header', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fakeFetch = vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return new Response('<table>x</table>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      });
+    });
+    const text = await fetchCbexTabContent(
+      '/page/jpxkc/prj/ggnr',
+      'BDID=4185',
+      fakeFetch as unknown as typeof fetch,
+    );
+    expect(text).toBe('<table>x</table>');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe('/page/jpxkc/prj/ggnr');
+    expect(calls[0].init.method).toBe('POST');
+    expect(calls[0].init.body).toBe('BDID=4185');
+    expect((calls[0].init.headers as Record<string, string>)['X-Requested-With']).toBe('XMLHttpRequest');
+    expect((calls[0].init.headers as Record<string, string>)['Content-Type']).toBe('application/x-www-form-urlencoded; charset=UTF-8');
+    expect(calls[0].init.credentials).toBe('include');
+  });
+
+  it('throws on non-2xx', async () => {
+    const fakeFetch = vi.fn(async () => new Response('nope', { status: 401 }));
+    await expect(
+      fetchCbexTabContent('/page/jpxkc/prj/ggnr', 'BDID=4185', fakeFetch as unknown as typeof fetch),
+    ).rejects.toThrow(/401/);
   });
 });

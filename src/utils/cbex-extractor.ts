@@ -238,6 +238,26 @@ export function extractTpzslist(doc: ParentNode): string[] {
 	return urls;
 }
 
+export async function fetchCbexTabContent(
+	endpoint: string,
+	body: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+	const res = await fetchImpl(endpoint, {
+		method: 'POST',
+		credentials: 'include',
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+			'X-Requested-With': 'XMLHttpRequest',
+		},
+		body,
+	});
+	if (!res.ok) {
+		throw new Error(`cbex tab fetch failed: ${endpoint} status=${res.status}`);
+	}
+	return await res.text();
+}
+
 export function extractBdwjsHtml(doc: ParentNode): string {
 	const ta = doc.querySelector('#content_BDWJS') as HTMLTextAreaElement | null;
 	if (!ta) return '';

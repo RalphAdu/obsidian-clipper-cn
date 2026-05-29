@@ -1,0 +1,169 @@
+
+
+
+
+
+
+
+
+
+
+
+
+    
+        <table class="table_default">
+            <tbody>
+            <tr>
+                <th width="25%">竞价编号</th>
+                <th width="15%">摇号申请编码</th>
+                <th width="10%">摇号次数</th>
+                <th width="20%">摇号注册时间</th>
+                <th width="15%">报价金额</th>
+                <th width="15%">报价时间</th>
+            </tr>
+            
+                <tr class="msr">
+                    <td><i class="msr_icon"></i>20251200298836</td>
+                    <td>6035100088419</td>
+                    <td>87</td>
+                    <td>2011-01-02 13:23:21.364</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 08:06:50</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200300477</td>
+                    <td>5456100169885</td>
+                    <td>87</td>
+                    <td>2011-01-05 19:57:29.954</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 09:00:50</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200310789</td>
+                    <td>5082100074343</td>
+                    <td>86</td>
+                    <td>2011-01-01 23:14:32.059</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 08:01:53</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200297663</td>
+                    <td>3045100229888</td>
+                    <td>86</td>
+                    <td>2011-01-10 19:56:46.860</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 09:35:43</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200293917</td>
+                    <td>3995100010624</td>
+                    <td>85</td>
+                    <td>2011-01-01 00:23:54.152</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 09:20:34</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200306249</td>
+                    <td>5804100118170</td>
+                    <td>85</td>
+                    <td>2011-01-03 17:19:28.255</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 11:01:39</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200298216</td>
+                    <td>0867100165094</td>
+                    <td>85</td>
+                    <td>2011-01-05 15:21:40.003</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 08:00:25</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200297982</td>
+                    <td>3743100442822</td>
+                    <td>85</td>
+                    <td>2011-02-25 16:51:20.431</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 08:00:08</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200306496</td>
+                    <td>3607100512849</td>
+                    <td>85</td>
+                    <td>2011-03-08 08:52:10.624</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 08:01:03</td>
+                </tr>
+            
+                <tr class="">
+                    <td>20251200302245</td>
+                    <td>7883100099729</td>
+                    <td>84</td>
+                    <td>2011-01-02 20:18:39.787</td>
+                    
+                    <td>￥30,000.00</td>
+                    <td>2025-12-15 08:00:09</td>
+                </tr>
+            
+            </tbody>
+        </table>
+        
+            <script type="text/javascript" src="/res/js/jquery.pagebar3.atag.js?t=20260426061715"></script>
+            <div class="list_page" id="pagebar_jjjg"></div>
+            <script type="text/javascript">
+                $(function () {
+                    $.fn.jpagebar3({
+                        //pagebar 对象div
+                        renderTo: $("#pagebar_jjjg"),
+                        //总记录数
+                        total: parseInt("265"),
+                        //每页显示数
+                        pageSize: parseInt("10"),
+                        //当前页码
+                        currentPage: parseInt("1"),
+                        //分页条按钮样式
+                        pageNameClass: "pagebtn-name",
+                        //页码样式
+                        pageCountClass: "pagebtn-count",
+                        //分页范围
+                        pageList: [5, 10, 20, 30],
+                        //分页方式(select:下拉框 default:输入框)
+                        method: "default",
+                        totalPage: "",
+                        change: function (nextPage, pageSize, total) {
+                            var type = $("#bd_detail_tab_ct8 .jjjg_tab .current").attr("data-type");
+                            Base.Ajax.load("/page/jpxkc/prj/jjjgListPaging", {
+                                id: "522611",
+                                type: type,
+                                pageNo: nextPage,
+                                pageSize: pageSize,
+                                _totalCount: nextPage != 1 ? '265' : ''
+                            }, function () {
+                                location.href = "#bd_detail_tab_ct8_list";
+                            }, $("#bd_detail_tab_ct8_list"));
+                        }
+                    });
+                })
+            </script>
+        
+    
+    
+
+

@@ -17,6 +17,7 @@ import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArt
 import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
 import { extractDocsQQContent, isDocsQQDocUrl, parseDocsQQUrl } from './utils/docs-qq-extractor';
 import { extractXiaoyuzhouStructuredContent, isXiaoyuzhouEpisodeUrl } from './utils/xiaoyuzhou-extractor';
+import { extractCbexStructuredContent, isCbexPrjDetailUrl } from './utils/cbex-extractor';
 import {
 	extractWeChatPublishedFromDocument,
 	normalizePreBlockLineBreaks,
@@ -332,6 +333,14 @@ declare global {
 					return null;
 				})
 				: null;
+			const cbexContent = isCbexPrjDetailUrl(document.URL)
+				? await extractCbexStructuredContent(document, document.URL).catch((error) => {
+					const msg = error instanceof Error ? error.message : String(error);
+					contentLogger.warn('Failed to extract cbex structured content', { error: msg });
+					extractorWarnings.push(`cbex: ${msg}`);
+					return null;
+				})
+				: null;
 			// Site extractor matched URL but returned null (silently — e.g. scys
 			// extractScysArticleStandalone returns null on 401 instead of throwing,
 			// so the .catch above doesn't fire). Surface to user explicitly.
@@ -362,6 +371,11 @@ declare global {
 				extractedContent.podcast = xiaoyuzhouContent.podcast;
 				extractedContent.podcastUrl = xiaoyuzhouContent.podcastUrl;
 				extractedContent.episodeNumber = xiaoyuzhouContent.episodeNumber;
+			}
+
+			if (cbexContent) {
+				extractedContent.subject_id = cbexContent.subject_id;
+				extractedContent.status = cbexContent.status;
 			}
 
 			// scysContent's title/author/content/wordCount/description are already
@@ -440,24 +454,24 @@ declare global {
 					: '';
 
 				const response: ContentResponse = {
-					author: bilibiliContent?.author || xiaoyuzhouContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || docsQQContent?.author || defuddled.author,
+					author: bilibiliContent?.author || xiaoyuzhouContent?.author || cbexContent?.author || feishuContent?.author || scysContent?.author || zsxqContent?.author || docsQQContent?.author || defuddled.author,
 					attachments: scysContent?.attachments || [],
-					content: bilibiliContent?.structuredHtml || xiaoyuzhouContent?.content || feishuContent?.content || scysContent?.content || zsxqContent?.content || docsQQContent?.content || weChatArticleContent || defuddled.content,
-					description: bilibiliContent?.description || xiaoyuzhouContent?.description || defuddled.description,
+					content: bilibiliContent?.structuredHtml || xiaoyuzhouContent?.content || cbexContent?.content || feishuContent?.content || scysContent?.content || zsxqContent?.content || docsQQContent?.content || weChatArticleContent || defuddled.content,
+					description: bilibiliContent?.description || xiaoyuzhouContent?.description || cbexContent?.description || defuddled.description,
 					domain: getDomain(document.URL),
 					extractedContent: extractedContent,
 					favicon: defuddled.favicon,
 					fullHtml: cleanedHtml,
 					highlights: highlighter.getHighlights(),
-					image: bilibiliContent?.image || xiaoyuzhouContent?.image || defuddled.image,
+					image: bilibiliContent?.image || xiaoyuzhouContent?.image || cbexContent?.image || defuddled.image,
 					language: defuddled.language || '',
 					parseTime: defuddled.parseTime,
-					published: bilibiliContent?.published || xiaoyuzhouContent?.published || feishuContent?.published || scysContent?.published || zsxqContent?.published || docsQQContent?.published || weChatPublished || defuddled.published,
+					published: bilibiliContent?.published || xiaoyuzhouContent?.published || cbexContent?.published || feishuContent?.published || scysContent?.published || zsxqContent?.published || docsQQContent?.published || weChatPublished || defuddled.published,
 					schemaOrgData: defuddled.schemaOrgData,
 					selectedHtml: selectedHtml,
-					site: bilibiliContent ? 'Bilibili' : xiaoyuzhouContent ? '小宇宙' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : docsQQContent ? 'DocsQQ' : defuddled.site,
-					title: bilibiliContent?.title || xiaoyuzhouContent?.title || feishuContent?.title || scysContent?.title || zsxqContent?.title || docsQQContent?.title || defuddled.title,
-					wordCount: docsQQContent?.wordCount || bilibiliContent?.wordCount || xiaoyuzhouContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || zsxqContent?.wordCount || defuddled.wordCount,
+					site: bilibiliContent ? 'Bilibili' : xiaoyuzhouContent ? '小宇宙' : cbexContent ? 'cbex' : feishuContent ? 'Feishu' : scysContent ? 'Scys' : zsxqContent ? 'ZSXQ' : docsQQContent ? 'DocsQQ' : defuddled.site,
+					title: bilibiliContent?.title || xiaoyuzhouContent?.title || cbexContent?.title || feishuContent?.title || scysContent?.title || zsxqContent?.title || docsQQContent?.title || defuddled.title,
+					wordCount: docsQQContent?.wordCount || bilibiliContent?.wordCount || xiaoyuzhouContent?.wordCount || cbexContent?.wordCount || feishuContent?.wordCount || scysContent?.wordCount || zsxqContent?.wordCount || defuddled.wordCount,
 					metaTags: defuddled.metaTags || [],
 					extractorWarnings: extractorWarnings.length > 0 ? extractorWarnings : undefined,
 				};
@@ -708,7 +722,7 @@ declare global {
 		const data = event.data;
 		if (!data || data.type !== '__obsidianClipperTestExtract__') return;
 		const origin = location.hostname;
-		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$|^mp\.weixin\.qq\.com$|^docs\.qq\.com$|xiaoyuzhoufm\.com$/.test(origin)) return;
+		if (!/feishu\.cn$|larksuite\.com$|^scys\.com$|wx\.zsxq\.com$|^articles\.zsxq\.com$|^mp\.weixin\.qq\.com$|^docs\.qq\.com$|xiaoyuzhoufm\.com$|^jpxkc\.cbex\.com$/.test(origin)) return;
 		const testId = data.testId;
 		const key = '__obsidianClipperTestResult__:' + testId;
 		try {
@@ -718,7 +732,7 @@ declare global {
 			// wx.zsxq.com → zsxq-extractor; mp.weixin.qq.com → inline helpers (content.ts
 			// main path).
 			let result: { title?: string; content?: string; author?: string; published?: string } | null = null;
-			let source: 'scys' | 'feishu' | 'zsxq' | 'wechat' | 'docsqq' | 'xiaoyuzhou' | null = null;
+			let source: 'scys' | 'feishu' | 'zsxq' | 'wechat' | 'docsqq' | 'xiaoyuzhou' | 'cbex' | null = null;
 			if (isScysCourseUrl(document.URL) || isScysDocxUrl(document.URL) || isScysArticleUrl(document.URL)) {
 				result = await extractScysStructuredContent(document);
 				source = 'scys';
@@ -739,6 +753,9 @@ declare global {
 			} else if (isXiaoyuzhouEpisodeUrl(document.URL)) {
 				result = await extractXiaoyuzhouStructuredContent(document) as any;
 				source = 'xiaoyuzhou';
+			} else if (isCbexPrjDetailUrl(document.URL)) {
+				result = await extractCbexStructuredContent(document, document.URL) as any;
+				source = 'cbex' as any;
 			} else if (isWeChatArticleUrl(document.URL)) {
 				// mp.weixin uses inline helpers in main getPageContent path
 				// (not a dedicated extractor function). Mirror the popup
@@ -812,7 +829,7 @@ declare global {
 				favicon: '',
 				image: '',
 				published: (result as any)?.published || '',
-				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : source === 'docsqq' ? 'DocsQQ' : source === 'xiaoyuzhou' ? '小宇宙' : '',
+				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : source === 'docsqq' ? 'DocsQQ' : source === 'xiaoyuzhou' ? '小宇宙' : source === 'cbex' ? 'cbex' : '',
 				language: '',
 				wordCount: (result as any)?.wordCount || 0,
 				extractedContent: simulatedExtractedContent,
@@ -843,6 +860,11 @@ declare global {
 				if (r?.podcast) fmExtra.push(`podcast: ${r.podcast}`);
 				if (r?.podcastUrl) fmExtra.push(`podcastUrl: ${r.podcastUrl}`);
 				if (r?.episodeNumber) fmExtra.push(`episodeNumber: ${r.episodeNumber}`);
+			}
+			if (source === 'cbex') {
+				const r = result as any;
+				if (r?.subject_id) fmExtra.push(`subject_id: "${fmEscape(r.subject_id)}"`);
+				if (r?.status) fmExtra.push(`status: "${fmEscape(r.status)}"`);
 			}
 			const obsidianNote = [
 				'---',

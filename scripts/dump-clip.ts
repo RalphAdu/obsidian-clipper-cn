@@ -52,9 +52,10 @@ async function main() {
 		console.log(`[dump] feishu creds loaded: appId=${feishuSettings.appId.slice(0, 14)}...`);
 	}
 
-	// If a profile is supplied (scys/zsxq/feishu) skip the weixin-specific
-	// '#publish_time' wait — those sites don't have that selector.
-	const wait = userDataDir ? undefined : '#publish_time';
+	// If a profile is supplied (scys/zsxq) OR feishuSettings is supplied
+	// (feishu), skip the weixin-specific '#publish_time' wait — those sites
+	// don't have that selector.
+	const wait = (userDataDir || feishuSettings) ? undefined : '#publish_time';
 
 	console.log(`[dump] clipping ${url} ...`);
 	const clip = await runRealClip(url, { wait, timeout: 90_000, userDataDir, feishuSettings });

@@ -1,7 +1,13 @@
+// @vitest-environment happy-dom
+//
+// Turndown (used inside defuddle/full → createMarkdownContent) needs document
+// and DOMParser globals. Without a DOM environment it silently fails with
+// "Partial conversion completed with errors." The existing linkedom-based tests
+// are unaffected — they parse their own DOM with parseHTML() regardless of env.
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isCbexPrjDetailUrl, parseCbexUrl } from './cbex-extractor';
+import { isCbexPrjDetailUrl, parseCbexUrl, ct4FragmentToMarkdown, ct7FragmentToMarkdown, ct8FragmentToMarkdown } from './cbex-extractor';
 
 describe('isCbexPrjDetailUrl', () => {
   it('matches jpxkc.cbex.com prj detail URLs', () => {
@@ -215,5 +221,53 @@ describe('fetchCbexTabContent', () => {
     await expect(
       fetchCbexTabContent('/page/jpxkc/prj/ggnr', 'BDID=4185', fakeFetch as unknown as typeof fetch),
     ).rejects.toThrow(/401/);
+  });
+});
+
+describe('ct4 fragment to markdown', () => {
+  it('converts styled paragraphs to plain markdown', () => {
+    const fragment = `<p style="font-family: 'Times New Roman'; font-size: 14px;">第一段</p><p>第二段</p>`;
+    const md = ct4FragmentToMarkdown(fragment, 'https://jpxkc.cbex.com/');
+    expect(md).toContain('第一段');
+    expect(md).toContain('第二段');
+    expect(md).not.toContain('Times New Roman');
+  });
+});
+
+describe('ct7 fragment to markdown', () => {
+  it('converts bid-record table to GFM table', () => {
+    const fragment = `<table class="bd_detail_record">
+      <tr><th>序号</th><th>名称</th><th>出价人</th><th>价格</th><th>时间</th></tr>
+      <tr><td>265</td><td>京NC6575...</td><td>640610036...</td><td>30000.00</td><td>2025-12-15 16:00</td></tr>
+    </table>`;
+    const md = ct7FragmentToMarkdown(fragment, 'https://jpxkc.cbex.com/');
+    expect(md).toContain('| 序号 |');
+    expect(md).toContain('30000.00');
+  });
+
+  it('converts real ct7 fixture table to GFM table', () => {
+    const fragment = readFileSync(join(__dirname, 'cbex-extractor.fixture-ct7.html'), 'utf-8');
+    const md = ct7FragmentToMarkdown(fragment, 'https://jpxkc.cbex.com/');
+    expect(md).toContain('| 报价轮次 |');
+    expect(md).toContain('30,000.00');
+  });
+});
+
+describe('ct8 fragment to markdown', () => {
+  it('converts result table to GFM table', () => {
+    const fragment = `<table class="table_default">
+      <tr><th>委托方</th><th>受让方</th><th>联系电话</th></tr>
+      <tr><td>北京一中院</td><td>(脱敏)</td><td>(脱敏)</td></tr>
+    </table>`;
+    const md = ct8FragmentToMarkdown(fragment, 'https://jpxkc.cbex.com/');
+    expect(md).toContain('委托方');
+    expect(md).toContain('受让方');
+  });
+
+  it('converts real ct8 fixture table to GFM table', () => {
+    const fragment = readFileSync(join(__dirname, 'cbex-extractor.fixture-ct8.html'), 'utf-8');
+    const md = ct8FragmentToMarkdown(fragment, 'https://jpxkc.cbex.com/');
+    expect(md).toContain('竞价编号');
+    expect(md).toContain('30,000.00');
   });
 });

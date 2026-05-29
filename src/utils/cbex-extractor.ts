@@ -1,5 +1,7 @@
 // src/utils/cbex-extractor.ts
 
+import { createMarkdownContent } from 'defuddle/full';
+
 export interface CbexParsedUrl {
 	prjId: string;
 }
@@ -273,4 +275,20 @@ export function extractBdwjsHtml(doc: ParentNode): string {
 		return (d.textContent ?? '').trim();
 	}
 	return raw;
+}
+
+// ── HTML-fragment → Markdown converters (Task 8) ──────────────────────────────
+// Each tab (ct4/ct7/ct8) gets its own named export so Task 11 can add
+// per-section post-processing without touching the other converters.
+
+export function ct4FragmentToMarkdown(fragment: string, baseUrl: string): string {
+	return createMarkdownContent(fragment, baseUrl).trim();
+}
+
+export function ct7FragmentToMarkdown(fragment: string, baseUrl: string): string {
+	return createMarkdownContent(fragment, baseUrl).trim();
+}
+
+export function ct8FragmentToMarkdown(fragment: string, baseUrl: string): string {
+	return createMarkdownContent(fragment, baseUrl).trim();
 }

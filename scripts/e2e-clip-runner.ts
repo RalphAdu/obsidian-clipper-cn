@@ -36,6 +36,8 @@ export interface ClipOptions {
 	                           // the dir is NOT removed on exit so subsequent runs reuse login.
 	offscreen?: boolean;       // default true: position window at -2400,-2400 so it doesn't
 	                           // steal focus while still being 'headed' (needed for extensions)
+	feishuSettings?: { appId: string; appSecret: string };  // inject into chrome.storage.local.feishu_settings
+	                                                         // so feishu-extractor's background OpenAPI calls auth
 }
 
 const SCRIPTS_DIR = __dirname;
@@ -152,6 +154,26 @@ export async function runRealClip(url: string, opts: ClipOptions = {}): Promise<
 
 		if (cookies.length > 0) {
 			await context.addCookies(cookies as any);
+		}
+
+		// Inject feishu_settings into background SW chrome.storage.local so the
+		// feishu extractor can mint a tenant_access_token via background.ts
+		// `getFeishuTenantToken`. Fresh playwright profile has empty
+		// chrome.storage.local — without this, feishu OpenAPI calls 401.
+		if (opts.feishuSettings) {
+			let sw = context.serviceWorkers()[0];
+			if (!sw) {
+				sw = await Promise.race([
+					context.waitForEvent('serviceworker', { timeout: 15_000 }),
+					new Promise<never>((_, rej) =>
+						setTimeout(() => rej(new Error('background SW not ready within 15s')), 15_000)
+					),
+				]) as any;
+			}
+			await sw!.evaluate(async (s) => {
+				// @ts-expect-error chrome global in SW
+				await chrome.storage.local.set({ feishu_settings: s });
+			}, opts.feishuSettings);
 		}
 
 		try {

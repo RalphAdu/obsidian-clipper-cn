@@ -1071,9 +1071,15 @@ function renderBlock(block: FeishuBlock, ctx: RenderCtx): string {
 			return renderBlockChildren(block, ctx);
 
 		case FEISHU_BLOCK_TYPE.TEXT: {
+			// X0nq (2026-05-29): TEXT block can hold its own paragraph AND act
+			// as a container with a populated `children` array. Feishu docx
+			// puts the document root at PAGE → first TEXT; that TEXT's body is
+			// the opening "核心提示：…" paragraph and its children carry the
+			// rest of the doc. Always recurse children — no-op when empty.
 			const inner = renderTextElements(block.text?.elements, ctx);
-			if (!inner.trim()) return '';
-			return `<p>${inner}</p>`;
+			const childrenHtml = renderBlockChildren(block, ctx);
+			if (!inner.trim()) return childrenHtml;
+			return `<p>${inner}</p>${childrenHtml}`;
 		}
 
 		case FEISHU_BLOCK_TYPE.HEADING1:

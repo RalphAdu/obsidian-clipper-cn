@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { isCbexPrjDetailUrl, parseCbexUrl } from './cbex-extractor';
 
 describe('isCbexPrjDetailUrl', () => {
@@ -29,8 +31,26 @@ describe('parseCbexUrl', () => {
   });
 });
 
-import { extractCbexParams } from './cbex-extractor';
+import {
+  extractCbexParams,
+  extractTitle,
+  extractSubjectId,
+  extractStatus,
+  extractEndTime,
+  extractBidStartTime,
+  extractSignupEndTime,
+  extractPrices,
+  extractBuyerInfo,
+  extractStats,
+  extractCbexTopFields,
+} from './cbex-extractor';
 import { parseHTML } from 'linkedom';
+
+function loadFixture(name: string): Document {
+  const html = readFileSync(join(__dirname, name), 'utf-8');
+  const { document } = parseHTML(html);
+  return document as unknown as Document;
+}
 
 describe('extractCbexParams', () => {
   it('extracts BDID, cpdm, zgxj, jjcc from inline scripts', () => {
@@ -56,5 +76,68 @@ describe('extractCbexParams', () => {
     const html = `<html><body><script>var bdid = "4185";</script></body></html>`;
     const { document: doc } = parseHTML(html);
     expect(extractCbexParams(doc)).toBeNull();
+  });
+});
+
+describe('top-level field extractors', () => {
+  const doc = loadFixture('cbex-extractor.fixture.html');
+
+  it('extractTitle returns .bd_detail_name text', () => {
+    expect(extractTitle(doc)).toBe('京NC6575别克牌SGM6527AT蓝小型汽车');
+  });
+
+  it('extractSubjectId strips 标的物编号： prefix', () => {
+    expect(extractSubjectId(doc)).toBe('202512NC6575');
+  });
+
+  it('extractStatus returns .state_mark text', () => {
+    expect(extractStatus(doc)).toBe('竞价结束');
+  });
+
+  it('extractEndTime composes ymd hm from .time_num span sequence', () => {
+    expect(extractEndTime(doc)).toBe('2025-12-15 16:00');
+  });
+
+  it('extractBidStartTime parses 竞价开始时间：YYYY.MM.DD HH:MM', () => {
+    expect(extractBidStartTime(doc)).toBe('2025-12-15 08:00');
+  });
+
+  it('extractSignupEndTime parses Chinese date', () => {
+    expect(extractSignupEndTime(doc)).toBe('2025-12-12 15:00');
+  });
+
+  it('extractPrices returns all numeric values', () => {
+    expect(extractPrices(doc)).toEqual({
+      start_price: 20000,
+      assess_price: 20000,
+      cap_price: 30000,
+      deposit: 20000,
+      final_price: 30000,
+    });
+  });
+
+  it('extractBuyerInfo returns lottery code/count/registered_at', () => {
+    expect(extractBuyerInfo(doc)).toEqual({
+      lottery_code: '6035100088419',
+      lottery_count: '87',
+      lottery_registered: '2011-01-02 13:23',
+    });
+  });
+
+  it('extractStats returns followers/views/bid_count', () => {
+    expect(extractStats(doc)).toEqual({
+      followers: 411,
+      views: 124489,
+      bid_count: 265,
+    });
+  });
+
+  it('extractCbexTopFields composes everything', () => {
+    const result = extractCbexTopFields(doc);
+    expect(result.title).toBe('京NC6575别克牌SGM6527AT蓝小型汽车');
+    expect(result.subject_id).toBe('202512NC6575');
+    expect(result.prices.final_price).toBe(30000);
+    expect(result.stats.bid_count).toBe(265);
+    expect(result.buyer.lottery_code).toBe('6035100088419');
   });
 });

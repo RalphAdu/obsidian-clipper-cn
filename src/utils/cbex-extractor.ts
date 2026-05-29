@@ -338,3 +338,46 @@ export function buildCbexFrontmatter(input: CbexFrontmatterInput): string {
 	lines.push('---');
 	return lines.join('\n') + '\n';
 }
+
+// ── Key-info table ────────────────────────────────────────────────────────────
+
+export interface KeyInfoInput {
+	subject_id: string;
+	status: string;
+	start_price?: number;
+	assess_price?: number;
+	cap_price?: number;
+	final_price?: number;
+	deposit?: number;
+	bid_start: string;
+	signup_end: string;
+	buyer: CbexBuyer;
+	stats: CbexStats;
+}
+
+function formatYuan(n: number): string {
+	return `¥${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function buildKeyInfoTable(i: KeyInfoInput): string {
+	const rows: Array<[string, string]> = [
+		['标的物编号', i.subject_id],
+		['竞价状态', i.status],
+	];
+	if (i.start_price !== undefined) rows.push(['起始价', formatYuan(i.start_price)]);
+	if (i.assess_price !== undefined) rows.push(['评估价', formatYuan(i.assess_price)]);
+	if (i.cap_price !== undefined) rows.push(['最高限价', formatYuan(i.cap_price)]);
+	if (i.final_price !== undefined) rows.push(['成交价', formatYuan(i.final_price)]);
+	if (i.deposit !== undefined) rows.push(['保证金', formatYuan(i.deposit)]);
+	rows.push(['竞价开始时间', i.bid_start]);
+	rows.push(['报名截止时间', i.signup_end]);
+	if (i.buyer.lottery_code) rows.push(['买受人摇号编码', i.buyer.lottery_code]);
+	if (i.buyer.lottery_count) rows.push(['买受人摇号次数', i.buyer.lottery_count]);
+	if (i.buyer.lottery_registered) rows.push(['买受人摇号注册时间', i.buyer.lottery_registered]);
+	rows.push(['关注数', String(i.stats.followers)]);
+	rows.push(['围观数', String(i.stats.views)]);
+	rows.push(['报价次数', String(i.stats.bid_count)]);
+	const lines = ['| 项目 | 内容 |', '|---|---|'];
+	for (const [k, v] of rows) lines.push(`| ${k} | ${v} |`);
+	return lines.join('\n');
+}

@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isCbexPrjDetailUrl, parseCbexUrl, ct4FragmentToMarkdown, ct7FragmentToMarkdown, ct8FragmentToMarkdown } from './cbex-extractor';
+import { isCbexPrjDetailUrl, parseCbexUrl, ct4FragmentToMarkdown, ct7FragmentToMarkdown, ct8FragmentToMarkdown, buildKeyInfoTable } from './cbex-extractor';
 
 describe('isCbexPrjDetailUrl', () => {
   it('matches jpxkc.cbex.com prj detail URLs', () => {
@@ -319,5 +319,50 @@ describe('buildCbexFrontmatter', () => {
     });
     expect(yaml).not.toContain('final_price');
     expect(yaml).not.toContain('assess_price');
+  });
+});
+
+import { buildKeyInfoTable } from './cbex-extractor';
+
+describe('buildKeyInfoTable', () => {
+  it('renders all rows when full state', () => {
+    const md = buildKeyInfoTable({
+      subject_id: '202512NC6575',
+      status: '竞价结束',
+      start_price: 20000,
+      assess_price: 20000,
+      cap_price: 30000,
+      final_price: 30000,
+      deposit: 20000,
+      bid_start: '2025-12-15 08:00',
+      signup_end: '2025-12-12 15:00',
+      buyer: { lottery_code: '6035100088419', lottery_count: '87', lottery_registered: '2011-01-02 13:23' },
+      stats: { followers: 411, views: 124477, bid_count: 265 },
+    });
+    expect(md).toContain('| 项目 | 内容 |');
+    expect(md).toContain('| 标的物编号 | 202512NC6575 |');
+    expect(md).toContain('| 起始价 | ¥20,000.00 |');
+    expect(md).toContain('| 成交价 | ¥30,000.00 |');
+    expect(md).toContain('| 买受人摇号编码 | 6035100088419 |');
+    expect(md).toContain('| 关注数 | 411 |');
+    expect(md).toContain('| 围观数 | 124477 |');
+    expect(md).toContain('| 报价次数 | 265 |');
+  });
+
+  it('omits absent rows (报价中, no buyer)', () => {
+    const md = buildKeyInfoTable({
+      subject_id: '202501X',
+      status: '报价中',
+      start_price: 100,
+      cap_price: 200,
+      deposit: 100,
+      bid_start: '2026-01-01 08:00',
+      signup_end: '2025-12-31 15:00',
+      buyer: {},
+      stats: { followers: 0, views: 0, bid_count: 0 },
+    });
+    expect(md).not.toContain('成交价');
+    expect(md).not.toContain('买受人');
+    expect(md).not.toContain('评估价');
   });
 });

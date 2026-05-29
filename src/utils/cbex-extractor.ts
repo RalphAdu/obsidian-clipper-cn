@@ -393,7 +393,9 @@ export async function extractCbexStructuredContent(
 	const ct2Imgs = extractTpzslist(doc as unknown as ParentNode).map((u) =>
 		u.startsWith('http') ? u : `${baseUrl}${u.startsWith('/') ? '' : '/'}${u}`,
 	);
-	const ct2Html = ct2Imgs.map((u) => `<p><img src="${u}" alt="" /></p>`).join('\n');
+	// Wrap each image in <figure> — Defuddle's Readability cleaner strips bare
+	// <p><img></p> as decorative; <figure> persuades it the images are content.
+	const ct2Html = ct2Imgs.map((u, i) => `<figure><img src="${u}" alt="标的物图${i + 1}" /></figure>`).join('\n');
 	// ct5 竞买须知 (already-rendered HTML)
 	const ct5Html = ((doc as unknown as ParentNode).querySelector('#bd_detail_tab_ct5')?.innerHTML || '').trim();
 	// ct6 联系方式 (already-rendered HTML)

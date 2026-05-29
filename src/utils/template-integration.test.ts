@@ -1,3 +1,6 @@
+// MUST be first import — sets process.env.TZ=UTC before dayjs is loaded
+// transitively by ./shared, otherwise {{date}} renders with host timezone offset.
+import './__test-setup__/freeze-tz';
 import { describe, test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, basename, extname } from 'path';
@@ -10,7 +13,8 @@ import { compileTemplate } from './template-compiler';
 import { createAsyncResolver, createSelectorProcessor } from '../api';
 
 // ---------------------------------------------------------------------------
-// Freeze time so {{date}} is deterministic in expected output
+// Freeze time so {{date}} is deterministic in expected output.
+// Timezone is pinned to UTC by the freeze-tz setup import above.
 // ---------------------------------------------------------------------------
 
 const FROZEN_DATE = new Date('2025-01-15T12:00:00Z');

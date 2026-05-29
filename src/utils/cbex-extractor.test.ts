@@ -44,6 +44,7 @@ import {
   extractStats,
   extractCbexTopFields,
   extractBdwjsHtml,
+  extractTpzslist,
 } from './cbex-extractor';
 import { parseHTML } from 'linkedom';
 
@@ -153,5 +154,32 @@ describe('extractBdwjsHtml', () => {
   it('returns empty string if textarea missing', () => {
     const { document: doc } = parseHTML('<html></html>');
     expect(extractBdwjsHtml(doc)).toBe('');
+  });
+});
+
+describe('extractTpzslist', () => {
+  it('parses tpzslist JSON array', () => {
+    const html = `<html><body><script>
+      var oldtpzs = "/foo.jpg";
+      var tpzslist = ["/editorUpload/file/2025/11/aaa.jpg","/editorUpload/file/2025/11/bbb.jpg"];
+      </script></body></html>`;
+    const { document: doc } = parseHTML(html);
+    expect(extractTpzslist(doc)).toEqual([
+      '/editorUpload/file/2025/11/aaa.jpg',
+      '/editorUpload/file/2025/11/bbb.jpg',
+    ]);
+  });
+
+  it('returns empty array if not found', () => {
+    const { document: doc } = parseHTML('<html></html>');
+    expect(extractTpzslist(doc)).toEqual([]);
+  });
+
+  it('parses real fixture tpzslist (9 images)', () => {
+    const fixture = readFileSync(join(__dirname, 'cbex-extractor.fixture.html'), 'utf-8');
+    const { document: doc } = parseHTML(fixture);
+    const list = extractTpzslist(doc);
+    expect(list.length).toBeGreaterThanOrEqual(9);
+    expect(list[0]).toMatch(/^\/?editorUpload\/file\//);
   });
 });

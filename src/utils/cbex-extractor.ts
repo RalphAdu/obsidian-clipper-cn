@@ -210,6 +210,34 @@ export function extractCbexTopFields(doc: ParentNode): CbexTopFields {
 	};
 }
 
+export function extractTpzslist(doc: ParentNode): string[] {
+	const scripts = Array.from(doc.querySelectorAll('script:not([src])'));
+	const all = scripts.map((s) => s.textContent || '').join('\n');
+
+	// Form 1: `var tpzslist = ["url1","url2",...]` — JSON array of string URLs
+	const mJson = all.match(/\btpzslist\s*=\s*(\[[^\]]*\])/);
+	if (mJson) {
+		try {
+			const parsed = JSON.parse(mJson[1]);
+			if (Array.isArray(parsed)) {
+				return parsed.filter((u): u is string => typeof u === 'string');
+			}
+		} catch {
+			// fall through to form 2
+		}
+	}
+
+	// Form 2: string concatenation — `tpzslist = tpzslist + '<img src="...">'`
+	// Extract all src= values from those concatenation lines
+	const urls: string[] = [];
+	const concatRe = /\btpzslist\s*=\s*tpzslist\s*\+\s*['"][^'"]*<img[^>]+src=['"]([^'"]+)['"]/g;
+	let m: RegExpExecArray | null;
+	while ((m = concatRe.exec(all)) !== null) {
+		urls.push(m[1]);
+	}
+	return urls;
+}
+
 export function extractBdwjsHtml(doc: ParentNode): string {
 	const ta = doc.querySelector('#content_BDWJS') as HTMLTextAreaElement | null;
 	if (!ta) return '';

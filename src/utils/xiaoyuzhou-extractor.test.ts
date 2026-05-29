@@ -479,6 +479,15 @@ describe('extractXiaoyuzhouStructuredContent (integration with fixture)', () => 
     expect(result.wordCount).toBeGreaterThan(100);
   });
 
+  it('published is date-only YYYY-MM-DD (Obsidian Properties date type)', async () => {
+    const result = await extractXiaoyuzhouStructuredContent(doc);
+    // ISO datetime "2025-06-18T07:30:00.000Z" → date-only "2025-06-18"
+    // 让 Obsidian Properties UI 渲染为 MM/DD/YYYY date picker (跟 created 同格式)
+    // 而不是 full ISO datetime input
+    expect(result.published).toBe('2025-06-18');
+    expect(result.published).not.toMatch(/T\d{2}:\d{2}/);
+  });
+
   it('reply preview + totalReplyCount visibility note injected', async () => {
     const result = await extractXiaoyuzhouStructuredContent(doc);
     // 第一条置顶评论是 厚望，含 37 条总回复，2 条 inline preview (闫槿/orzanol)

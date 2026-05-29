@@ -33,12 +33,21 @@ describe('xiaoyuzhou e2e — episode 6850d2ed', () => {
 		expect(clip.markdown).toMatch(/^episodeNumber: E112$/m);
 	});
 
-	it('body has HTML audio player embed at top (not ![](url.m4a) which Obsidian renders broken)', () => {
-		// markdown-post-process converts ![](url.m4a) → <audio controls src="url"></audio>
-		// (Obsidian image-embed only renders image MIME; audio URLs need <audio> tag)
-		expect(clip.markdown).toMatch(/<audio controls src="https:\/\/media\.xyzcdn\.net\/.+\.m4a"><\/audio>/);
+	it('body has HTML audio player embed at top (sticky positioned to survive scroll-out unmount)', () => {
+		// markdown-post-process converts ![](url.m4a) → <audio controls src="url" style="position:sticky..."></audio>
+		// position:sticky keeps player pinned during scroll (Obsidian's virtual
+		// scroller pauses audio when its DOM node unmounts off-screen).
+		expect(clip.markdown).toMatch(/<audio controls src="https:\/\/media\.xyzcdn\.net\/[^"]+\.m4a" style="[^"]*position:sticky[^"]*"><\/audio>/);
 		// Negative assertion: stale `![](.m4a)` form must NOT survive post-process
 		expect(clip.markdown).not.toMatch(/!\[[^\]]*\]\([^)]+\.m4a\)/);
+	});
+
+	it('frontmatter published is date-only (no T..Z timestamp)', () => {
+		// Obsidian Properties UI renders YYYY-MM-DD as date picker (matching `created` field);
+		// full ISO datetime "2025-06-18T07:30:00.000Z" renders as datetime input which
+		// looks visually inconsistent with `created: 2026-05-29`.
+		expect(clip.markdown).toMatch(/^published: 2025-06-18$/m);
+		expect(clip.markdown).not.toMatch(/^published: \d{4}-\d{2}-\d{2}T/m);
 	});
 
 	it('timestamps are markdown links to audio#t=N', () => {

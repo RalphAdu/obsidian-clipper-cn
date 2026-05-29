@@ -57,11 +57,20 @@ function fixFencedCodeBacktickEscapes(markdown: string): string {
 // Pattern matches markdown-on-its-own-line audio image-embed (avoiding inline
 // edge cases) and rewrites to <audio> tag. Site-agnostic but in practice only
 // triggers for xiaoyuzhou which emits .m4a embed at note top.
+//
+// position:sticky keeps the player pinned to viewport top when the user scrolls
+// down to read shownote / comments — otherwise Obsidian's preview-view virtual
+// scroller unmounts off-screen DOM nodes and the audio element gets paused/
+// destroyed mid-playback (verified 2026-05-29 with xiaoyuzhou clip in Reading
+// View — playback halted whenever the embed scrolled out of view).
+// top:0 anchors against the markdown view scroll container; z-index keeps it
+// above heading anchors / callout boxes.
 const AUDIO_IMAGE_EMBED_RE = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+\.(?:m4a|mp3|wav|ogg|webm|flac|3gp|opus|oga))\)$/gm;
+const AUDIO_EMBED_STYLE = 'position:sticky;top:0;z-index:100;width:100%;background:var(--background-primary);padding:4px 0';
 
 function convertAudioImageEmbedToHtml(markdown: string): string {
 	return markdown.replace(AUDIO_IMAGE_EMBED_RE, (_match, url: string) =>
-		`<audio controls src="${url}"></audio>`
+		`<audio controls src="${url}" style="${AUDIO_EMBED_STYLE}"></audio>`
 	);
 }
 

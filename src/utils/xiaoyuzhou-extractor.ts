@@ -355,7 +355,11 @@ export async function extractXiaoyuzhouStructuredContent(
   const podcastName = ld.partOfSeries?.name || '';
   const author = podcastName;
   const description = truncate((ld.description || '').trim(), 200);
-  const published = ld.datePublished || '';
+  // datePublished 是 ISO datetime（"2025-06-18T07:30:00.000Z"），但 Obsidian
+  // Properties UI 把这种 full ISO 渲染成 datetime 输入 (`2025-06-18T07:30:00.000Z`
+  // 整段显示)；而 `created` 等 date-only 字段 (`2026-05-29`) 渲染为美式 `MM/DD/YYYY`
+  // date picker。为了视觉一致截前 10 字符 `YYYY-MM-DD`，Obsidian 自动识别为 date 类型。
+  const published = (ld.datePublished || '').slice(0, 10);
   const image = getMetaContent(doc, 'og:image') || '';
   const site = '小宇宙';
   const source = canonicalizeUrl(url);

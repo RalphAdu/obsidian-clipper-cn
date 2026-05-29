@@ -861,6 +861,11 @@ declare global {
 				if (r?.podcastUrl) fmExtra.push(`podcastUrl: ${r.podcastUrl}`);
 				if (r?.episodeNumber) fmExtra.push(`episodeNumber: ${r.episodeNumber}`);
 			}
+			if (source === 'cbex') {
+				const r = result as any;
+				if (r?.subject_id) fmExtra.push(`subject_id: "${fmEscape(r.subject_id)}"`);
+				if (r?.status) fmExtra.push(`status: "${fmEscape(r.status)}"`);
+			}
 			const obsidianNote = [
 				'---',
 				`title: "${fmTitle}"`,

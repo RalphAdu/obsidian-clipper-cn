@@ -38,6 +38,28 @@ describe('cbex e2e — 522611 (竞价结束 + 成交 + 买受人摇号)', () => 
 	it('contains 成交价', () => {
 		expect(clip.markdown).toContain('成交价');
 	});
+
+	it('frontmatter has start_price / cap_price / deposit', () => {
+		expect(clip.markdown).toMatch(/^start_price: 20000$/m);
+		expect(clip.markdown).toMatch(/^cap_price: 30000$/m);
+		expect(clip.markdown).toMatch(/^deposit: 20000$/m);
+	});
+
+	it('frontmatter has final_price 30000 (成交)', () => {
+		expect(clip.markdown).toMatch(/^final_price: 30000$/m);
+	});
+
+	it('frontmatter has bid_start / signup_end / end_time', () => {
+		expect(clip.markdown).toMatch(/^bid_start: "2025-12-15 08:00"$/m);
+		expect(clip.markdown).toMatch(/^signup_end: "2025-12-12 15:00"$/m);
+		expect(clip.markdown).toMatch(/^end_time: "2025-12-15 16:00:00"$/m);
+	});
+
+	it('frontmatter has bid_count / followers / views (numbers)', () => {
+		expect(clip.markdown).toMatch(/^bid_count: \d+$/m);
+		expect(clip.markdown).toMatch(/^followers: \d+$/m);
+		expect(clip.markdown).toMatch(/^views: \d+$/m);
+	});
 });
 
 describe('cbex e2e — 522884 (竞价结束 + 成交)', () => {
@@ -64,5 +86,23 @@ describe('cbex e2e — 522884 (竞价结束 + 成交)', () => {
 
 	it('contains 成交价', () => {
 		expect(clip.markdown).toContain('成交价');
+	});
+
+	it('frontmatter has start_price / cap_price / deposit', () => {
+		expect(clip.markdown).toMatch(/^start_price: \d+$/m);
+		expect(clip.markdown).toMatch(/^cap_price: \d+$/m);
+		expect(clip.markdown).toMatch(/^deposit: \d+$/m);
+	});
+
+	it('frontmatter has bid_start / signup_end / end_time', () => {
+		expect(clip.markdown).toMatch(/^bid_start: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}"$/m);
+		expect(clip.markdown).toMatch(/^signup_end: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}"$/m);
+		expect(clip.markdown).toMatch(/^end_time: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"$/m);
+	});
+
+	it('frontmatter has bid_count / followers / views', () => {
+		expect(clip.markdown).toMatch(/^bid_count: \d+$/m);
+		expect(clip.markdown).toMatch(/^followers: \d+$/m);
+		expect(clip.markdown).toMatch(/^views: \d+$/m);
 	});
 });

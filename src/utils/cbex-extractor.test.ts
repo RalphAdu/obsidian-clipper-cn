@@ -103,8 +103,8 @@ describe('top-level field extractors', () => {
     expect(extractStatus(doc)).toBe('竞价结束');
   });
 
-  it('extractEndTime composes ymd hm from .time_num span sequence', () => {
-    expect(extractEndTime(doc)).toBe('2025-12-15 16:00');
+  it('extractEndTime composes ymd hms from .time_num span sequence', () => {
+    expect(extractEndTime(doc)).toBe('2025-12-15 16:00:00');
   });
 
   it('extractBidStartTime parses 竞价开始时间：YYYY.MM.DD HH:MM', () => {
@@ -320,6 +320,45 @@ describe('buildCbexFrontmatter', () => {
     expect(yaml).not.toContain('final_price');
     expect(yaml).not.toContain('assess_price');
   });
+
+  it('emits end_time when provided', () => {
+    const yaml = buildCbexFrontmatter({
+      title: 'X',
+      url: 'https://jpxkc.cbex.com/jpxkc/prj/detail/123.html',
+      subject_id: '202501TEST',
+      status: '竞价结束',
+      start_price: 100,
+      cap_price: 200,
+      deposit: 100,
+      bid_start: '2026-01-01 08:00',
+      signup_end: '2025-12-31 15:00',
+      end_time: '2026-01-01 16:00:00',
+      bid_count: 0,
+      followers: 0,
+      views: 5,
+      created: '2026-05-30',
+    });
+    expect(yaml).toMatch(/^end_time: "2026-01-01 16:00:00"$/m);
+  });
+
+  it('omits end_time when undefined', () => {
+    const yaml = buildCbexFrontmatter({
+      title: 'X',
+      url: 'https://jpxkc.cbex.com/jpxkc/prj/detail/123.html',
+      subject_id: '202501TEST',
+      status: '报价中',
+      start_price: 100,
+      cap_price: 200,
+      deposit: 100,
+      bid_start: '2026-01-01 08:00',
+      signup_end: '2025-12-31 15:00',
+      bid_count: 0,
+      followers: 0,
+      views: 5,
+      created: '2026-05-30',
+    });
+    expect(yaml).not.toMatch(/^end_time:/m);
+  });
 });
 
 describe('extractCbexStructuredContent (integration)', () => {
@@ -344,6 +383,13 @@ describe('extractCbexStructuredContent (integration)', () => {
     expect(result.title).toBe('京NC6575别克牌SGM6527AT蓝小型汽车');
     expect(result.subject_id).toBe('202512NC6575');
     expect(result.status).toBe('竞价结束');
+    expect(result.end_time).toBe('2025-12-15 16:00:00');
+    expect(result.bid_start).toBe('2025-12-15 08:00');
+    expect(result.signup_end).toBe('2025-12-12 15:00');
+    expect(result.prices.final_price).toBe(30000);
+    expect(result.prices.start_price).toBe(20000);
+    expect(result.prices.cap_price).toBe(30000);
+    expect(result.stats.bid_count).toBeGreaterThan(0);
     expect(result.site).toBe('cbex');
     expect(result.content).toContain('<h2>关键信息</h2>');
     expect(result.content).toContain('<h2>标的物介绍</h2>');

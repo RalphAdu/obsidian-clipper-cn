@@ -43,6 +43,10 @@ keys/
 # Local Claude Code chat-history exports — never tracked
 .claude/chat-exports/
 
+# cbex/jpxkc 2238 批量 audit artifacts (REPORT.md / markdown 542 张 / step-reports / ids.json)
+# — 同步到 main 持久保留但不进 git（spec 2026-05-30-cbex-jpxkc-batch-audit-2238-design.md §6 STEP 8）
+.claude/cbex-batch-2238/
+
 # Serena MCP local project workspace (config + LSP symbol cache) — never tracked
 .serena/
 

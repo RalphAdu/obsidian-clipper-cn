@@ -17,7 +17,7 @@ import { extractScysStructuredContent, isScysCourseUrl, isScysDocxUrl, isScysArt
 import { extractZsxqStructuredContent, isZsxqTopicUrl, isZsxqArticleUrl, isZsxqArticlesHtmlUrl } from './utils/zsxq-extractor';
 import { extractDocsQQContent, isDocsQQDocUrl, parseDocsQQUrl } from './utils/docs-qq-extractor';
 import { extractXiaoyuzhouStructuredContent, isXiaoyuzhouEpisodeUrl } from './utils/xiaoyuzhou-extractor';
-import { extractCbexStructuredContent, isCbexPrjDetailUrl } from './utils/cbex-extractor';
+import { extractCbexStructuredContent, isCbexPrjDetailUrl, buildCbexFrontmatter } from './utils/cbex-extractor';
 import {
 	extractWeChatPublishedFromDocument,
 	normalizePreBlockLineBreaks,
@@ -825,9 +825,9 @@ declare global {
 				contentHtml: content,
 				url: document.URL,
 				fullHtml: '',
-				description: '',
+				description: (result as any)?.description || '',
 				favicon: '',
-				image: '',
+				image: (result as any)?.image || '',
 				published: (result as any)?.published || '',
 				site: source === 'scys' ? 'Scys' : source === 'feishu' ? 'Feishu' : source === 'zsxq' ? 'ZSXQ' : source === 'docsqq' ? 'DocsQQ' : source === 'xiaoyuzhou' ? '小宇宙' : source === 'cbex' ? 'cbex' : '',
 				language: '',
@@ -863,8 +863,47 @@ declare global {
 			}
 			if (source === 'cbex') {
 				const r = result as any;
-				if (r?.subject_id) fmExtra.push(`subject_id: "${fmEscape(r.subject_id)}"`);
-				if (r?.status) fmExtra.push(`status: "${fmEscape(r.status)}"`);
+				// Use buildCbexFrontmatter for the full cbex frontmatter (start_price,
+				// cap_price, deposit, bid_start, signup_end, end_time, bid_count,
+				// followers, views, etc.). Strip the wrapping --- and the title/url/
+				// source/created lines we already emit above; keep only the cbex-
+				// specific extras. See spec §9.2 for context.
+				const fullCbexYaml = buildCbexFrontmatter({
+					title: r?.title || '',
+					url: document.URL,
+					subject_id: r?.subject_id || '',
+					status: r?.status || '',
+					final_price: r?.prices?.final_price,
+					start_price: r?.prices?.start_price,
+					assess_price: r?.prices?.assess_price,
+					cap_price: r?.prices?.cap_price,
+					deposit: r?.prices?.deposit,
+					bid_start: r?.bid_start || r?.published || '',
+					signup_end: r?.signup_end || '',
+					end_time: r?.end_time,
+					bid_count: r?.stats?.bid_count || 0,
+					followers: r?.stats?.followers || 0,
+					views: r?.stats?.views || 0,
+					created: today,
+				});
+				// fullCbexYaml looks like "---\ntitle: ...\nurl: ...\nsource: cbex\n
+				// subject_id: ...\n...\ncreated: ...\n---\n"
+				// Extract only the lines we want as fmExtra (cbex-specific):
+				// subject_id, status, final_price, start_price, assess_price,
+				// cap_price, deposit, bid_start, signup_end, end_time, bid_count,
+				// followers, views. Skip title/url/source/created (already in
+				// outer obsidianNote template above).
+				const innerLines = fullCbexYaml
+					.replace(/^---\n/, '')
+					.replace(/\n---\n?$/, '')
+					.split('\n')
+					.filter((line) =>
+						!line.startsWith('title:')
+						&& !line.startsWith('url:')
+						&& !line.startsWith('source:')
+						&& !line.startsWith('created:'),
+					);
+				fmExtra.push(...innerLines);
 			}
 			const obsidianNote = [
 				'---',

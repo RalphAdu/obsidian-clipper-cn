@@ -110,9 +110,9 @@ export function extractStatus(doc: ParentNode): string {
 export function extractEndTime(doc: ParentNode): string {
 	const nums = Array.from(doc.querySelectorAll('.bd_detail_state_over .time_num'))
 		.map((el) => (el.textContent || '').trim());
-	if (nums.length < 5) return '';
-	const [y, mo, d, h, mi] = nums;
-	return `${y}-${pad(mo)}-${pad(d)} ${pad(h)}:${pad(mi)}`;
+	if (nums.length < 6) return '';
+	const [y, mo, d, h, mi, s] = nums;
+	return `${y}-${pad(mo)}-${pad(d)} ${pad(h)}:${pad(mi)}:${pad(s)}`;
 }
 
 export function extractBidStartTime(doc: ParentNode): string {
@@ -307,6 +307,7 @@ export interface CbexFrontmatterInput {
 	final_price?: number;
 	bid_start: string;
 	signup_end: string;
+	end_time?: string;
 	bid_count: number;
 	followers: number;
 	views: number;
@@ -331,6 +332,7 @@ export function buildCbexFrontmatter(input: CbexFrontmatterInput): string {
 	if (input.deposit !== undefined) lines.push(`deposit: ${input.deposit}`);
 	lines.push(`bid_start: ${yamlEscape(input.bid_start)}`);
 	lines.push(`signup_end: ${yamlEscape(input.signup_end)}`);
+	if (input.end_time) lines.push(`end_time: ${yamlEscape(input.end_time)}`);
 	lines.push(`bid_count: ${input.bid_count}`);
 	lines.push(`followers: ${input.followers}`);
 	lines.push(`views: ${input.views}`);
@@ -354,6 +356,11 @@ export interface CbexStructuredContent {
 	wordCount: number;     // content.length
 
 	// Proprietary fields (extractedContent dict for template engine)
+	end_time: string;      // YYYY-MM-DD HH:mm:ss from .bd_detail_state_over .time_num
+	bid_start: string;
+	signup_end: string;
+	prices: CbexPrices;
+	stats: CbexStats;
 	subject_id: string;
 	status: string;
 }
@@ -381,9 +388,21 @@ export async function extractCbexStructuredContent(
 
 	const [ggnrRaw, wtListRaw, jjjgRaw] = await Promise.all([
 		safeFetch('/page/jpxkc/prj/ggnr', `BDID=${params.bdid}`),
-		safeFetch('/page/jpxkc/prj/wtListPaging', `cpdm=${parsed.prjId}&zgxj=${params.zgxj}&type=all`),
+		// pageSize=10000 to capture ALL bid records (default would paginate at 10
+		// rows, yielding wrong tr-count for high-bid auctions like 522611's 265 bids).
+		safeFetch('/page/jpxkc/prj/wtListPaging', `cpdm=${parsed.prjId}&zgxj=${params.zgxj}&type=all&pageNo=1&pageSize=10000`),
 		safeFetch('/page/jpxkc/prj/jjjgListPaging', `id=${parsed.prjId}&jjcc=${params.jjcc}&pageNo=1&pageSize=10`),
 	]);
+
+	// Override bid_count from wtList data row count.
+	// `.jp_detail_bjnum span` is 最高限价报价人数 (cap-price bidders), NOT total
+	// bid count. wtList HTML structure: 1 <tr> header (with <th>) + N <tr> data
+	// rows (with <td>). Subtract 1 from total tr count to get true bid count.
+	const wtTrCount = wtListRaw ? (wtListRaw.match(/<tr/gi) || []).length : 0;
+	const wtDataRowCount = Math.max(0, wtTrCount - 1);
+	if (wtDataRowCount > 0) {
+		top.stats.bid_count = wtDataRowCount;
+	}
 
 	const baseUrl = new URL(url).origin;
 
@@ -418,10 +437,12 @@ export async function extractCbexStructuredContent(
 	const parts: string[] = [`<h1>${escapeHtml(top.title)}</h1>`, '<h2>关键信息</h2>', keyInfoHtml];
 	if (ct1Html) parts.push('<h2>标的物介绍</h2>', ct1Html);
 	if (ct2Html) parts.push('<h2>图片展示</h2>', ct2Html);
-	if (ggnrRaw) parts.push('<h2>司法处置公告</h2>', ggnrRaw);
+	const ggnrHasContent = ggnrRaw && ggnrRaw.replace(/<[^>]+>/g, '').trim().length >= 50;
+	const jjjgHasContent = jjjgRaw && jjjgRaw.replace(/<[^>]+>/g, '').trim().length >= 50;
+	if (ggnrHasContent) parts.push('<h2>司法处置公告</h2>', ggnrRaw);
 	if (ct5Html) parts.push('<h2>竞买须知</h2>', ct5Html);
-	if (wtListRaw) parts.push('<h2>竞价记录</h2>', wtListRaw);
-	if (jjjgRaw) parts.push('<h2>竞价结果</h2>', jjjgRaw);
+	if (wtDataRowCount > 0) parts.push('<h2>竞价记录</h2>', wtListRaw);
+	if (jjjgHasContent) parts.push('<h2>竞价结果</h2>', jjjgRaw);
 	if (ct6Html) parts.push('<h2>联系方式</h2>', ct6Html);
 	const body = parts.join('\n');
 
@@ -435,6 +456,11 @@ export async function extractCbexStructuredContent(
 		source: url,
 		content: body,
 		wordCount: body.length,
+		end_time: top.end_time,
+		bid_start: top.bid_start,
+		signup_end: top.signup_end,
+		prices: top.prices,
+		stats: top.stats,
 		subject_id: top.subject_id,
 		status: top.status,
 	};

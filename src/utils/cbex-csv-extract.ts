@@ -147,21 +147,21 @@ function extractGonggao(body: string): string {
 	return '';
 }
 
-/** spec §4.3 违章 3 字段 — 京内+京外求和，容错短形态 */
+/** spec §4.3 违章 3 字段 — 京内+京外求和，容错短形态 + 空格/紧邻无分隔 */
 export function extract违章(text: string): { 次数: number; 扣分: number; 罚款: number } {
 	const stripped = text.replace(/[\s ]/g, '');
 	let 次数 = 0, 扣分 = 0, 罚款 = 0;
-	// 标准三元组 X 起 Y 分 Z 元
-	for (const m of stripped.matchAll(/(\d+)起[，,](\d+)分[，,](\d+)元/g)) {
+	// 标准三元组 X 起 Y 分 Z 元 (接受 [，,] 可选 — 522432 用空格分隔 / 522613 紧邻无分隔)
+	for (const m of stripped.matchAll(/(\d+)起[，,]?(\d+)分[，,]?(\d+)元/g)) {
 		次数 += +m[1]; 扣分 += +m[2]; 罚款 += +m[3];
 	}
 	// 短形态 X 起 Z 元（缺扣分）：只在三元组之外的部分匹配
-	const noTriple = stripped.replace(/\d+起[，,]\d+分[，,]\d+元[；;]?/g, '');
-	for (const m of noTriple.matchAll(/(\d+)起[，,](\d+)元/g)) {
+	const noTriple = stripped.replace(/\d+起[，,]?\d+分[，,]?\d+元[；;]?/g, '');
+	for (const m of noTriple.matchAll(/(\d+)起[，,]?(\d+)元/g)) {
 		次数 += +m[1]; 罚款 += +m[2];
 	}
 	// 只剩 X 起（京外纯次数）
-	const onlyQi = noTriple.replace(/\d+起[，,]\d+元[；;]?/g, '');
+	const onlyQi = noTriple.replace(/\d+起[，,]?\d+元[；;]?/g, '');
 	for (const m of onlyQi.matchAll(/(\d+)起[；;]/g)) {
 		次数 += +m[1];
 	}
@@ -206,7 +206,8 @@ export function clusterFeesByTotalMarker(text: string): number[] {
 	const fees = Array.from(text.matchAll(/(\d+(?:\.\d+)?)\s*元/g))
 		.map((m) => ({ value: +m[1], offset: m.index! }));
 	const totalMarkers = Array.from(
-		text.matchAll(/(?:车辆的费用)?(?:共|合|总)计(?:约)?\s*(\d+(?:\.\d+)?)\s*元/g)
+		// 接受 "共计X元" / "共计约X元" / "合计X元" / "总计X元" / "车辆的费用共计X元" / "合计费用：X元"（523009）
+		text.matchAll(/(?:车辆的费用)?(?:共|合|总)计(?:约|费用)?[：:]?\s*(\d+(?:\.\d+)?)\s*元/g)
 	).map((m) => ({ value: +m[1], offset: m.index! }));
 
 	const grouped = new Set<number>();
@@ -240,12 +241,21 @@ export function clusterFeesByTotalMarker(text: string): number[] {
 	return reps;
 }
 
-/** spec §4.5 STEP 3 — 提取 "停车、维修等费用：" 整段，到下一个编号节为止 */
+/** spec §4.5 STEP 3 — 提取 "停车、维修等费用：" 整段，到下一个编号节为止
+ * 终止 lookahead 改严格为 `\s*5、` 段标（而非 `\d+、`），避免错命中分项内 "4160、" 数字逗号。
+ * 起始 alt label：标准 "停车、维修等费用：" 或 4 段直接列分项 "停车 X 元、维修费"（523009 无完整 label 形态）。
+ */
 export function extract停车维修费用Block(cleaned: string): string {
+	// Variant A: 标准 "停车、维修等费用：" label
 	const m = cleaned.match(
-		/(?:\d+、)?停车[、，]?维修[^：:]{0,8}[：:][\s\S]*?(?=\d+、|其他瑕疵披露|拟提供的文件|备注|$)/
+		/(?:\d+、)?\s*停车[、，]?\s*维修[^：:]{0,8}[：:][\s\S]*?(?=\s*5、|其他瑕疵披露|拟提供的文件|预展方式|备注|$)/
 	);
-	return m ? m[0] : '';
+	if (m) return m[0];
+	// Variant B: 4 段直接列分项 "4、 停车 X 元、维修费 Y 元、..."（无完整 label，523009 形态）
+	const m2 = cleaned.match(
+		/\d+、\s*停车\s*\d+\s*元[、，][\s\S]*?(?=\s*5、|其他瑕疵披露|拟提供的文件|预展方式|备注|$)/
+	);
+	return m2 ? m2[0] : '';
 }
 
 /** spec §4.5 — 4 费用字段：违章罚款 / 停车维修费 / 配钥匙费 / 其他费用 */
@@ -253,10 +263,12 @@ export function extract费用(权利限制Text: string): {
 	违章罚款: number; 停车维修费: number; 配钥匙费: number; 其他费用: number;
 } {
 	// STEP 1: 排除非费用片段（日费率 + 违章起数段）
+	// 违章 X 起 [Y 分] Z 元 — 接受 [，,] 可选 (空格/紧邻无分隔；522432/522613 形态)
 	const cleaned = 权利限制Text
 		.replace(/(?:每天|24\s*小时|\d+\s*小时)\s*\d+(?:\.\d+)?\s*元/g, '')
 		.replace(/\d+(?:\.\d+)?\s*元\s*\/\s*(?:天|小时)/g, '')
-		.replace(/\d+\s*起[，,][^；;]*?元/g, '');
+		.replace(/\d+\s*起[\s，,]*\d+\s*分[\s，,]*\d+\s*元/g, '')
+		.replace(/\d+\s*起[\s，,]*\d+\s*元/g, '');
 
 	// STEP 2: 违章罚款（用原文，不用 cleaned，避免 replace 误删）
 	const { 罚款: 违章罚款 } = extract违章(权利限制Text);
@@ -273,7 +285,9 @@ export function extract费用(权利限制Text: string): {
 	else if (m2) 配钥匙费 = +m2[1];
 
 	// STEP 5: 其他费用 = cleaned 内 feeBlock 之外的总价 - 配钥匙费
-	const restText = cleaned
+	// 截断 "5、" 后段（5 段「其他瑕疵披露」内复述费用不算其他费用，避免 522392/393 双计同笔费用）
+	const before5 = cleaned.split(/\s*5、/)[0];
+	const restText = before5
 		.replace(feeBlock, '')
 		.replace(/配钥匙费用?\s*[：:]?\s*\d+(?:\.\d+)?\s*元/g, '')
 		.replace(/配钥匙的相关费用为\s*\d+(?:\.\d+)?\s*元/g, '');
